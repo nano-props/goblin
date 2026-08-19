@@ -42,7 +42,7 @@ describe('getRemotes', () => {
     gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
       if (args[0] === 'remote' && args.length === 1) return 'origin\n'
       if (args[0] === 'remote' && args[1] === 'get-url') {
-        return args.includes('--push') ? 'https://example.test/repo.git\n' : 'https://example.test/repo.git\n'
+        return args.includes('--push') ? 'https://example.test/repo.git' : 'https://example.test/repo.git'
       }
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
@@ -52,6 +52,24 @@ describe('getRemotes', () => {
         name: 'origin',
         fetchUrl: 'https://example.test/repo.git',
         pushUrl: 'https://example.test/repo.git',
+      },
+    ])
+  })
+
+  test('preserves whitespace in machine-oriented remote URLs', async () => {
+    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin\n'
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return args.includes('--push') ? '/tmp/push\npath ' : '/tmp/fetch path '
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(getRemotes('/tmp/repo')).resolves.toEqual([
+      {
+        name: 'origin',
+        fetchUrl: '/tmp/fetch path ',
+        pushUrl: '/tmp/push\npath ',
       },
     ])
   })

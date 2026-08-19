@@ -43,7 +43,11 @@ async function probeGitAvailable(): Promise<GitAvailability> {
  * or abort. Wraps execa so all git invocations share timeout, buffering
  * and cancellation behavior.
  */
-export async function git(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
+export async function git(
+  cwd: string,
+  args: string[],
+  opts?: GitOptions & { preserveTrailingWhitespace?: boolean },
+): Promise<string> {
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS
   let cancellationObserved = opts?.signal?.aborted ?? false
   const observeCancellation = () => {
@@ -59,7 +63,7 @@ export async function git(cwd: string, args: string[], opts?: GitOptions): Promi
       // Some repos can produce large outputs (log, for-each-ref). 10MB headroom.
       maxBuffer: 10 * 1024 * 1024,
     })
-    return stdout.trimEnd()
+    return opts?.preserveTrailingWhitespace ? stdout : stdout.trimEnd()
   } catch (error) {
     if (cancellationObserved || isProcessCancellation(error)) throw new OperationCancelledError()
     throw error

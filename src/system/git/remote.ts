@@ -109,16 +109,17 @@ export function parseRemoteUrls(output: string): GitRemoteInfo[] {
 
 export async function getRemotes(cwd: string, signal?: AbortSignal): Promise<GitRemoteInfo[]> {
   const names = nonEmptyLines(await git(cwd, ['remote'], { signal }))
+  // This boundary intentionally starts two reads per configured remote. Remote
+  // configuration is user-owned and normally small; if it becomes an
+  // untrusted or bulk-generated input, add bounded admission here.
   return await Promise.all(
     names.map(async (name) => {
       const [fetchOutput, pushOutput] = await Promise.all([
-        git(cwd, ['remote', 'get-url', '--', name], { signal }),
-        git(cwd, ['remote', 'get-url', '--push', '--', name], { signal }),
+        git(cwd, ['remote', 'get-url', '--', name], { signal, preserveTrailingWhitespace: true }),
+        git(cwd, ['remote', 'get-url', '--push', '--', name], { signal, preserveTrailingWhitespace: true }),
       ])
-      const fetchUrl = nonEmptyLines(fetchOutput)[0] ?? null
-      const pushUrl = nonEmptyLines(pushOutput)[0] ?? null
-      if (!fetchUrl || !pushUrl) throw new Error('Incomplete remote output')
-      return { name, fetchUrl, pushUrl }
+      if (!fetchOutput || !pushOutput) throw new Error('Incomplete remote output')
+      return { name, fetchUrl: fetchOutput, pushUrl: pushOutput }
     }),
   )
 }
