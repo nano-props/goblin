@@ -196,6 +196,10 @@ export interface LogEntry {
 
 export const DEFAULT_REPOSITORY_LOG_COUNT = 100
 
+/**
+ * Single-URL projection using the first value from `git remote get-url` or
+ * `git remote get-url --push`. A push still targets every configured push URL.
+ */
 export interface GitRemoteInfo {
   name: string
   fetchUrl: string

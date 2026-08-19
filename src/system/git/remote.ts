@@ -1,4 +1,10 @@
-import { git, gitCommandResultWithOptions, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
+import {
+  git,
+  gitCommandResultWithOptions,
+  gitResultWithOptions,
+  gitScalar,
+  NETWORK_TIMEOUT_MS,
+} from '#/system/git/git-exec.ts'
 import { commandMayHaveRun, withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
 import {
   GIT_OBJECT_ID_OR_PREFIX_RE,
@@ -91,30 +97,44 @@ async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Pro
   }
 }
 
-export function parseRemoteVerbose(output: string): GitRemoteInfo[] {
-  const lines = output.split('\n').filter((line) => line.trim().length > 0)
-  const remotes = new Map<string, { name: string; fetchUrl?: string; pushUrl?: string }>()
-  for (const line of lines) {
-    const match = line.match(REMOTE_VERBOSE_LINE_RE)
-    if (!match) throw new Error('Invalid remote output')
-    const name = match[1]!
-    const remote = remotes.get(name) ?? { name }
-    if (match[3] === 'fetch') remote.fetchUrl = match[2]!
-    else remote.pushUrl = match[2]!
-    remotes.set(name, remote)
+/** Parses NUL-delimited name/fetch URL/push URL records emitted by the SSH Git adapter. */
+export function parseRemoteUrls(output: string): GitRemoteInfo[] {
+  if (output.length === 0) return []
+  const fields = output.split('\0')
+  if (fields.pop() !== '' || fields.length % 3 !== 0) throw new Error('Invalid remote output')
+  const remotes: GitRemoteInfo[] = []
+  for (let index = 0; index < fields.length; index += 3) {
+    const name = fields[index]
+    const fetchUrl = fields[index + 1]
+    const pushUrl = fields[index + 2]
+    if (!name || !fetchUrl || !pushUrl) throw new Error('Invalid remote output')
+    remotes.push({ name: name!, fetchUrl: fetchUrl!, pushUrl: pushUrl! })
   }
-  const result: GitRemoteInfo[] = []
-  for (const remote of remotes.values()) {
-    if (!remote.fetchUrl || !remote.pushUrl) throw new Error('Incomplete remote output')
-    result.push({ name: remote.name, fetchUrl: remote.fetchUrl, pushUrl: remote.pushUrl })
-  }
-  return result
+  return remotes
 }
 
-const REMOTE_VERBOSE_LINE_RE = /^(\S+)\s+(.+?)\s+\((fetch|push)\)$/
-
 export async function getRemotes(cwd: string, signal?: AbortSignal): Promise<GitRemoteInfo[]> {
-  return parseRemoteVerbose(await git(cwd, ['remote', '-v'], { signal }))
+  const names = nonEmptyLines(await git(cwd, ['remote'], { signal }))
+  // This boundary intentionally starts two reads per configured remote. Remote
+  // configuration is user-owned and normally small; if it becomes an
+  // untrusted or bulk-generated input, add bounded admission here.
+  return await Promise.all(
+    names.map(async (name) => {
+      const [fetchUrl, pushUrl] = await Promise.all([
+        gitScalar(cwd, ['remote', 'get-url', '--', name], { signal }),
+        gitScalar(cwd, ['remote', 'get-url', '--push', '--', name], { signal }),
+      ])
+      if (!fetchUrl || !pushUrl) throw new Error('Incomplete remote output')
+      return { name, fetchUrl, pushUrl }
+    }),
+  )
+}
+
+function nonEmptyLines(output: string): string[] {
+  return output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
 }
 
 export function pickPreferredRemote<T extends { name: string }>(

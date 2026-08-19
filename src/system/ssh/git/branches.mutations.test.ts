@@ -46,7 +46,7 @@ describe('remote Git branch mutations', () => {
             return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitStatus':
             return okRemoteResult('')
-          case 'gitRemoteVerbose':
+          case 'gitRemotes':
             return okRemoteResult('')
           case 'gitIsAncestor':
             return okRemoteResult(command.descendant === 'release/1.0' ? 'true' : 'false')
@@ -133,7 +133,7 @@ describe('remote Git branch mutations', () => {
           return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
-        case 'gitRemoteVerbose':
+        case 'gitRemotes':
           return okRemoteResult('')
         default:
           return okRemoteResult('')

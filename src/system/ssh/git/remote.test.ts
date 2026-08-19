@@ -15,14 +15,12 @@ describe('remote Git repository network operations', () => {
   test('pushRemoteBranch prefers the configured upstream remote and branch', async () => {
     const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       switch (command.type) {
-        case 'gitRemoteVerbose':
+        case 'gitRemotes':
           return okRemoteResult(
             [
-              'origin\tgit@github.com:acme/project.git (fetch)',
-              'origin\tgit@github.com:acme/project.git (push)',
-              'fork\tgit@github.com:alice/project.git (fetch)',
-              'fork\tgit@github.com:alice/project.git (push)',
-            ].join('\n'),
+              'origin\0git@github.com:acme/project.git\0git@github.com:acme/project.git\0',
+              'fork\0git@github.com:alice/project.git\0git@github.com:alice/project.git\0',
+            ].join(''),
           )
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('fork', 'topic/feature-test'))
@@ -53,10 +51,8 @@ describe('remote Git repository network operations', () => {
   test('pushRemoteBranch falls back to origin and sets upstream when no upstream is configured', async () => {
     const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       switch (command.type) {
-        case 'gitRemoteVerbose':
-          return okRemoteResult(
-            'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
-          )
+        case 'gitRemotes':
+          return okRemoteResult('origin\0git@github.com:acme/project.git\0git@github.com:acme/project.git\0')
         case 'gitUpstream':
           return okRemoteResult(NUL.repeat(3))
         case 'gitPush':
@@ -97,14 +93,12 @@ describe('remote Git repository network operations', () => {
               '',
             ].join('\n'),
           )
-        case 'gitRemoteVerbose':
+        case 'gitRemotes':
           return okRemoteResult(
             [
-              'origin\tgit@github.com:acme/project.git (fetch)',
-              'origin\tgit@github.com:acme/project.git (push)',
-              'fork\tgit@github.com:alice/project.git (fetch)',
-              'fork\tgit@github.com:alice/project.git (push)',
-            ].join('\n'),
+              'origin\0git@github.com:acme/project.git\0git@github.com:acme/project.git\0',
+              'fork\0git@github.com:alice/project.git\0git@github.com:alice/project.git\0',
+            ].join(''),
           )
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('fork', 'feature/test'))
@@ -124,7 +118,7 @@ describe('remote Git repository network operations', () => {
     })
   })
 
-  test.each(['gitSnapshot', 'gitRemoteVerbose', 'gitUpstream'] as const)(
+  test.each(['gitSnapshot', 'gitRemotes', 'gitUpstream'] as const)(
     'fetchRemoteRepo rejects when authoritative %s discovery fails',
     async (failedCommand) => {
       const run = vi.fn<RemoteCommandRunner>(async (command) => {
@@ -132,10 +126,8 @@ describe('remote Git repository network operations', () => {
         if (command.type === 'gitSnapshot') {
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         }
-        if (command.type === 'gitRemoteVerbose') {
-          return okRemoteResult(
-            'origin\tgit@example.test:project.git (fetch)\norigin\tgit@example.test:project.git (push)',
-          )
+        if (command.type === 'gitRemotes') {
+          return okRemoteResult('origin\0git@example.test:project.git\0git@example.test:project.git\0')
         }
         return okRemoteResult('')
       })
@@ -164,10 +156,8 @@ describe('remote Git repository network operations', () => {
     'pushRemoteBranch rejects malformed upstream authority',
     async (upstreamOutput) => {
       const run = vi.fn<RemoteCommandRunner>(async (command) => {
-        if (command.type === 'gitRemoteVerbose') {
-          return okRemoteResult(
-            'origin\tgit@example.test:project.git (fetch)\norigin\tgit@example.test:project.git (push)',
-          )
+        if (command.type === 'gitRemotes') {
+          return okRemoteResult('origin\0git@example.test:project.git\0git@example.test:project.git\0')
         }
         return command.type === 'gitUpstream' ? okRemoteResult(upstreamOutput) : okRemoteResult('')
       })
@@ -180,10 +170,8 @@ describe('remote Git repository network operations', () => {
   test('getRemoteTrackingBranches filters */HEAD from valid refs', async () => {
     const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
-        case 'gitRemoteVerbose':
-          return okRemoteResult(
-            'origin\thttps://example.test/repo.git (fetch)\norigin\thttps://example.test/repo.git (push)',
-          )
+        case 'gitRemotes':
+          return okRemoteResult('origin\0https://example.test/repo.git\0https://example.test/repo.git\0')
         case 'gitRemoteFetchSpecs':
           return okRemoteResult('+refs/heads/*:refs/remotes/origin/*')
         case 'gitRemoteBranches':
@@ -210,8 +198,8 @@ describe('remote Git repository network operations', () => {
 
   test('getRemoteTrackingBranches rejects malformed authoritative output', async () => {
     const run = vi.fn<RemoteCommandRunner>(async (command) =>
-      command.type === 'gitRemoteVerbose'
-        ? okRemoteResult('origin\thttps://example.test/repo.git (fetch)\norigin\thttps://example.test/repo.git (push)')
+      command.type === 'gitRemotes'
+        ? okRemoteResult('origin\0https://example.test/repo.git\0https://example.test/repo.git\0')
         : okRemoteResult('refs/remotes/origin/main\ntruncated-ref'),
     )
     await expect(getRemoteTrackingBranches(TARGET, { run })).rejects.toThrow('error.failed-read-repo')

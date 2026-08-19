@@ -1,7 +1,7 @@
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import {
   getRepoUrlForRemotes,
-  parseRemoteVerbose,
+  parseRemoteUrls,
   repoRemoteInfoForRemotes,
   resolveFetchRemoteForRemotes,
   resolvePushTargetForRemotes,
@@ -154,13 +154,13 @@ export async function getRemoteRemotes(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteCommandRunner },
 ): Promise<GitRemoteInfo[]> {
-  const result = await options.run({ type: 'gitRemoteVerbose', path: target.remotePath }, target, {
+  const result = await options.run({ type: 'gitRemotes', path: target.remotePath }, target, {
     signal: options.signal,
   })
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   try {
-    return parseRemoteVerbose(result.stdout)
+    return parseRemoteUrls(result.stdout)
   } catch {
     throw new Error('error.failed-read-repo')
   }

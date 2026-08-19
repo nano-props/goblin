@@ -14,6 +14,7 @@ import {
 import { REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS } from '#/system/ssh/worktree-bootstrap-protocol.ts'
 import { loadRemoteWorktreeBootstrapScript } from '#/system/ssh/remote-worktree-bootstrap-script.ts'
 import { remoteGitOperationStateScript } from '#/system/ssh/remote-git-operation-state-script.ts'
+import { remoteGitRemotesScript } from '#/system/ssh/remote-git-remotes-script.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
 /** Boot-probe timeout for the placeholder-tab hydrate path. Shorter than
@@ -68,7 +69,7 @@ export type RemoteCommandKind =
   | { type: 'gitBranchDelete'; path: string; branch: string; force?: boolean }
   | { type: 'gitUpstream'; path: string; branch: string }
   | { type: 'gitIsAncestor'; path: string; ancestor: string; descendant: string }
-  | { type: 'gitRemoteVerbose'; path: string }
+  | { type: 'gitRemotes'; path: string }
   | { type: 'readRemoteFile'; path: string }
   | {
       type: 'bootstrapRemoteWorktree'
@@ -462,8 +463,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
         'goblin_status=$?',
         `if [ "$goblin_status" -eq 0 ]; then printf 'true\\n'; elif [ "$goblin_status" -eq 1 ]; then printf 'false\\n'; else exit "$goblin_status"; fi`,
       ].join('\n')
-    case 'gitRemoteVerbose':
-      return `git -C ${shellQuote(command.path)} remote -v`
+    case 'gitRemotes':
+      return remoteGitRemotesScript(command.path)
     case 'readRemoteFile':
       return [
         `if [ ! -e ${shellQuote(command.path)} ] && [ ! -L ${shellQuote(command.path)} ]; then exit 0; fi`,

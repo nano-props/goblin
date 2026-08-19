@@ -51,10 +51,8 @@ describe('remote Git snapshot', () => {
           )
         case 'gitStatus':
           throw new Error('snapshot must not read status')
-        case 'gitRemoteVerbose':
-          return okRemoteResult(
-            'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)',
-          )
+        case 'gitRemotes':
+          return okRemoteResult('origin\0git@gitlab.com:acme/project.git\0git@gitlab.com:acme/project.git\0')
         case 'gitOperationState':
           return okRemoteResult('operation none\nmaterialized-branch main\n')
         default:
@@ -575,14 +573,14 @@ describe('remote Git snapshot', () => {
 
   test.each([
     'truncated remote output',
-    'origin\tgit@example.test:project.git (fetch)',
-    'origin\tgit@example.test:project.git (fetch)\ntruncated remote output',
+    'origin\0git@example.test:project.git\0',
+    'origin\0git@example.test:project.git\0git@example.test:project.git\0extra\0',
   ])('rejects malformed authoritative remote output', async (remoteOutput) => {
     const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'gitSnapshot') {
         return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
       }
-      if (command.type === 'gitRemoteVerbose') return okRemoteResult(remoteOutput)
+      if (command.type === 'gitRemotes') return okRemoteResult(remoteOutput)
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitOperationState') return okRemoteResult('operation none\nmaterialized-branch main\n')
@@ -592,7 +590,7 @@ describe('remote Git snapshot', () => {
     await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
-  test.each(['gitWorktreeList', 'gitRemoteVerbose'] as const)(
+  test.each(['gitWorktreeList', 'gitRemotes'] as const)(
     'rejects an authoritative remote snapshot when %s fails',
     async (failedCommand) => {
       const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {

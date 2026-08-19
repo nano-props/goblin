@@ -18,7 +18,7 @@ describe('remote Git mutation admission', () => {
       const run = vi.fn<RemoteCommandRunner>(async (command) => {
         if (command.type === 'gitSnapshot') return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         if (command.type === 'gitUpstream') return okRemoteResult(upstreamOutput('origin', 'feature/test'))
-        if (command.type === 'gitRemoteVerbose') return failRemoteResult('remote discovery failed')
+        if (command.type === 'gitRemotes') return failRemoteResult('remote discovery failed')
         if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
         return okRemoteResult('')
       })

@@ -4,8 +4,9 @@ import {
   commitUrlForBrowserRemote,
   fetchAll,
   getBrowserRepoUrl,
+  getRemotes,
   getRepoUrlForRemotes,
-  parseRemoteVerbose,
+  parseRemoteUrls,
   resolveFetchRemoteForRemotes,
   resolvePushTargetForRemotes,
   pullBranch,
@@ -14,14 +15,19 @@ import type { BrowserRemoteProvider, GitRemoteInfo } from '#/shared/git-types.ts
 import type * as GitExecModule from '#/system/git/git-exec.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 
-const gitMock = vi.hoisted(() => vi.fn())
+const gitResponseMock = vi.hoisted(() => vi.fn())
+const gitScalarCallMock = vi.hoisted(() => vi.fn())
 const gitCommandResultWithOptionsMock = vi.hoisted(() => vi.fn())
 
 vi.mock('#/system/git/git-exec.ts', async () => {
   const actual = await vi.importActual<typeof GitExecModule>('#/system/git/git-exec.ts')
   return {
     ...actual,
-    git: vi.fn((cwd: string, args: string[], options?: unknown) => gitMock(cwd, args, options)),
+    git: vi.fn((cwd: string, args: string[], options?: unknown) => gitResponseMock(cwd, args, options)),
+    gitScalar: vi.fn((cwd: string, args: string[], options?: unknown) => {
+      gitScalarCallMock(cwd, args, options)
+      return gitResponseMock(cwd, args, options)
+    }),
     gitCommandResultWithOptions: vi.fn((cwd: string, options: unknown, ...args: string[]) =>
       gitCommandResultWithOptionsMock(cwd, options, ...args),
     ),
@@ -36,64 +42,85 @@ function browserRemote(url: string, provider: BrowserRemoteProvider) {
   return { url, provider }
 }
 
-describe('parseRemoteVerbose', () => {
-  test('parses complete remotes in first-seen order and retains distinct fetch and push URLs', () => {
+describe('getRemotes', () => {
+  test('reads machine-oriented remote URLs without parsing display annotations', async () => {
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin\n'
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return args.includes('--push') ? 'https://example.test/repo.git' : 'https://example.test/repo.git'
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(getRemotes('/tmp/repo')).resolves.toEqual([
+      {
+        name: 'origin',
+        fetchUrl: 'https://example.test/repo.git',
+        pushUrl: 'https://example.test/repo.git',
+      },
+    ])
+    expect(gitScalarCallMock).toHaveBeenCalledTimes(2)
+    expect(gitScalarCallMock).toHaveBeenCalledWith('/tmp/repo', ['remote', 'get-url', '--', 'origin'], {
+      signal: undefined,
+    })
+    expect(gitScalarCallMock).toHaveBeenCalledWith('/tmp/repo', ['remote', 'get-url', '--push', '--', 'origin'], {
+      signal: undefined,
+    })
+  })
+
+  test('preserves whitespace in machine-oriented remote URLs', async () => {
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin\n'
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return args.includes('--push') ? '/tmp/push\npath ' : '/tmp/fetch path '
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(getRemotes('/tmp/repo')).resolves.toEqual([
+      {
+        name: 'origin',
+        fetchUrl: '/tmp/fetch path ',
+        pushUrl: '/tmp/push\npath ',
+      },
+    ])
+  })
+})
+
+describe('parseRemoteUrls', () => {
+  test('preserves remote order and machine-protocol URL fields', () => {
     expect(
-      parseRemoteVerbose(
-        [
-          'upstream\tgit@example.test:sample/upstream.git (push)',
-          'origin\thttps://example.test/sample/origin.git (fetch)',
-          'upstream\thttps://example.test/sample/upstream.git (fetch)',
-          'origin\tgit@example.test:sample/origin.git (push)',
-          '',
-        ].join('\n'),
+      parseRemoteUrls(
+        'upstream\0git@example.test:upstream.git\0git@example.test:upstream-push.git\0' +
+          'origin\0https://example.test/origin.git\0https://example.test/origin.git\0',
       ),
     ).toEqual([
       {
         name: 'upstream',
-        fetchUrl: 'https://example.test/sample/upstream.git',
-        pushUrl: 'git@example.test:sample/upstream.git',
+        fetchUrl: 'git@example.test:upstream.git',
+        pushUrl: 'git@example.test:upstream-push.git',
       },
       {
         name: 'origin',
-        fetchUrl: 'https://example.test/sample/origin.git',
-        pushUrl: 'git@example.test:sample/origin.git',
+        fetchUrl: 'https://example.test/origin.git',
+        pushUrl: 'https://example.test/origin.git',
       },
     ])
   })
 
-  test('uses the last URL for a repeated remote role', () => {
-    expect(
-      parseRemoteVerbose(
-        [
-          'origin\thttps://example.test/sample/old.git (fetch)',
-          'origin\thttps://example.test/sample/current.git (fetch)',
-          'origin\tgit@example.test:sample/current.git (push)',
-        ].join('\n'),
-      ),
-    ).toEqual([
-      {
-        name: 'origin',
-        fetchUrl: 'https://example.test/sample/current.git',
-        pushUrl: 'git@example.test:sample/current.git',
-      },
-    ])
-  })
-
-  test('rejects malformed and incomplete remote output', () => {
-    expect(() => parseRemoteVerbose('origin https://example.test/sample/repo.git')).toThrow('Invalid remote output')
-    expect(() => parseRemoteVerbose('origin\thttps://example.test/sample/repo.git (fetch)')).toThrow(
-      'Incomplete remote output',
-    )
-  })
+  test.each(['origin\0fetch-only\0', 'origin\0\0push\0', 'origin\0fetch\0push\0extra\0'])(
+    'rejects malformed remote record: %s',
+    (output) => {
+      expect(() => parseRemoteUrls(output)).toThrow('Invalid remote output')
+    },
+  )
 })
 
 describe('getBrowserRepoUrl', () => {
   test('returns the branch URL on the remote when a branch is provided', async () => {
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
-      if (args[0] === 'remote' && args[1] === '-v') {
-        return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
-      }
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin'
+      if (args[0] === 'remote' && args[1] === 'get-url') return 'git@github.com:acme/project.git'
       if (args[0] === 'for-each-ref') return 'refs/remotes/origin/feature/test\0origin\0refs/heads/feature/test\0='
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
@@ -104,10 +131,9 @@ describe('getBrowserRepoUrl', () => {
   })
 
   test('returns the repo URL when no branch is provided', async () => {
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
-      if (args[0] === 'remote' && args[1] === '-v') {
-        return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
-      }
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin'
+      if (args[0] === 'remote' && args[1] === 'get-url') return 'git@github.com:acme/project.git'
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
@@ -115,10 +141,9 @@ describe('getBrowserRepoUrl', () => {
   })
 
   test('returns the commit URL when a commit target is provided', async () => {
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
-      if (args[0] === 'remote' && args[1] === '-v') {
-        return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
-      }
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin'
+      if (args[0] === 'remote' && args[1] === 'get-url') return 'git@github.com:acme/project.git'
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
@@ -128,10 +153,9 @@ describe('getBrowserRepoUrl', () => {
   })
 
   test('returns the GitLab branch URL when the remote is GitLab', async () => {
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
-      if (args[0] === 'remote' && args[1] === '-v') {
-        return 'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)'
-      }
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin'
+      if (args[0] === 'remote' && args[1] === 'get-url') return 'git@gitlab.com:acme/project.git'
       if (args[0] === 'for-each-ref') return 'refs/remotes/origin/feature/test\0origin\0refs/heads/feature/test\0='
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
@@ -146,14 +170,10 @@ describe('getBrowserRepoUrl', () => {
     // the branch (e.g. `main`) from the tracking ref `origin/main`. The
     // helper should resolve that exact remote instead of consulting the
     // local branch's tracking config.
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
-      if (args[0] === 'remote' && args[1] === '-v') {
-        return (
-          'origin\tgit@github.com:acme/project.git (fetch)\n' +
-          'origin\tgit@github.com:acme/project.git (push)\n' +
-          'upstream\tgit@gitlab.com:acme/mirror.git (fetch)\n' +
-          'upstream\tgit@gitlab.com:acme/mirror.git (push)'
-        )
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin\nupstream'
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return args.at(-1) === 'origin' ? 'git@github.com:acme/project.git' : 'git@gitlab.com:acme/mirror.git'
       }
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
@@ -169,10 +189,9 @@ describe('getBrowserRepoUrl', () => {
   })
 
   test('returns null when the explicit remote does not exist', async () => {
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
-      if (args[0] === 'remote' && args[1] === '-v') {
-        return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
-      }
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args.length === 1) return 'origin'
+      if (args[0] === 'remote' && args[1] === 'get-url') return 'git@github.com:acme/project.git'
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
@@ -335,9 +354,9 @@ describe('resolveFetchRemoteForRemotes', () => {
 
 describe('fetchAll', () => {
   test('returns an error when remote metadata cannot be read', async () => {
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
       if (args[0] === 'branch' && args[1] === '--show-current') return 'main'
-      if (args[0] === 'remote' && args[1] === '-v') throw new Error('failed to read remotes')
+      if (args[0] === 'remote') throw new Error('failed to read remotes')
       if (args[0] === 'config') throw new Error('no upstream')
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
@@ -348,11 +367,10 @@ describe('fetchAll', () => {
   })
 
   test('marks a failed fetch command as mutation-ambiguous', async () => {
-    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+    gitResponseMock.mockImplementation(async (_cwd: string, args: string[]) => {
       if (args[0] === 'branch' && args[1] === '--show-current') return 'main'
-      if (args[0] === 'remote' && args[1] === '-v') {
-        return 'origin\tgit@example.test:sample/repo.git (fetch)\norigin\tgit@example.test:sample/repo.git (push)'
-      }
+      if (args[0] === 'remote' && args.length === 1) return 'origin'
+      if (args[0] === 'remote' && args[1] === 'get-url') return 'git@example.test:sample/repo.git'
       if (args[0] === 'for-each-ref') return 'refs/remotes/origin/main\0origin\0refs/heads/main\0='
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
@@ -393,6 +411,6 @@ describe('pullBranch', () => {
       result: { ok: false, message: 'cancelled' },
       execution: { status: 'not-started' },
     })
-    expect(gitMock).not.toHaveBeenCalled()
+    expect(gitResponseMock).not.toHaveBeenCalled()
   })
 })

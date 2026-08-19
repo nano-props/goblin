@@ -38,12 +38,8 @@ async function probeGitAvailable(): Promise<GitAvailability> {
   }
 }
 
-/**
- * Run a git command, returning stdout. Throws on non-zero exit, timeout,
- * or abort. Wraps execa so all git invocations share timeout, buffering
- * and cancellation behavior.
- */
-export async function git(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
+/** Run Git without normalizing stdout so protocol decoders retain authority over its text. */
+async function executeGit(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS
   let cancellationObserved = opts?.signal?.aborted ?? false
   const observeCancellation = () => {
@@ -56,16 +52,32 @@ export async function git(cwd: string, args: string[], opts?: GitOptions): Promi
       timeout: timeoutMs,
       cancelSignal: opts?.signal,
       forceKillAfterDelay: 500,
+      stripFinalNewline: false,
       // Some repos can produce large outputs (log, for-each-ref). 10MB headroom.
       maxBuffer: 10 * 1024 * 1024,
     })
-    return stdout.trimEnd()
+    return stdout
   } catch (error) {
     if (cancellationObserved || isProcessCancellation(error)) throw new OperationCancelledError()
     throw error
   } finally {
     opts?.signal?.removeEventListener('abort', observeCancellation)
   }
+}
+
+/**
+ * Run a Git text command, returning normalized stdout. Throws on non-zero exit,
+ * timeout, or abort.
+ */
+export async function git(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
+  return (await executeGit(cwd, args, opts)).trimEnd()
+}
+
+/** Read one LF-terminated Git scalar without altering any character in the value. */
+export async function gitScalar(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
+  const output = await executeGit(cwd, args, opts)
+  if (!output.endsWith('\n')) throw new Error('Git scalar output is not LF-terminated')
+  return output.slice(0, -1)
 }
 
 /** Git lookup commands use exit 1 to mean "no matching values". */
