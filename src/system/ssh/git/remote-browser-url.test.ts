@@ -8,9 +8,7 @@ describe('remote Git browser URL', () => {
     const run: RemoteCommandRunner = async (command) => {
       switch (command.type) {
         case 'gitRemotes':
-          return okRemoteResult(
-            'origin\tgit@github.com:acme/project.git\tgit@github.com:acme/project.git',
-          )
+          return okRemoteResult('origin\0git@github.com:acme/project.git\0git@github.com:acme/project.git\0')
         case 'gitOperationState':
           return okRemoteResult('operation none\nmaterialized-branch\n')
         case 'gitUpstream':

@@ -61,8 +61,8 @@ describe('parseRemoteUrls', () => {
   test('preserves remote order and machine-protocol URL fields', () => {
     expect(
       parseRemoteUrls(
-        'upstream\tgit@example.test:upstream.git\tgit@example.test:upstream-push.git\n' +
-          'origin\thttps://example.test/origin.git\thttps://example.test/origin.git\n',
+        'upstream\0git@example.test:upstream.git\0git@example.test:upstream-push.git\0' +
+          'origin\0https://example.test/origin.git\0https://example.test/origin.git\0',
       ),
     ).toEqual([
       {
@@ -78,7 +78,7 @@ describe('parseRemoteUrls', () => {
     ])
   })
 
-  test.each(['origin\tfetch-only', 'origin\t\tpush', 'origin\tfetch\tpush\textra'])(
+  test.each(['origin\0fetch-only\0', 'origin\0\0push\0', 'origin\0fetch\0push\0extra\0'])(
     'rejects malformed remote record: %s',
     (output) => {
       expect(() => parseRemoteUrls(output)).toThrow('Invalid remote output')

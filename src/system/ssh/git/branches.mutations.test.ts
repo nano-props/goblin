@@ -133,7 +133,7 @@ describe('remote Git branch mutations', () => {
           return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
-          case 'gitRemotes':
+        case 'gitRemotes':
           return okRemoteResult('')
         default:
           return okRemoteResult('')

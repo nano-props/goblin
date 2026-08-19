@@ -52,9 +52,7 @@ describe('remote Git snapshot', () => {
         case 'gitStatus':
           throw new Error('snapshot must not read status')
         case 'gitRemotes':
-          return okRemoteResult(
-            'origin\tgit@gitlab.com:acme/project.git\tgit@gitlab.com:acme/project.git',
-          )
+          return okRemoteResult('origin\0git@gitlab.com:acme/project.git\0git@gitlab.com:acme/project.git\0')
         case 'gitOperationState':
           return okRemoteResult('operation none\nmaterialized-branch main\n')
         default:
@@ -575,8 +573,8 @@ describe('remote Git snapshot', () => {
 
   test.each([
     'truncated remote output',
-    'origin\tgit@example.test:project.git',
-    'origin\tgit@example.test:project.git\tgit@example.test:project.git\textra',
+    'origin\0git@example.test:project.git\0',
+    'origin\0git@example.test:project.git\0git@example.test:project.git\0extra\0',
   ])('rejects malformed authoritative remote output', async (remoteOutput) => {
     const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'gitSnapshot') {

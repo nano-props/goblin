@@ -22,9 +22,7 @@ describe('remote Git branch network operations', () => {
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('fork', 'feature/test'))
         case 'gitRemotes':
-          return okRemoteResult(
-            'origin\tgit@github.com:acme/project.git\tgit@github.com:acme/project.git',
-          )
+          return okRemoteResult('origin\0git@github.com:acme/project.git\0git@github.com:acme/project.git\0')
         case 'gitWorktreeList':
           return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
         case 'resolveRepoCommonDir':

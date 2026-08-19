@@ -131,9 +131,7 @@ describe('repo source runtime failure classification', () => {
             ),
           )
         case 'gitRemotes':
-          return okRemoteResult(
-            'origin\tgit@example.test:project/repo.git\tgit@example.test:project/repo.git',
-          )
+          return okRemoteResult('origin\0git@example.test:project/repo.git\0git@example.test:project/repo.git\0')
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('origin', 'feature/test'))
         case 'gitPush':
@@ -193,7 +191,7 @@ describe('repo source runtime failure classification', () => {
                 '',
               ].join('\n'),
             )
-        case 'gitRemotes':
+          case 'gitRemotes':
             return okRemoteResult('')
           case 'gitUpstream':
             return okRemoteResult(upstreamOutput('origin', 'feature/test'))

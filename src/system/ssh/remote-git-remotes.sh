@@ -10,10 +10,8 @@ if [[ -z "$REMOTE_OUTPUT" ]]; then
 fi
 
 while IFS= read -r REMOTE; do
-  FETCH_OUTPUT=$(git -C "$REPO_PATH" remote get-url --all -- "$REMOTE")
-  PUSH_OUTPUT=$(git -C "$REPO_PATH" remote get-url --push --all -- "$REMOTE")
-  mapfile -t FETCH_URLS <<< "$FETCH_OUTPUT"
-  mapfile -t PUSH_URLS <<< "$PUSH_OUTPUT"
-  [[ -n "$FETCH_OUTPUT" && -n "$PUSH_OUTPUT" ]]
-  printf '%s\t%s\t%s\n' "$REMOTE" "${FETCH_URLS[-1]}" "${PUSH_URLS[-1]}"
+  FETCH_URL=$(git -C "$REPO_PATH" remote get-url -- "$REMOTE")
+  PUSH_URL=$(git -C "$REPO_PATH" remote get-url --push -- "$REMOTE")
+  [[ -n "$FETCH_URL" && -n "$PUSH_URL" ]]
+  printf '%s\0%s\0%s\0' "$REMOTE" "$FETCH_URL" "$PUSH_URL"
 done <<< "$REMOTE_OUTPUT"
