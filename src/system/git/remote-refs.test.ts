@@ -19,7 +19,7 @@ describe('getRemoteTrackingBranches', () => {
     const signal = new AbortController().signal
     gitMock.mockImplementation(async (_cwd: string, args: string[]) =>
       args[0] === 'remote'
-        ? 'origin\thttps://example.test/repo.git (fetch)\norigin\thttps://example.test/repo.git (push)'
+        ? 'origin'
         : 'refs/remotes/origin/HEAD\nrefs/remotes/origin/main\nrefs/remotes/origin/feature/a\n',
     )
     gitLookupMock.mockResolvedValue('+refs/heads/*:refs/remotes/origin/*')

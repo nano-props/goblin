@@ -9,7 +9,7 @@ describe('remote Git browser URL', () => {
       switch (command.type) {
         case 'gitRemoteVerbose':
           return okRemoteResult(
-            'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
+            'origin\tgit@github.com:acme/project.git\tgit@github.com:acme/project.git',
           )
         case 'gitOperationState':
           return okRemoteResult('operation none\nmaterialized-branch\n')

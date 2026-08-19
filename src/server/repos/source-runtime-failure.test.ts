@@ -132,7 +132,7 @@ describe('repo source runtime failure classification', () => {
           )
         case 'gitRemoteVerbose':
           return okRemoteResult(
-            'origin\tgit@example.test:project/repo.git (fetch)\norigin\tgit@example.test:project/repo.git (push)',
+            'origin\tgit@example.test:project/repo.git\tgit@example.test:project/repo.git',
           )
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('origin', 'feature/test'))

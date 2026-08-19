@@ -53,7 +53,7 @@ describe('remote Git snapshot', () => {
           throw new Error('snapshot must not read status')
         case 'gitRemoteVerbose':
           return okRemoteResult(
-            'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)',
+            'origin\tgit@gitlab.com:acme/project.git\tgit@gitlab.com:acme/project.git',
           )
         case 'gitOperationState':
           return okRemoteResult('operation none\nmaterialized-branch main\n')
@@ -575,8 +575,8 @@ describe('remote Git snapshot', () => {
 
   test.each([
     'truncated remote output',
-    'origin\tgit@example.test:project.git (fetch)',
-    'origin\tgit@example.test:project.git (fetch)\ntruncated remote output',
+    'origin\tgit@example.test:project.git',
+    'origin\tgit@example.test:project.git\tgit@example.test:project.git\textra',
   ])('rejects malformed authoritative remote output', async (remoteOutput) => {
     const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'gitSnapshot') {

@@ -1,4 +1,5 @@
 import { git, gitCommandResultWithOptions, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
+import { last } from 'es-toolkit'
 import { commandMayHaveRun, withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
 import {
   GIT_OBJECT_ID_OR_PREFIX_RE,
@@ -91,30 +92,37 @@ async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Pro
   }
 }
 
-export function parseRemoteVerbose(output: string): GitRemoteInfo[] {
+/** Parses the machine-oriented remote records emitted by local and SSH Git adapters. */
+export function parseRemoteUrls(output: string): GitRemoteInfo[] {
   const lines = output.split('\n').filter((line) => line.trim().length > 0)
-  const remotes = new Map<string, { name: string; fetchUrl?: string; pushUrl?: string }>()
+  const remotes: GitRemoteInfo[] = []
   for (const line of lines) {
-    const match = line.match(REMOTE_VERBOSE_LINE_RE)
-    if (!match) throw new Error('Invalid remote output')
-    const name = match[1]!
-    const remote = remotes.get(name) ?? { name }
-    if (match[3] === 'fetch') remote.fetchUrl = match[2]!
-    else remote.pushUrl = match[2]!
-    remotes.set(name, remote)
+    const fields = line.split('\t')
+    if (fields.length !== 3 || fields.some((field) => field.length === 0)) throw new Error('Invalid remote output')
+    const [name, fetchUrl, pushUrl] = fields
+    remotes.push({ name: name!, fetchUrl: fetchUrl!, pushUrl: pushUrl! })
   }
-  const result: GitRemoteInfo[] = []
-  for (const remote of remotes.values()) {
-    if (!remote.fetchUrl || !remote.pushUrl) throw new Error('Incomplete remote output')
-    result.push({ name: remote.name, fetchUrl: remote.fetchUrl, pushUrl: remote.pushUrl })
-  }
-  return result
+  return remotes
 }
 
-const REMOTE_VERBOSE_LINE_RE = /^(\S+)\s+(.+?)\s+\((fetch|push)\)$/
-
 export async function getRemotes(cwd: string, signal?: AbortSignal): Promise<GitRemoteInfo[]> {
-  return parseRemoteVerbose(await git(cwd, ['remote', '-v'], { signal }))
+  const names = nonEmptyLines(await git(cwd, ['remote'], { signal }))
+  return await Promise.all(
+    names.map(async (name) => {
+      const [fetchOutput, pushOutput] = await Promise.all([
+        git(cwd, ['remote', 'get-url', '--all', '--', name], { signal }),
+        git(cwd, ['remote', 'get-url', '--push', '--all', '--', name], { signal }),
+      ])
+      const fetchUrl = last(nonEmptyLines(fetchOutput)) ?? null
+      const pushUrl = last(nonEmptyLines(pushOutput)) ?? null
+      if (!fetchUrl || !pushUrl) throw new Error('Incomplete remote output')
+      return { name, fetchUrl, pushUrl }
+    }),
+  )
+}
+
+function nonEmptyLines(output: string): string[] {
+  return output.split('\n').map((line) => line.trim()).filter(Boolean)
 }
 
 export function pickPreferredRemote<T extends { name: string }>(

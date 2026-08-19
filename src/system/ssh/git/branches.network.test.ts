@@ -23,7 +23,7 @@ describe('remote Git branch network operations', () => {
           return okRemoteResult(upstreamOutput('fork', 'feature/test'))
         case 'gitRemoteVerbose':
           return okRemoteResult(
-            'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
+            'origin\tgit@github.com:acme/project.git\tgit@github.com:acme/project.git',
           )
         case 'gitWorktreeList':
           return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)

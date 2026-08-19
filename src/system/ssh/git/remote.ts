@@ -1,7 +1,7 @@
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import {
   getRepoUrlForRemotes,
-  parseRemoteVerbose,
+  parseRemoteUrls,
   repoRemoteInfoForRemotes,
   resolveFetchRemoteForRemotes,
   resolvePushTargetForRemotes,
@@ -160,7 +160,7 @@ export async function getRemoteRemotes(
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   try {
-    return parseRemoteVerbose(result.stdout)
+    return parseRemoteUrls(result.stdout)
   } catch {
     throw new Error('error.failed-read-repo')
   }
