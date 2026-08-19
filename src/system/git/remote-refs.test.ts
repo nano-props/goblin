@@ -2,16 +2,19 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { getRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
 
 const gitMock = vi.hoisted(() => vi.fn())
+const gitScalarMock = vi.hoisted(() => vi.fn())
 const gitLookupMock = vi.hoisted(() => vi.fn())
 
 vi.mock('#/system/git/git-exec.ts', () => ({
   git: gitMock,
+  gitScalar: gitScalarMock,
   gitLookup: gitLookupMock,
 }))
 
 describe('getRemoteTrackingBranches', () => {
   beforeEach(() => {
     gitMock.mockReset()
+    gitScalarMock.mockReset()
     gitLookupMock.mockReset()
   })
 
@@ -22,6 +25,7 @@ describe('getRemoteTrackingBranches', () => {
         ? 'origin'
         : 'refs/remotes/origin/HEAD\nrefs/remotes/origin/main\nrefs/remotes/origin/feature/a\n',
     )
+    gitScalarMock.mockResolvedValue('https://example.test/repo.git')
     gitLookupMock.mockResolvedValue('+refs/heads/*:refs/remotes/origin/*')
 
     await expect(getRemoteTrackingBranches('/repo', signal)).resolves.toEqual([
@@ -35,15 +39,10 @@ describe('getRemoteTrackingBranches', () => {
       signal,
     })
     expect(gitMock).toHaveBeenCalledWith('/repo', ['remote'], { signal })
-    expect(gitMock).toHaveBeenCalledWith('/repo', ['remote', 'get-url', '--', 'origin'], {
-      signal,
-      preserveTrailingWhitespace: true,
-    })
-    expect(gitMock).toHaveBeenCalledWith('/repo', ['remote', 'get-url', '--push', '--', 'origin'], {
-      signal,
-      preserveTrailingWhitespace: true,
-    })
-    expect(gitMock).toHaveBeenCalledTimes(4)
+    expect(gitScalarMock).toHaveBeenCalledWith('/repo', ['remote', 'get-url', '--', 'origin'], { signal })
+    expect(gitScalarMock).toHaveBeenCalledWith('/repo', ['remote', 'get-url', '--push', '--', 'origin'], { signal })
+    expect(gitMock).toHaveBeenCalledTimes(2)
+    expect(gitScalarMock).toHaveBeenCalledTimes(2)
     expect(gitLookupMock).toHaveBeenCalledOnce()
   })
 

@@ -1,4 +1,10 @@
-import { git, gitCommandResultWithOptions, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
+import {
+  git,
+  gitCommandResultWithOptions,
+  gitResultWithOptions,
+  gitScalar,
+  NETWORK_TIMEOUT_MS,
+} from '#/system/git/git-exec.ts'
 import { commandMayHaveRun, withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
 import {
   GIT_OBJECT_ID_OR_PREFIX_RE,
@@ -114,12 +120,12 @@ export async function getRemotes(cwd: string, signal?: AbortSignal): Promise<Git
   // untrusted or bulk-generated input, add bounded admission here.
   return await Promise.all(
     names.map(async (name) => {
-      const [fetchOutput, pushOutput] = await Promise.all([
-        git(cwd, ['remote', 'get-url', '--', name], { signal, preserveTrailingWhitespace: true }),
-        git(cwd, ['remote', 'get-url', '--push', '--', name], { signal, preserveTrailingWhitespace: true }),
+      const [fetchUrl, pushUrl] = await Promise.all([
+        gitScalar(cwd, ['remote', 'get-url', '--', name], { signal }),
+        gitScalar(cwd, ['remote', 'get-url', '--push', '--', name], { signal }),
       ])
-      if (!fetchOutput || !pushOutput) throw new Error('Incomplete remote output')
-      return { name, fetchUrl: fetchOutput, pushUrl: pushOutput }
+      if (!fetchUrl || !pushUrl) throw new Error('Incomplete remote output')
+      return { name, fetchUrl, pushUrl }
     }),
   )
 }

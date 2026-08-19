@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { git } from '#/system/git/git-exec.ts'
+import { git, gitScalar } from '#/system/git/git-exec.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 let tmp: string | null = null
@@ -12,13 +12,22 @@ afterEach(() => {
   tmp = null
 })
 
-describe('git', () => {
+describe('Git execution', () => {
   test('normalizes process cancellation at the git boundary', async () => {
     const controller = new AbortController()
     controller.abort()
     await expect(git(process.cwd(), ['status'], { signal: controller.signal })).rejects.toBeInstanceOf(
       OperationCancelledError,
     )
+  })
+
+  test('reads a scalar without removing value whitespace', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-helper-test-'))
+    await git(tmp, ['init', '-q'])
+    const remoteUrl = `${tmp}/remote \n`
+    await git(tmp, ['config', 'remote.origin.url', remoteUrl])
+
+    await expect(gitScalar(tmp, ['remote', 'get-url', '--', 'origin'])).resolves.toBe(remoteUrl)
   })
 
   test('times out promptly when git ignores SIGTERM', async () => {
