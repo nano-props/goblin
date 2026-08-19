@@ -22,6 +22,13 @@ Pane targets have two contracts:
   workspace ID; runtime IDs are never persisted.
 - Runtime targets bind the containing workspace ID and current server-issued runtime ID after validation.
 
+Client navigation and pane commands use a runtime-scoped pane location. It
+combines the route target, the canonical tab-layout target, and the current
+workspace runtime identity. The route and layout targets normally match. For
+a Git source worktree, the URL is `/worktree/:worktreeSlug`, while tabs and
+pane commands use the workspace-root layout target. This is a projection
+rule, not a second route or authority.
+
 Navigation is target-first. A materialized Git worktree is addressed by its
 stable worktree locator/path even while `HEAD` changes during rebase, merge,
 cherry-pick, revert, bisect, checkout, or detached operation. A branch target

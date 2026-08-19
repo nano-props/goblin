@@ -34,7 +34,7 @@ export type WorkspacePaneTabsTarget =
 
 export type FilesystemWorkspacePaneTabsTarget = RootWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget
 
-/** Resolves the canonical layout owner for a worktree presentation. */
+/** Resolves the canonical tab-layout target for a worktree presentation. */
 export function workspacePaneTabsLayoutTargetForWorktree(
   routeTarget: GitWorktreeWorkspacePaneTabsTarget,
   isSource: true,

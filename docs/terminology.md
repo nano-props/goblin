@@ -134,6 +134,7 @@ Repo naming rules:
 - Use `Repo*`, not `Repository*`, unless required by an external API.
 - Use `WorkspacePaneTab*`, not `WorkspacePaneView*`, for tab concepts.
 - Use `RepoSession` only for repo open/close/hydration lifecycle, not for terminal sessions or auth sessions.
+- Runtime-scoped route plus tab-layout-target context: `WorkspacePaneLocation`; target-only value: `WorkspacePaneTabsTarget`.
 
 Canonical examples:
 

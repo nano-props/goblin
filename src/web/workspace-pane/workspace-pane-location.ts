@@ -65,6 +65,13 @@ export interface BranchPaneLocation extends WorkspacePaneLocationBase {
   branchName: string
 }
 
+/**
+ * Runtime-scoped context for a routed workspace pane.
+ *
+ * `routeTarget` identifies the URL target; `paneTarget` identifies the
+ * canonical tab-layout target. They differ for a source worktree, whose
+ * worktree route uses the workspace-root layout target.
+ */
 export type WorkspacePaneLocation =
   WorkspaceRootPaneLocation | SourceWorktreePaneLocation | LinkedWorktreePaneLocation | BranchPaneLocation
 
