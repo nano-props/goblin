@@ -13,8 +13,8 @@ export interface GoblinCommandIo {
   stderr(message: string): void
 }
 
-// Minimal HTTP transport. Today: only POST to dispatch an intent
-// (`/api/repo/view`). Kept narrow so a future capability (e.g. a
+// Minimal HTTP transport. Server-backed commands use the single
+// `/api/terminal-command` entry point. Kept narrow so a future capability (e.g. a
 // read endpoint, command-line websocket, file fallback) can extend
 // the interface without re-shaping every existing command.
 export interface GoblinCommandTransport {

@@ -19,6 +19,7 @@ describe('g terminal command', () => {
     const env = buildGoblinTerminalCommandEnvironment({
       binDir,
       entryPath,
+      terminalSessionId: 'term-111111111111111111111',
       serverUrl: 'http://127.0.0.1:32100',
       accessToken: 'secret',
       currentPath: '/usr/bin',
@@ -28,6 +29,7 @@ describe('g terminal command', () => {
     expect(env).toMatchObject({
       PATH: `${binDir}${path.delimiter}/usr/bin`,
       GOBLIN_TERMINAL: '1',
+      GOBLIN_TERMINAL_SESSION_ID: 'term-111111111111111111111',
       GOBLIN_SERVER_URL: 'http://127.0.0.1:32100',
       GOBLIN_SERVER_ACCESS_TOKEN: 'secret',
       GOBLIN_NODE: '/node',
@@ -43,6 +45,7 @@ describe('g terminal command', () => {
     const env = buildGoblinTerminalCommandEnvironment({
       binDir,
       entryPath: path.join(binDir, 'missing.js'),
+      terminalSessionId: 'term-111111111111111111111',
       serverUrl: 'http://127.0.0.1:32100',
       accessToken: 'secret',
     })

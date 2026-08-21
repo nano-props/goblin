@@ -54,6 +54,7 @@ import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import {
+  captureWorkspaceRuntimeEpochCapability,
   captureWorkspaceRuntimeMembershipCapability,
   isCurrentWorkspaceRuntime,
   onWorkspaceRuntimeClosed,
@@ -65,6 +66,8 @@ import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
+import { createTerminalCommandApplication } from '#/server/terminal/terminal-command-application.ts'
+import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 
 // Realtime presence detects a disconnected page. This additional grace absorbs
 // a normal socket reconnect without retaining an expired page's memberships,
@@ -90,6 +93,7 @@ export interface ServerTerminalRuntime {
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
+  terminalCommandHost: ServerTerminalCommandHost
   shutdown(): void
 }
 
@@ -260,6 +264,18 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     broadcastWorkspaceTabsChanged: publishWorkspaceTabsChanged,
   })
+  const terminalCommandHost = createTerminalCommandApplication({
+    manager,
+    async readPaneTabs(userId, workspaceId, workspaceRuntimeId, signal) {
+      return await workspaceTabsCoordinator.snapshot({
+        userId,
+        workspaceId,
+        scope: terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId),
+        epochCapability: captureWorkspaceRuntimeEpochCapability(userId, workspaceId, workspaceRuntimeId),
+        signal,
+      })
+    },
+  })
   const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
     async openRuntime(clientId, userId, input) {
       return await workspacePaneRuntimeApplication.open(clientId, userId, input)
@@ -405,6 +421,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     workspacePaneTabsHost,
     worktreeRemovalApplication,
     workspaceCapabilityTransitionHost,
+    terminalCommandHost,
     shutdown() {
       host.shutdown()
     },

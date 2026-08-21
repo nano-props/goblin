@@ -47,6 +47,7 @@ describe('g command cli', () => {
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('Open the changes tab'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g info'))
     expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g log'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('g term [list|prune]'))
     expect(postJson).not.toHaveBeenCalled()
   })
 
@@ -74,34 +75,46 @@ describe('g command cli', () => {
   test('g delta posts a view intent for the changes tab', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
-    postJson.mockResolvedValue({ ok: true })
+    postJson.mockResolvedValue({ output: '' })
 
     const code = await runGoblinCommand(['delta'], {}, io, transport)
 
     expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'changes' }, expect.any(Function))
+    expect(postJson).toHaveBeenCalledWith(
+      '/api/terminal-command',
+      { command: 'delta', payload: { args: [] } },
+      expect.any(Function),
+    )
   })
 
   test('g info posts a view intent for the status tab', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
-    postJson.mockResolvedValue({ ok: true })
+    postJson.mockResolvedValue({ output: '' })
 
     const code = await runGoblinCommand(['info'], {}, io, transport)
 
     expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'status' }, expect.any(Function))
+    expect(postJson).toHaveBeenCalledWith(
+      '/api/terminal-command',
+      { command: 'info', payload: { args: [] } },
+      expect.any(Function),
+    )
   })
 
   test('g log posts a view intent for the history tab', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
-    postJson.mockResolvedValue({ ok: true })
+    postJson.mockResolvedValue({ output: '' })
 
     const code = await runGoblinCommand(['log'], {}, io, transport)
 
     expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'history' }, expect.any(Function))
+    expect(postJson).toHaveBeenCalledWith(
+      '/api/terminal-command',
+      { command: 'log', payload: { args: [] } },
+      expect.any(Function),
+    )
   })
 
   test('g init creates an empty commented goblin.toml in the current directory', async () => {
@@ -151,21 +164,26 @@ describe('g command cli', () => {
     }
   })
 
-  test('rejects extra positional arguments for view commands', async () => {
+  test('forwards extra view arguments for server-side validation', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
 
+    postJson.mockRejectedValue(new Error("'delta' does not take arguments"))
     const code = await runGoblinCommand(['delta', 'extra'], {}, io, transport)
 
-    expect(code).toBe(2)
+    expect(code).toBe(1)
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('does not take arguments'))
-    expect(postJson).not.toHaveBeenCalled()
+    expect(postJson).toHaveBeenCalledWith(
+      '/api/terminal-command',
+      { command: 'delta', payload: { args: ['extra'] } },
+      expect.any(Function),
+    )
   })
 
   test('surfaces server-side errors with non-zero exit code', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
-    postJson.mockResolvedValue({ ok: false, message: 'no Goblin window is currently listening' })
+    postJson.mockRejectedValue(new Error('no Goblin window is currently listening'))
 
     const code = await runGoblinCommand(['delta'], {}, io, transport)
 
@@ -182,5 +200,78 @@ describe('g command cli', () => {
 
     expect(code).toBe(1)
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('connection refused'))
+  })
+
+  test('g term shows the current built-in terminal', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockResolvedValue({ output: 'Terminal: current' })
+
+    const code = await runGoblinCommand(
+      ['term'],
+      { GOBLIN_TERMINAL_SESSION_ID: 'term-111111111111111111111' },
+      io,
+      transport,
+    )
+
+    expect(code).toBe(0)
+    expect(postJson).toHaveBeenCalledWith(
+      '/api/terminal-command',
+      {
+        command: 'term',
+        payload: { terminalSessionId: 'term-111111111111111111111', args: [] },
+      },
+      expect.any(Function),
+    )
+    expect(io.stdout).toHaveBeenCalledWith('Terminal: current')
+  })
+
+  test('g term list prints the current workspace terminal list', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockResolvedValue({ output: 'AVAILABILITY\navailable\norphaned' })
+
+    const code = await runGoblinCommand(
+      ['term', 'list'],
+      { GOBLIN_TERMINAL_SESSION_ID: 'term-111111111111111111111' },
+      io,
+      transport,
+    )
+
+    expect(code).toBe(0)
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('AVAILABILITY'))
+    expect(io.stdout).toHaveBeenCalledWith(expect.stringContaining('orphaned'))
+  })
+
+  test('g term prune reports closed orphan terminals', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockResolvedValue({ output: 'Pruned 1 orphan terminal.' })
+
+    const code = await runGoblinCommand(
+      ['term', 'prune'],
+      { GOBLIN_TERMINAL_SESSION_ID: 'term-111111111111111111111' },
+      io,
+      transport,
+    )
+
+    expect(code).toBe(0)
+    expect(io.stdout).toHaveBeenCalledWith('Pruned 1 orphan terminal.')
+  })
+
+  test('g term requires a terminal identity from a newly opened Goblin terminal', async () => {
+    const { io } = makeIo()
+    const { transport, postJson } = makeTransport()
+    postJson.mockRejectedValue(new Error('current Goblin terminal is no longer available'))
+
+    const code = await runGoblinCommand(['term', 'list'], {}, io, transport)
+
+    expect(code).toBe(1)
+    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('current Goblin terminal'))
+    expect(postJson).toHaveBeenCalledWith(
+      '/api/terminal-command',
+      { command: 'term', payload: { terminalSessionId: '', args: ['list'] } },
+      expect.any(Function),
+    )
   })
 })

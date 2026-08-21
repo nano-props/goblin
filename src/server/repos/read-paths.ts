@@ -14,6 +14,7 @@ import {
   type LogEntry,
   type RepoLogTarget,
   type WorktreeStatus,
+  type WorktreeInfo,
 } from '#/shared/git-types.ts'
 import type {
   PullRequestEntry,
@@ -42,6 +43,15 @@ export async function getWorkspacePaneTargetMembership(
 ): Promise<WorkspacePaneTargetMembership> {
   return await runRepoMembershipRead(cwd, options, async (source) => {
     return await source.getWorkspacePaneTargetMembership({ signal: options.signal })
+  })
+}
+
+export async function getRepoWorktreeMembership(
+  cwd: WorkspaceId,
+  options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
+): Promise<WorktreeInfo[]> {
+  return await runRepoMembershipRead(cwd, options, async (source) => {
+    return await source.getWorktreeMembership({ signal: options.signal })
   })
 }
 

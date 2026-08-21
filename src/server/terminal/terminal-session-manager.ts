@@ -1134,6 +1134,12 @@ export class TerminalSessionManager<TUser extends string | number> {
     return session ? this.sessionSummary(session) : null
   }
 
+  getSessionSummaryForDurableId(userId: TUser, terminalSessionId: string): TerminalSessionSummary | null {
+    if (!this.isValidUserId(userId)) return null
+    const session = this.directory.getByDurableId(userId, terminalSessionId)
+    return session ? this.sessionSummary(session) : null
+  }
+
   getSessionCount(): number {
     return Array.from(this.directory.entries()).length
   }

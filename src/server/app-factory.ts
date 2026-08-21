@@ -17,7 +17,6 @@ import { createHostRoutes } from '#/server/routes/host.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
-import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
@@ -28,6 +27,8 @@ import { MAX_PASTE_HTTP_BODY_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { isJsonContentType } from '#/server/common/http-validate.ts'
+import { createTerminalCommandRoutes } from '#/server/routes/terminal-command.ts'
+import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -43,6 +44,7 @@ export interface ServerAppOptions {
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
+  terminalCommandHost?: ServerTerminalCommandHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to
@@ -263,12 +265,21 @@ export function createApp(options: ServerAppOptions): Hono {
       workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
     }),
   )
-  app.route('/api/repo', createRepoViewRoutes())
   app.route(
     '/api/workspace',
     createWorkspaceRoutes({ workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost }),
   )
   app.route('/api/clipboard', createClipboardRoutes())
+  app.use('/api/terminal-command', createAccessTokenMiddleware(options.accessToken))
+  app.use('/api/terminal-command', requireJsonContentType())
+  app.use(
+    '/api/terminal-command',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
+  app.route('/api/terminal-command', createTerminalCommandRoutes(options.terminalCommandHost))
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, appRealtimeHost: options.appRealtimeHost }))
 
   // Periodic prune of clipboard temp dirs left by previous server
