@@ -1,22 +1,6 @@
-// Client-side host info. Hydrated at boot from the public
-// `/api/host` endpoint (see `#/server/routes/host.ts` and
-// `#/server/host-info.ts`). The server already knows its
-// own `process.platform` and `os.homedir()` — the Electron preload
-// used to ferry those over `goblin:get-home-dir` /
-// `goblin:get-platform` IPC. Moving to a public endpoint:
-//
-//   - drops two IPC channels that were only used to populate the
-//     bootstrap script before the first paint
-//   - collapses the "Electron vs web" runtime detection: the
-//     embedded and standalone web paths now share the same fetch,
-//     the same module, and the same code path
-//   - lets the Vite-served dev path exercise the exact same wire
-//     format the production client does
-//
-// `homeDirectory()` and `getPlatform()` remain synchronous because the
-// entrypoint establishes the snapshot before mounting the application.
-// A missing snapshot is therefore a violated bootstrap invariant, not an
-// alternate web platform or empty home directory.
+// The entrypoint hydrates server-owned host information before mounting the
+// application, so synchronous readers treat a missing snapshot as a violated
+// bootstrap invariant rather than an alternate platform or empty home path.
 
 import { createStore } from 'zustand/vanilla'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
@@ -56,10 +40,7 @@ export const hostInfoStore = createStore<HostInfoState>((set) => ({
   error: null,
 
   async hydrate(options) {
-    // Bump the version so a fast second call (StrictMode dev
-    // double-invoke, the user reloading the client with a stale
-    // `hydrate()` still in flight) cannot overwrite a fresher
-    // snapshot. Same pattern as `#/web/stores/i18n.ts`.
+    // A newer hydration owns the projection and rejects stale completion.
     const version = ++hydrateVersion
     set({ status: 'pending', error: null })
     try {

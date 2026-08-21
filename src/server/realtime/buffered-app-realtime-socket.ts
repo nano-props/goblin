@@ -29,28 +29,25 @@ export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<TerminalOu
 function parseTerminalOutputEvent(payload: string): TerminalOutputCheckpoint | null {
   try {
     const parsed = JSON.parse(payload) as unknown
-    if (!parsed || typeof parsed !== 'object' || !('type' in parsed)) return null
-    if ((parsed as { type?: unknown }).type !== 'output') return null
-    const event = (parsed as { event?: unknown }).event
+    if (!parsed || typeof parsed !== 'object' || Reflect.get(parsed, 'type') !== 'output') return null
+    const event = Reflect.get(parsed, 'event')
     if (!event || typeof event !== 'object') return null
-    const maybeEvent = event as {
-      terminalRuntimeSessionId?: unknown
-      terminalRuntimeGeneration?: unknown
-      seq?: unknown
-    }
+    const terminalRuntimeSessionId = Reflect.get(event, 'terminalRuntimeSessionId')
+    const terminalRuntimeGeneration = Reflect.get(event, 'terminalRuntimeGeneration')
+    const seq = Reflect.get(event, 'seq')
     if (
-      typeof maybeEvent.terminalRuntimeSessionId !== 'string' ||
-      !Number.isSafeInteger(maybeEvent.terminalRuntimeGeneration) ||
-      !Number.isSafeInteger(maybeEvent.seq)
+      typeof terminalRuntimeSessionId !== 'string' ||
+      !isSafeInteger(terminalRuntimeGeneration) ||
+      !isSafeInteger(seq)
     ) {
       return null
     }
-    return {
-      terminalRuntimeSessionId: maybeEvent.terminalRuntimeSessionId,
-      terminalRuntimeGeneration: maybeEvent.terminalRuntimeGeneration as number,
-      seq: maybeEvent.seq as number,
-    }
+    return { terminalRuntimeSessionId, terminalRuntimeGeneration, seq }
   } catch {
     return null
   }
+}
+
+function isSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value)
 }

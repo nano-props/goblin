@@ -47,7 +47,7 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
     const terminalRecovery = new AppTerminalProjectionRecovery({
       projection: terminalProjection,
       readClientId: readClientPageId,
-      recoverSessions: async (target) => await terminalClient.recoverSessions(target),
+      recoverSessions: (target) => terminalClient.recoverSessions(target),
       hydrationEntry: (workspaceId) =>
         terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(workspaceId),
       beginHydration: (workspaceId, workspaceRuntimeId) =>
@@ -62,8 +62,8 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error }),
     })
     const workspaceTabsRecovery = new WorkspacePaneTabsRecovery({
-      refresh: async (target, requirement) =>
-        await refreshWorkspacePaneTabsQueryData(target.workspaceId, target.workspaceRuntimeId, { requirement }),
+      refresh: (target, requirement) =>
+        refreshWorkspacePaneTabsQueryData(target.workspaceId, target.workspaceRuntimeId, { requirement }),
       currentRevision: (target) => workspacePaneTabsProjectionRevision(target.workspaceId, target.workspaceRuntimeId),
       logFailure: (target, error) => {
         appRuntimeProjectionLog.debug('failed to refresh workspace pane tabs', { ...target, error })
@@ -71,8 +71,8 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
     })
     const reconnectRecovery = new WorkspaceRuntimeReconnectRecovery({
       scopeRegistry,
-      reconcileMemberships: async () =>
-        await reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+      reconcileMemberships: () =>
+        reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
       currentWorkspaceRuntimeId: workspaceRuntimeIdForRoot,
       terminalRecovery,
       workspaceTabsRecovery,

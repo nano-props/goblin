@@ -217,12 +217,12 @@ export class PhysicalWorktreeIdentityResolver implements PhysicalWorktreeCapture
       signal: epoch.abortController.signal,
     })
     if (!result.ok) throw new Error(result.message || result.stderr || 'error.unavailable')
-    const captured = parseRemotePhysicalWorktreeCapture(result.stdout)
+    const identity = parseRemotePhysicalWorktreeIdentity(result.stdout)
     return {
-      identity: captured.identity,
+      identity,
       execution: Object.freeze({
         kind: 'remote' as const,
-        canonicalWorktreePath: captured.identity.endpoint,
+        canonicalWorktreePath: identity.endpoint,
         target: Object.freeze({ ...resolved.target }),
         configFingerprint: resolved.configFingerprint,
       }),
@@ -405,12 +405,6 @@ export function createPhysicalWorktreeIdentityResolver(
 }
 
 export function parseRemotePhysicalWorktreeIdentity(output: string): PhysicalWorktreeIdentity {
-  return parseRemotePhysicalWorktreeCapture(output).identity
-}
-
-function parseRemotePhysicalWorktreeCapture(output: string): {
-  identity: PhysicalWorktreeIdentity
-} {
   const fields = output.split('\0')
   const runtimeToken = fields[0] ?? ''
   const machineFact = fields[1] ?? ''
@@ -430,9 +424,7 @@ function parseRemotePhysicalWorktreeCapture(output: string): {
     .update(`goblin-remote-execution-v2\0${runtimeToken}\0${machineFact}\0${rootNamespaceFact}`)
     .digest('hex')
     .slice(0, 32)
-  return {
-    identity: { kind: 'remote', executionNamespaceId, endpoint },
-  }
+  return { kind: 'remote', executionNamespaceId, endpoint }
 }
 
 function nativeRealpath(input: string): Promise<string> {

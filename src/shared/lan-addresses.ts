@@ -17,7 +17,7 @@ export function getLanAddresses(): string[] {
   const interfaces = os.networkInterfaces()
   const addresses: string[] = []
   if (!interfaces) return addresses
-  for (const [, infos] of Object.entries(interfaces)) {
+  for (const infos of Object.values(interfaces)) {
     if (!infos) continue
     for (const iface of infos) {
       if (iface.family === 'IPv4' && !iface.internal && isLanAddress(iface.address)) {

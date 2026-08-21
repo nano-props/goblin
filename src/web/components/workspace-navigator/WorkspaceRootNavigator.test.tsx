@@ -99,9 +99,7 @@ describe('WorkspaceRootNavigator', () => {
     await openActionMenu(container)
     await fireEvent.click(actionButton('tab.terminal'))
 
-    expect(workspaceCommandMocks.terminal).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: WORKSPACE_ID }),
-    )
+    expect(workspaceCommandMocks.terminal).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WORKSPACE_ID }))
   })
 
   test('keeps the remote directory name visible while its capability probe is pending', () => {
@@ -109,9 +107,7 @@ describe('WorkspaceRootNavigator', () => {
     const workspace = emptyWorkspace(remoteWorkspaceId, 'workspace-runtime-remote')
     workspacesStore.setState({ workspaces: { [remoteWorkspaceId]: workspace }, workspaceOrder: [remoteWorkspaceId] })
 
-    const { container } = renderNavigator(
-      <WorkspaceRootNavigator workspaceId={remoteWorkspaceId} selected={false} />,
-    )
+    const { container } = renderNavigator(<WorkspaceRootNavigator workspaceId={remoteWorkspaceId} selected={false} />)
 
     expect(workspaceRow(container).textContent).toContain('Documents')
     expect(workspaceRow(container).textContent).not.toContain('example:')

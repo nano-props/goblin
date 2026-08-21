@@ -2,10 +2,13 @@ import * as v from 'valibot'
 import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
-import { LANG_PREF_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
+import { LANG_PREF_VALUES, LANG_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
-import { WorkspacePaneStaticTabEntrySchema } from '#/shared/workspace-pane-tabs-validators.ts'
-import { WorkspacePaneTabsSnapshotSchema, WorkspaceRuntimeIdSchema } from '#/shared/workspace-pane-tabs-validators.ts'
+import {
+  WorkspacePaneStaticTabEntrySchema,
+  WorkspacePaneTabsSnapshotSchema,
+  WorkspaceRuntimeIdSchema,
+} from '#/shared/workspace-pane-tabs-validators.ts'
 import { RepoSnapshotResponseSchema } from '#/shared/repo-response-schema.ts'
 import {
   RemoteWorkspaceTargetResponseSchema,
@@ -77,7 +80,7 @@ export const SettingsSnapshotSchema = v.strictObject({
 })
 
 export const I18nSnapshotSchema = v.strictObject({
-  lang: v.picklist(['en', 'zh', 'ko', 'ja']),
+  lang: v.picklist(LANG_VALUES),
   pref: v.picklist(LANG_PREF_VALUES),
   dict: v.record(v.string(), v.string()),
 })

@@ -47,9 +47,7 @@ describe('gitWorkspaceNavigatorRows', () => {
       materializedBranch: null,
     }
 
-    expect(
-      gitWorkspaceNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' }).map(rowIdentity),
-    ).toEqual([
+    expect(gitWorkspaceNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' }).map(rowIdentity)).toEqual([
       { kind: 'branch', branchName: 'main' },
       { kind: 'branch', branchName: 'feature/example' },
       { kind: 'worktree', worktreePath: WORKTREE_PATH },

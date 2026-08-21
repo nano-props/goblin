@@ -323,7 +323,6 @@ export class WorkspacePaneLayoutAggregate {
       const staticTabs = mixedTabs.filter(
         (tab): tab is WorkspacePaneStaticTabEntry => !isWorkspacePaneRuntimeTabEntry(tab),
       )
-      const targetKey = targetProjectionKey(target)
       const durableTarget = restorableWorkspacePaneTargetFromRuntime(target.target)
       if (!durableTarget) throw new Error('error.workspace-tabs-target-invalid')
       const entry = { target: durableTarget, tabs: staticTabs }

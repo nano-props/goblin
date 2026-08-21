@@ -31,20 +31,23 @@ function windowStateFile(): string {
 
 function normalizeWindowBounds(value: unknown): WindowBounds | null {
   if (!value || typeof value !== 'object') return null
-  const bounds = value as Partial<WindowBounds>
+  const width = Reflect.get(value, 'width')
+  const height = Reflect.get(value, 'height')
   if (
-    typeof bounds.width !== 'number' ||
-    typeof bounds.height !== 'number' ||
-    !Number.isFinite(bounds.width) ||
-    !Number.isFinite(bounds.height) ||
-    bounds.width <= 0 ||
-    bounds.height <= 0
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
   ) {
     return null
   }
-  const normalized: WindowBounds = { width: bounds.width, height: bounds.height }
-  if (typeof bounds.x === 'number' && Number.isFinite(bounds.x)) normalized.x = bounds.x
-  if (typeof bounds.y === 'number' && Number.isFinite(bounds.y)) normalized.y = bounds.y
+  const normalized: WindowBounds = { width, height }
+  const x = Reflect.get(value, 'x')
+  const y = Reflect.get(value, 'y')
+  if (typeof x === 'number' && Number.isFinite(x)) normalized.x = x
+  if (typeof y === 'number' && Number.isFinite(y)) normalized.y = y
   return normalized
 }
 
@@ -52,9 +55,11 @@ export async function loadWindowState(): Promise<WindowState> {
   if (cache) return cache
   try {
     const raw = await fs.readFile(windowStateFile(), 'utf-8')
-    const parsed = JSON.parse(raw) as Partial<WindowState>
+    const parsed: unknown = JSON.parse(raw)
     cache = {
-      windowBounds: normalizeWindowBounds(parsed.windowBounds),
+      windowBounds: normalizeWindowBounds(
+        parsed && typeof parsed === 'object' ? Reflect.get(parsed, 'windowBounds') : undefined,
+      ),
     }
   } catch {
     cache = { ...DEFAULT_WINDOW_STATE }

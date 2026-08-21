@@ -269,7 +269,6 @@ describe('setWorkspacePaneTab', () => {
 
     expect(preferredTabFor('feature/plain')).toBe('terminal')
   })
-
 })
 
 function worktreeTargetKey(worktreePath: string): string {
@@ -309,7 +308,6 @@ describe('setZenMode', () => {
 
     expect(workspacesStore.getState().zenMode).toBe(true)
   })
-
 })
 
 describe('setWorkspacePaneSize', () => {

@@ -1,7 +1,4 @@
-// Pure transforms for the workspace filesystem tree source layer
-// (docs/filetree.md). Kept in a separate module so the source
-// layer's public surface stays narrow while the helpers behind it
-// remain unit-testable in isolation.
+// Pure transforms for direct-child workspace filesystem projections.
 
 import path from 'node:path'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'

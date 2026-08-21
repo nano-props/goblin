@@ -102,7 +102,6 @@ describe('repo workspace pane tab navigation', () => {
     expect(adjacentWorkspacePaneTab(model.tabs, null, -1)).toBeNull()
     expect(adjacentWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
-
 })
 
 function navigationModel() {

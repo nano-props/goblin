@@ -78,7 +78,7 @@ export function createAuthRoutes({ accessToken }: AuthRouteOptions): Hono {
 
 function extractToken(body: unknown): string | null {
   if (!body || typeof body !== 'object') return null
-  const candidate = (body as { token?: unknown }).token
+  const candidate = Reflect.get(body, 'token')
   return typeof candidate === 'string' ? candidate : null
 }
 

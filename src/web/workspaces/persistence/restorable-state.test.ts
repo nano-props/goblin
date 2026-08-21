@@ -444,37 +444,37 @@ describe('restorable-workspace-state', () => {
   })
 
   test('persists and restores an open worktree-only preferred tab', () => {
-      const tab = 'changes'
-      const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
-      const repo = seedRepoWithReadModelForTest({
-        id: 'goblin+file:///tmp/repo',
-        branchSnapshots: [createBranchSnapshot('feature/worktree')],
-        worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
-        currentBranchName: 'feature/worktree',
-        preferredWorkspacePaneTab: tab,
-        workspacePaneTabsByBranch: {
-          'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry(tab)],
-        },
-      })
-
-      const sessionState = clientWorkspaceStateFromRestorableWorkspaceState({
-        workspaces: { [repo.id]: repo },
-        restorableWorkspaceState: {
-          workspaceOrder: [repo.id],
-          restoredWorkspaceId: repo.id,
-          zenMode: false,
-          workspacePaneSize: 55,
-          branchViewModeByWorkspace: {},
-          selectedTerminalSessionIdByTerminalFilesystemTarget: {},
-        },
-      })
-      expect(sessionState.preferredWorkspacePaneTabByTargetByWorkspace).toEqual({
-        'goblin+file:///tmp/repo': { [targetKey]: tab },
-      })
-      expect(
-        restoreRestorableWorkspaceStateFromClientWorkspace(sessionState).preferredWorkspacePaneTabByTargetByWorkspace,
-      ).toEqual({ 'goblin+file:///tmp/repo': { [targetKey]: tab } })
+    const tab = 'changes'
+    const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: tab,
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry(tab)],
+      },
     })
+
+    const sessionState = clientWorkspaceStateFromRestorableWorkspaceState({
+      workspaces: { [repo.id]: repo },
+      restorableWorkspaceState: {
+        workspaceOrder: [repo.id],
+        restoredWorkspaceId: repo.id,
+        zenMode: false,
+        workspacePaneSize: 55,
+        branchViewModeByWorkspace: {},
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+      },
+    })
+    expect(sessionState.preferredWorkspacePaneTabByTargetByWorkspace).toEqual({
+      'goblin+file:///tmp/repo': { [targetKey]: tab },
+    })
+    expect(
+      restoreRestorableWorkspaceStateFromClientWorkspace(sessionState).preferredWorkspacePaneTabByTargetByWorkspace,
+    ).toEqual({ 'goblin+file:///tmp/repo': { [targetKey]: tab } })
+  })
 
   test('persists an explicit empty workspace pane preference', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')

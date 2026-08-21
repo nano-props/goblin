@@ -922,10 +922,14 @@ describe('WorkspacePane directory workspaces', () => {
       return true
     })
 
-    renderWorkspacePane(workspaceId, { kind: 'routed', route: null }, {
-      ...navigation,
-      commitFilesystemWorkspacePaneRoute,
-    })
+    renderWorkspacePane(
+      workspaceId,
+      { kind: 'routed', route: null },
+      {
+        ...navigation,
+        commitFilesystemWorkspacePaneRoute,
+      },
+    )
 
     screen.getByRole('button', { name: 'dashboard.directory.open-files' }).click()
 

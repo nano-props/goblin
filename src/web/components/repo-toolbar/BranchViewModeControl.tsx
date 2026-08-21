@@ -1,18 +1,3 @@
-// Single-button worktree filter for the sidebar branch list. The previous
-// SegmentedControl (all / worktrees) was hard to discover and the
-// "blue pill" reading of the selected thumb (low-opacity accent
-// tint) only ever landed muddy against the surrounding chrome. This
-// control is now a single ghost toggle that paints a subtle accent
-// fill when active.
-//
-// Behaviour:
-//   pressed   → branchViewMode === 'worktrees' (filter on, only
-//                branches that own a worktree path render)
-//   unpressed → branchViewMode === 'all'       (no filter)
-// The underlying store action `setBranchViewMode` is unchanged;
-// GitWorkspaceNavigator / persistence / refresh continue to read
-// The value is a restorable per-workspace client preference.
-
 import { defineComponent } from 'vue'
 import { FolderTree, ListTree } from '@lucide/vue'
 import type { LucideIcon } from '@lucide/vue'

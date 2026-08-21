@@ -19,10 +19,9 @@ export function workspaceLocatorFromNativeCommandInput(
   platform: WorkspaceLocatorPlatform,
   homeDir: string,
 ): WorkspaceId | null {
-  const input = rawInput
-  const parsed = parseWorkspaceLocator(input, platform)
+  const parsed = parseWorkspaceLocator(rawInput, platform)
   if (parsed?.transport === 'file') return formatWorkspaceLocator(parsed, platform)
-  const expanded = expandNativeHomePath(input, platform, homeDir)
+  const expanded = expandNativeHomePath(rawInput, platform, homeDir)
   if (!expanded || !isNativeAbsoluteWorkspacePath(expanded, platform)) return null
   return formatWorkspaceLocator({ transport: 'file', platform, path: expanded }, platform)
 }

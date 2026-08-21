@@ -241,20 +241,21 @@ async function openWorkspaceRuntime(
   if (!parseWorkspaceLocator(entry.id, serverLocatorPlatform())) return { kind: 'invalid' }
   if (isRemoteWorkspaceId(entry.id)) return await openRemoteWorkspace(input, entry, options)
   return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease, runtimeCapability) => {
-    let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.workspaceRuntimeId)
-    if (!authoritativeProbe) throw new WorkspaceRuntimeStaleError()
-    if (authoritativeProbe.status === 'probing') {
-      authoritativeProbe = await runSerializedInitialWorkspaceProbe({
-        userId: input.userId,
-        workspaceId: entry.id,
-        workspaceRuntimeId: lease.workspaceRuntimeId,
-        probe: async () => await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal }),
-        beforeCommit: async ({ before, after }) => {
-          if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemoval(input, runtimeCapability)
-        },
-      })
-    }
+    const currentProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.workspaceRuntimeId)
+    if (!currentProbe) throw new WorkspaceRuntimeStaleError()
+    const authoritativeProbe =
+      currentProbe.status === 'probing'
+        ? await runSerializedInitialWorkspaceProbe({
+            userId: input.userId,
+            workspaceId: entry.id,
+            workspaceRuntimeId: lease.workspaceRuntimeId,
+            probe: async () => await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal }),
+            beforeCommit: async ({ before, after }) => {
+              if (!workspaceGitCleanupRequired(before, after)) return
+              await commitGitCapabilityRemoval(input, runtimeCapability)
+            },
+          })
+        : currentProbe
     if (!workspaceGitAvailable(authoritativeProbe) || !options.active) {
       return {
         kind: 'opened',
@@ -306,24 +307,11 @@ async function openRemoteWorkspace(
       input.signal,
     )
     runtimeCapability.assertCurrent()
-    if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') {
-      if (lifecycle.kind === 'settled') {
-        return {
-          kind: 'opened',
-          opened: stubWorkspace({
-            entry,
-            workspaceId: lease.workspaceId,
-            workspaceProbe: lifecycle.workspaceProbe,
-            transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
-            lease,
-            runtimeCapability,
-          }),
-        }
-      }
-      throw new Error('workspace workspace runtime was superseded during restore')
+    if (lifecycle.kind !== 'settled') {
+      throw new Error('workspace runtime was superseded during restore')
     }
     const workspaceProbe = lifecycle.workspaceProbe
-    if (!workspaceGitAvailable(workspaceProbe) || !options.active) {
+    if (lifecycle.lifecycle.kind === 'failed' || !workspaceGitAvailable(workspaceProbe) || !options.active) {
       return {
         kind: 'opened',
         opened: stubWorkspace({

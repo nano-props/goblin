@@ -25,9 +25,6 @@ export function settingsSnapshotQueryOptions() {
   return {
     queryKey: settingsSnapshotQueryKey(),
     queryFn: ({ signal }: { signal: AbortSignal }) => getSettingsSnapshot({ signal }),
-    // No initial data from the bootstrap — the server no longer
-    // inlines it. The query starts pending and the authenticated
-    // bootstrap pass populates the cache.
     // Settings changes are pushed through the invalidation ingress and local
     // mutations update this cache directly. Keeping a freshly fetched snapshot
     // fresh lets bootstrap and mounted consumers share one authoritative read.
@@ -59,7 +56,7 @@ function githubCliQueryOptions(hosts?: string[]) {
 function lanInfoQueryOptions() {
   return {
     queryKey: lanInfoQueryKey(),
-    queryFn: async () => await getLanInfo(),
+    queryFn: () => getLanInfo(),
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
   }

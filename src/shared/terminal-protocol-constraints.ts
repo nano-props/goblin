@@ -1,5 +1,6 @@
 import * as v from 'valibot'
 import type { TerminalSize } from '#/shared/terminal-types.ts'
+import { utf8ByteLength } from '#/shared/utf8-byte-length.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -32,31 +33,8 @@ export function isValidTerminalWriteData(value: unknown): value is string {
   return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS && !value.includes('\0')
 }
 
-export function terminalUtf8ByteLength(value: string): number {
-  let bytes = 0
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i)
-    if (code <= 0x7f) {
-      bytes += 1
-    } else if (code <= 0x7ff) {
-      bytes += 2
-    } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < value.length) {
-      const next = value.charCodeAt(i + 1)
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4
-        i += 1
-      } else {
-        bytes += 3
-      }
-    } else {
-      bytes += 3
-    }
-  }
-  return bytes
-}
-
 export function isTerminalWsMessageWithinLimit(value: string): boolean {
-  return terminalUtf8ByteLength(value) <= TERMINAL_WS_MESSAGE_LIMIT_BYTES
+  return utf8ByteLength(value) <= TERMINAL_WS_MESSAGE_LIMIT_BYTES
 }
 
 export function constrainTerminalSize(cols: number, rows: number): TerminalSize | null {

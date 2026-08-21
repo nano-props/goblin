@@ -148,9 +148,9 @@ const CreateWorktreeRowActionReadModel = defineComponent<{
       () => props.repo.id,
       () => props.repo.workspaceRuntimeId,
     )
-    const branchAction = computed(() => {
-      return projectBranchActionOperation(props.repo.branchAction, operationsReadModel.data.value?.operations)
-    })
+    const branchAction = computed(() =>
+      projectBranchActionOperation(props.repo.branchAction, operationsReadModel.data.value?.operations),
+    )
     return () => (
       <CreateWorktreeRowActionView
         disabled={branchAction.value.phase !== 'idle'}

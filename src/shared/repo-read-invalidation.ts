@@ -13,10 +13,13 @@ export interface RepoReadInvalidationEvent {
 
 export function isRepoReadInvalidationEvent(value: unknown): value is RepoReadInvalidationEvent {
   if (!value || typeof value !== 'object') return false
-  const event = value as Partial<RepoReadInvalidationEvent>
+  const type = Reflect.get(value, 'type')
+  const repoId = Reflect.get(value, 'repoId')
+  const domain = Reflect.get(value, 'domain')
   return (
-    event.type === 'repo-read-invalidated' &&
-    toSafeCanonicalWorkspaceId(event.repoId) !== null &&
-    isStringIn(REPO_READ_INVALIDATION_DOMAINS, event.domain)
+    type === 'repo-read-invalidated' &&
+    typeof repoId === 'string' &&
+    toSafeCanonicalWorkspaceId(repoId) !== null &&
+    isStringIn(REPO_READ_INVALIDATION_DOMAINS, domain)
   )
 }

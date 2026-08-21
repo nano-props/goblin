@@ -42,7 +42,7 @@ export async function commitFilesystemWorkspacePaneRoute(input: {
   )
   if (expectedCurrentHref === null) return abandonAppRouteCommit(options)
   const target = routeLocation(route)
-  return await settleOwnedAppRouteCommit({
+  return settleOwnedAppRouteCommit({
     generation: options?.navigationGeneration,
     targetHref: appRouteHref(router, target),
     expectedCurrentHref,
@@ -86,7 +86,7 @@ export async function commitBranchWorkspacePaneRoute(input: {
     options?.onCommit?.()
     return true
   }
-  return await settleOwnedAppRouteCommit({
+  return settleOwnedAppRouteCommit({
     generation: options?.navigationGeneration,
     commitEffect: options?.onCommit,
     abandonEffect: options?.onAbandon,

@@ -383,7 +383,7 @@ export function createClientRealtimeSocketConnection<
       throw error
     }
     const requestSocket = ws
-    return await new Promise<TOutputs[TAction]>((resolve, reject) => {
+    return new Promise<TOutputs[TAction]>((resolve, reject) => {
       const timeout = setTimeout(() => {
         const pending = pendingSocketRequests.get(requestId)
         if (!pending) return

@@ -135,7 +135,6 @@ describe('workspace pane runtime tab target projection', () => {
 
     expect(projection.runtimeTabStateByType.terminal.selectedSessionId).toBe('term-222222222222222222222')
   })
-
 })
 
 function terminalView(terminalSessionId: string) {

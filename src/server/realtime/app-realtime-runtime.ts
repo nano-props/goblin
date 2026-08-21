@@ -74,8 +74,7 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
         return
       }
       const transport = new MemoryBoundRealtimeSocket(socket)
-      let buffered: BufferedAppRealtimeSocket
-      buffered = new BufferedAppRealtimeSocket(transport, () => {
+      const buffered = new BufferedAppRealtimeSocket(transport, () => {
         broker.unregisterSocket(buffered)
         socketBindingByRawSocket.delete(socket)
       })

@@ -1,22 +1,5 @@
-// Standalone dispatch functions for branch action confirmations.
-//
-// These were previously inlined into `useBranchActions`, where the
-// `(repo, branch)` for the IPC call was captured by closure from the
-// hook call site. That coupling was fine when the host and the request
-// were in the same component subtree, but the layout-level `BranchActionDialogHost`
-// needs to dispatch a confirmation against the dialog payload's
-// `(repo, branch)` — not the host's `(repo, branch)` — so the user can
-// open a dialog for a non-selected branch (e.g. a row in the zen-mode
-// HoverCard popover).
-//
-// Each function takes the resolved `repo` and `branch` explicitly,
-// plus the dialog payload, and **returns the IPC promise** rather than
-// dropping it. The host's `onConfirm` returns this promise to
-// `useAsyncPending.run`, which then marks the Confirm button as
-// `aria-busy` and rejects duplicate clicks for the duration of the IPC
-// round-trip. The force-promote callbacks dispatch back into
-// `branchActionDialogsStore` to open the follow-up confirm dialog
-// with the same payload.
+// Confirmation dispatches use the dialog's explicit repo and branch payload,
+// which may differ from the currently selected branch.
 
 import {
   deleteBranchNeedsForceConfirm,
@@ -36,14 +19,6 @@ interface BranchActionDispatchContext {
   repo: BranchActionRepo
 }
 
-/**
- * Dispatch a `deleteBranch` action against the resolved repo. Mirrors
- * the pre-PR `useBranchActions.deleteBranch` private function, but
- * takes `repo` explicitly so the host can pass the repo looked up
- * from the dialog payload (which may differ from the host's own
- * `(repo, branch)` when the dialog was opened for a non-selected
- * branch row).
- */
 export function dispatchDeleteBranch({
   repo,
   branchName,
@@ -78,10 +53,6 @@ export function dispatchDeleteBranch({
   )
 }
 
-/**
- * Dispatch a `removeWorktree` action against the resolved repo. See
- * `dispatchDeleteBranch` for why this lives outside the hook.
- */
 export function dispatchRemoveWorktree({
   repo,
   target,
@@ -125,10 +96,7 @@ export function dispatchRemoveWorktree({
   )
 }
 
-/**
- * Dispatch a `push` action, bypassing the protected-branch confirm
- * gate (the user has already cleared it by confirming the dialog).
- */
+// The dialog confirmation has already cleared the protected-branch gate.
 export function dispatchPush({
   repo,
   branchName,

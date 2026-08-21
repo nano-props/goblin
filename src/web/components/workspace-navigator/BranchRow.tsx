@@ -21,13 +21,6 @@ export interface BranchRowProps {
   onActionMenuOpenChange?: (open: boolean) => void
   terminalBellCount?: number
   terminalOutputActive?: boolean
-  /**
-   * Whether a branch action (queued or running) currently targets this
-   * row. Resolved by the data-binding wrapper (`GitWorkspaceNavigatorBranchRow`) from
-   * `branchActionDisplayPhase` so the row stays purely presentational
-   * and can be reused in contexts that don't carry a live operations
-   * state. Defaults to `false` when the wrapper doesn't compute it.
-   */
   branchActionBusy?: boolean
 }
 
@@ -53,8 +46,6 @@ export const BranchRow = defineComponent<BranchRowProps>({
 
     return () => {
       const isSelected = props.branch.name === props.selected
-      // The action affordance only appears on hover/focus in non-compact
-      // mode. Keep it visible while this row's action is busy.
       const actionHidden = !compact.value && !props.actionMenuOpen && !props.branchActionBusy
       const leadingTerminalBellCount = compact.value ? (props.terminalBellCount ?? 0) : 0
       const showTerminalOutputActive = !isSelected && !!props.terminalOutputActive

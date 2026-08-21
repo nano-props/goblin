@@ -166,10 +166,7 @@ export function remoteWorkspaceRuntimeFailureFromTargetResolutionError(input: {
   const message = input.error instanceof Error ? input.error.message : String(input.error)
   const text = message.toLowerCase()
   const timedOut =
-    typeof input.error === 'object' &&
-    input.error !== null &&
-    'timedOut' in input.error &&
-    (input.error as { timedOut?: unknown }).timedOut === true
+    typeof input.error === 'object' && input.error !== null && Reflect.get(input.error, 'timedOut') === true
   const reason: RemoteWorkspaceFailureReason = timedOut || text.includes('timed out') ? 'timeout' : 'config-changed'
   return new RemoteWorkspaceRuntimeFailureError({
     workspaceId: requiredWorkspaceId(input.workspaceId),

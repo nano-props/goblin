@@ -110,19 +110,16 @@ async function probeGitHubAuthStatuses(signal?: AbortSignal): Promise<Record<str
     reject: false,
     env: ghEnv(),
   })
-  let payload: GitHubCliAuthStatusPayload = {}
-  if (result.stdout) {
-    try {
-      payload = JSON.parse(result.stdout) as GitHubCliAuthStatusPayload
-    } catch {
-      payload = {}
-    }
-  }
-  return parseGitHubCliHostStates(payload)
+  return parseGitHubCliHostStates(parseGitHubCliAuthStatusPayload(result.stdout))
 }
 
-function cachedGitHubCliSnapshotFresh(): boolean {
-  return !!cachedGitHubCliSnapshot && Date.now() - cachedGitHubCliSnapshot.detectedAt < GITHUB_CLI_CACHE_TTL_MS
+function parseGitHubCliAuthStatusPayload(output: string): GitHubCliAuthStatusPayload {
+  if (!output) return {}
+  try {
+    return JSON.parse(output) as GitHubCliAuthStatusPayload
+  } catch {
+    return {}
+  }
 }
 
 async function detectGitHubCliSnapshot(signal?: AbortSignal): Promise<GitHubCliSnapshot> {
@@ -159,26 +156,27 @@ export async function probeGitHubCli(
 ): Promise<GitHubCliState> {
   const normalizedHosts = normalizeHosts(hosts)
   const force = options?.force === true
-  let snapshot: GitHubCliSnapshot
-  if (!force && cachedGitHubCliSnapshotFresh()) {
-    snapshot = cachedGitHubCliSnapshot!
-  } else if (!force && pendingGitHubCliSnapshot) {
-    snapshot = await pendingGitHubCliSnapshot
-  } else {
-    const work = detectGitHubCliSnapshot(signal)
-    if (!force) pendingGitHubCliSnapshot = work
-    try {
-      snapshot = await work
-    } finally {
-      if (!force && pendingGitHubCliSnapshot === work) pendingGitHubCliSnapshot = null
-    }
-  }
+  const snapshot = await resolveGitHubCliSnapshot(signal, force)
   cachedGitHubCliSnapshot = snapshot
   return {
     available: snapshot.available,
     version: snapshot.version,
     detectedAt: snapshot.detectedAt,
     hosts: selectGitHubCliHostStates(snapshot.hosts, normalizedHosts),
+  }
+}
+
+async function resolveGitHubCliSnapshot(signal: AbortSignal | undefined, force: boolean): Promise<GitHubCliSnapshot> {
+  const cached = cachedGitHubCliSnapshot
+  if (!force && cached && Date.now() - cached.detectedAt < GITHUB_CLI_CACHE_TTL_MS) return cached
+  if (!force && pendingGitHubCliSnapshot) return await pendingGitHubCliSnapshot
+
+  const work = detectGitHubCliSnapshot(signal)
+  if (!force) pendingGitHubCliSnapshot = work
+  try {
+    return await work
+  } finally {
+    if (!force && pendingGitHubCliSnapshot === work) pendingGitHubCliSnapshot = null
   }
 }
 

@@ -18,41 +18,18 @@ import type {
   ClientWorkspacePaneTabs,
 } from '#/web/bridge/types.ts'
 
-/** The complete native preload contract exposes this fixed capability set. */
-function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): ReadonlySet<ClientNativeCapability> {
-  void bridge
-  return new Set<ClientNativeCapability>([
-    'global-shortcut',
-    'open-settings-window',
-    'open-external-url',
-    'open-directory-dialog',
-    'consume-external-open-paths',
-    'terminal-notifications',
-    'terminal-badge',
-  ])
-}
+const NATIVE_CLIENT_CAPABILITIES: ReadonlySet<ClientNativeCapability> = new Set([
+  'global-shortcut',
+  'open-settings-window',
+  'open-external-url',
+  'open-directory-dialog',
+  'consume-external-open-paths',
+  'terminal-notifications',
+  'terminal-badge',
+])
 
-/**
- * Read the server-terminal config from the bootstrap. Shared by the
- * terminal client and the HTTP clipboard backend — both go through
- * the same `window.location.origin` + cookie auth flow, so there is
- * no longer an Electron-specific fork here.
- */
 function readServerAppRealtimeConfig(): AppRealtimeServerConfig | null {
-  // Two paths can populate the bootstrap's `initialServer`:
-  //
-  //  - QR-code URL bootstrap (`?accessToken=…`) drops a token on
-  //    the URL before first paint; `useAccessTokenStatus` consumes
-  //    the token for the cookie.
-  //
-  // Everything else (Electron embedded, standalone web, Vite-served
-  // dev) authenticates via the http-only cookie set by either
-  // `plantEmbedAuthCookie` (embedded main, before loadURL) or
-  // `POST /api/login` (web). The WS upgrade sends the cookie
-  // automatically. We derive the URL from `window.location.origin`
-  // and use an empty `accessToken`; the WebSocket helper still
-  // serializes that as `?t=`, but the server checks cookie before
-  // query token so cookie auth remains the effective channel.
+  // An initial server carries QR bootstrap credentials; other clients use their origin and auth cookie.
   const fromBootstrap = readWebBootstrap().initialServer
   if (fromBootstrap?.url) {
     if (fromBootstrap.accessToken === undefined) throw new Error('Initial server access token is missing')
@@ -71,9 +48,7 @@ interface ClientServerRealtimeClients {
   workspacePaneRuntime: ClientWorkspacePaneRuntime
 }
 
-// The app realtime client is *expensive*: it owns the shared WebSocket,
-// subscriber sets, liveness probes, and recovery hooks. Feature clients are sibling
-// capability adapters over that transport.
+// Realtime feature clients share one stateful WebSocket owner.
 let memoizedRealtimeClients: ClientServerRealtimeClients | null = null
 function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
   if (memoizedRealtimeClients) return memoizedRealtimeClients
@@ -100,27 +75,6 @@ function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
   return memoizedRealtimeClients
 }
 
-/**
- * The single client bridge. Replaces the previous
- * `electronBridge()` / `webBridge()` pair: there is no longer a
- * runtime-specific factory. Native shell capabilities read
- * `window.goblinNative` at their call boundary, while stateful server clients
- * bind their dependencies once when the shared realtime client is created.
- *
- * Why this is the right shape:
- *
- *  - The bootstrap is identical across repoOperationSchedulers now (host info and
- *    auth both live on dedicated `/api/*` endpoints). The only
- *    runtime-specific surface is the IPC bridge the Electron
- *    preload exposes under `window.goblinNative` — and that surface
- *    is detected per-call, not per-bridge.
- *
- *  - The previous "two factories" model forced every call site
- *    (`app/shell-client`, `terminal/client-facade`, `clipboard/resolver`) to be aware of
- *    the Electron vs web split. With a single bridge the split is
- *    a property of the bridge's `kind()` and `hasCapability()`
- *    results, not a fork in every call site.
- */
 function createClientBridge(): ClientBridge {
   const clipboardBackend = (() => {
     const server = readServerAppRealtimeConfig()
@@ -139,11 +93,9 @@ function createClientBridge(): ClientBridge {
     },
     hasCapability(capability) {
       const bridge = readNativeBridge()
-      return bridge ? capabilitiesFromBridge(bridge).has(capability) : false
+      return bridge ? NATIVE_CLIENT_CAPABILITIES.has(capability) : false
     },
     getBootstrap() {
-      // The bridge exposes the current bootstrap source; bootstrap.ts owns
-      // the single authoritative capture used by the application.
       return readWebBootstrap()
     },
     invokeIpc(request: IpcRequest) {
@@ -172,12 +124,12 @@ function createClientBridge(): ClientBridge {
     async getAccessTokenProjection() {
       const bridge = readNativeBridge()
       if (!bridge) throw new Error('Token projection is unavailable in this runtime')
-      return await bridge.getAccessTokenProjection()
+      return bridge.getAccessTokenProjection()
     },
     async rotateAccessToken() {
       const bridge = readNativeBridge()
       if (!bridge) throw new Error('Token rotation is unavailable in this runtime')
-      return await bridge.rotateAccessToken()
+      return bridge.rotateAccessToken()
     },
     host(): ClientHostBridge | null {
       return readNativeBridge()?.host ?? null
@@ -197,28 +149,12 @@ function createClientBridge(): ClientBridge {
   }
 }
 
-// The collapsed bridge is `kind()`-agnostic. Stateless native capability
-// methods read `window.goblinNative` at their call boundary, so the same outer
-// bridge handles embedded Electron and standalone web runtimes.
-//
-// We rebuild the outer bridge on every call rather than memoizing:
-// the inner terminal client is memoized separately (it owns the
-// WebSocket and must be a singleton), but everything else — IPC,
-// shell, capabilities, clipboard backend, bootstrap — is just a
-// closure over the live `goblinNative`. Rebuilding is cheap
-// (single closure allocation per access — well under the IPC
-// round-trip the bridge is built to support) and means tests (and
-// StrictMode double-mounts in dev) can swap the preload between
-// phases of an effect without breaking the bridge shape.
+// Rebuild stateless adapters from the live native bridge; stateful realtime clients remain shared.
 export function getClientBridge(): ClientBridge {
   if (testOverride) return testOverride
   return createClientBridge()
 }
 
-// Test override. When set to a non-null bridge, every
-// `getClientBridge()` call returns that bridge verbatim. When
-// cleared back to `null`, the next call rebuilds from the live
-// `window.goblinNative`. Production code never touches this.
 let testOverride: ClientBridge | null = null
 export function setClientBridgeForTests(bridge: ClientBridge | null): void {
   testOverride = bridge

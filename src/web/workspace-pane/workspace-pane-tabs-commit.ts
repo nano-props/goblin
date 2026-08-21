@@ -138,10 +138,8 @@ export function reportWorkspacePaneTabsFailure(input: {
 export async function updateWorkspacePaneTabs(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return workspacePaneTabsInteractionBlocker.run(
-    input,
-    workspacePaneTabsUpdateBlocksInteraction(input.operation),
-    () => updateWorkspacePaneTabsNow(input),
+  return workspacePaneTabsInteractionBlocker.run(input, workspacePaneTabsUpdateBlocksInteraction(input.operation), () =>
+    updateWorkspacePaneTabsNow(input),
   )
 }
 

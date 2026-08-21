@@ -1,15 +1,4 @@
-// Read layer for the worktree-scoped file tree (docs/filetree.md).
-//
-// This module composes the workspace filesystem source with
-// the minimal worktree boundary checks. It is the only place that
-// touches the HTTP-facing `WorkspaceFilesystemTreeResult` wire shape, and the only
-// entry point the route layer talks to.
-//
-// Anti-coupling rules (enforced by review):
-//   - Do not call status/log/pull-request read modules from here.
-//     Filetree is a display read; status projection is a separate concern.
-//   - Do not call HTTP / route utilities here.
-//   - Do not import UI types.
+// Composes the filesystem source with its runtime target boundary.
 
 import type { WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import {
@@ -38,21 +27,18 @@ export async function readWorkspaceFilesystemTree(
   const resolved = await resolveWorkspaceFilesystemExecution(target, { signal: options.signal })
   const knownWorktrees = resolved.worktree ? [resolved.worktree] : undefined
 
-  let source
-  if (resolved.transport === 'remote') {
-    const readRemoteTree = workspaceScoped ? readWorkspaceFilesystemSourceRemote : readGitWorktreeFilesystemSourceRemote
-    source = await readRemoteTree({
-      target: resolved.remoteTarget,
-      worktreePath: resolved.executionPath,
-      options,
-      signal: options.signal,
-      run: resolved.run,
-      ...(knownWorktrees ? { knownWorktrees } : {}),
-    })
-  } else {
-    source = workspaceScoped
-      ? await readWorkspaceFilesystemSourceLocal(resolved.executionPath, options, options.signal)
-      : await readGitWorktreeFilesystemSourceLocal(resolved.executionPath, options, options.signal)
-  }
+  const source =
+    resolved.transport === 'remote'
+      ? await (workspaceScoped ? readWorkspaceFilesystemSourceRemote : readGitWorktreeFilesystemSourceRemote)({
+          target: resolved.remoteTarget,
+          worktreePath: resolved.executionPath,
+          options,
+          signal: options.signal,
+          run: resolved.run,
+          ...(knownWorktrees ? { knownWorktrees } : {}),
+        })
+      : workspaceScoped
+        ? await readWorkspaceFilesystemSourceLocal(resolved.executionPath, options, options.signal)
+        : await readGitWorktreeFilesystemSourceLocal(resolved.executionPath, options, options.signal)
   return { nodes: source.nodes, truncated: source.truncated }
 }

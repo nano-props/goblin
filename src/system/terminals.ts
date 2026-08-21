@@ -1,11 +1,5 @@
-// Terminal backend registry. Each terminal app implements TerminalBackend
-// and registers itself here.
-//
-// Adding a new terminal:
-// 1. Create src/main/system/<name>.ts implementing TerminalBackend
-// 2. Register it in the `backends` map below
-// 3. Add the new id to TerminalApp in shared/settings.ts
-// 4. Add i18n keys for the workspace picker
+// Terminal backends own app-specific availability and launch behavior. This
+// registry keeps the shared TerminalApp contract exhaustive.
 
 import type { TerminalApp, TerminalAppAvailability } from '#/shared/settings.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
@@ -22,14 +16,6 @@ export interface TerminalBackend {
   openRemote?: (alias: string, remotePath: string) => Promise<ExecResult>
 }
 
-/** Concrete terminal app backends.
- *
- *  Backends hold function references, not invocation results — so they're
- *  inherently lazy w.r.t. `process.platform`. Per-backend `isInstalled`
- *  checks live with each backend (e.g. `isWindowsTerminalInstalled` already
- *  short-circuits on non-win32) and are reached through
- *  `getTerminalAppAvailability` below, which is the only place platform
- *  gating belongs. */
 const backends: Record<TerminalApp, TerminalBackend> = {
   ghostty: { open: openInGhostty, openRemote: openRemoteInGhostty },
   terminal: { open: openInAppleTerminal, openRemote: openRemoteInAppleTerminal },

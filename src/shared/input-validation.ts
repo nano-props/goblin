@@ -1,8 +1,8 @@
 import path from 'node:path'
-import { MAX_WORKSPACE_LOCATOR_LENGTH } from '#/shared/workspace-locator.ts'
 import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   formatWorkspaceLocator,
+  MAX_WORKSPACE_LOCATOR_LENGTH,
   parseWorkspaceLocator,
   type WorkspaceId,
   type WorkspaceLocatorPlatform,
@@ -25,15 +25,7 @@ export function isValidCwd(value: unknown): value is string {
 }
 
 export function toSafeSessionPath(value: unknown): string | null {
-  if (
-    typeof value !== 'string' ||
-    value.length === 0 ||
-    value.length > MAX_IPC_PATH_LENGTH ||
-    value.includes('\0') ||
-    !path.isAbsolute(value)
-  )
-    return null
-  return path.normalize(value)
+  return isValidAbsolutePath(value) ? path.normalize(value) : null
 }
 
 export function isValidWorkspaceLocatorInput(value: unknown): value is WorkspaceId {

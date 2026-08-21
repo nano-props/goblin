@@ -228,22 +228,20 @@ export async function getRemoteBranchMergeFacts(
   },
 ): Promise<{ mergedToCurrent: boolean; mergedToUpstream: boolean }> {
   const gitPath = options.path ?? target.remotePath
-  let mergedToCurrent = false
-  if (options.currentBranch) {
-    mergedToCurrent = await getRemoteIsAncestor(target, branch, options.currentBranch, {
-      signal: options.signal,
-      run: options.run,
-      path: gitPath,
-    })
-  }
-  let mergedToUpstream = false
-  if (options.upstream?.ancestryRef) {
-    mergedToUpstream = await getRemoteIsAncestor(target, branch, options.upstream.ancestryRef, {
-      signal: options.signal,
-      run: options.run,
-      path: gitPath,
-    })
-  }
+  const mergedToCurrent = options.currentBranch
+    ? await getRemoteIsAncestor(target, branch, options.currentBranch, {
+        signal: options.signal,
+        run: options.run,
+        path: gitPath,
+      })
+    : false
+  const mergedToUpstream = options.upstream?.ancestryRef
+    ? await getRemoteIsAncestor(target, branch, options.upstream.ancestryRef, {
+        signal: options.signal,
+        run: options.run,
+        path: gitPath,
+      })
+    : false
   return { mergedToCurrent, mergedToUpstream }
 }
 

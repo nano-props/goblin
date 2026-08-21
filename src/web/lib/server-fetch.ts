@@ -64,7 +64,7 @@ export async function fetchServerJson<T>(
   decode: (value: unknown) => T,
   init?: ServerFetchOptions,
 ): Promise<T> {
-  return await requestServerJson(path, decode, init, 'query')
+  return requestServerJson(path, decode, init, 'query')
 }
 
 async function requestServerJson<T>(
@@ -139,7 +139,7 @@ export async function postServerCommandJson<TInput extends object, TOutput>(
   decode: (value: unknown) => TOutput,
   options?: { signal?: AbortSignal; keepalive?: boolean; timeoutMs?: number },
 ): Promise<TOutput> {
-  return await requestServerJson(
+  return requestServerJson(
     path,
     decode,
     {
@@ -162,7 +162,7 @@ export async function postServerJson<TInput extends object, TOutput>(
   decode: (value: unknown) => TOutput,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<TOutput> {
-  return await requestServerJson(
+  return requestServerJson(
     path,
     decode,
     {

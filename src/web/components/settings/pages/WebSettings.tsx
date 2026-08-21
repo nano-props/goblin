@@ -15,21 +15,6 @@ import { decodeWith } from '#/shared/http-response-schema.ts'
 import { AccessTokenResponseSchema } from '#/shared/web-bootstrap-response-schema.ts'
 import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
-/**
- * Settings page for everything related to the embedded / standalone
- * server that the client talks to. Visible in both runtimes:
- *
- * - Both: the current address, the access token with copy support,
- *   token-bearing QR codes, and any active LAN URLs.
- * - Electron only: the `lanEnabled` toggle (the bind address is
- *   owned by the host process) and the `Rotate token` action
- *   (the native host atomically stages the next-start credential).
- *
- * In web / `bun run serve.sh` mode the operator owns the process
- * and the bind address; rotation is an operator-owned file change, so
- * we don't surface those native-host controls. Server-reported LAN
- * addresses remain visible because they are useful in either runtime.
- */
 export const WebSettings = defineComponent({
   name: 'WebSettings',
   setup() {
@@ -40,11 +25,6 @@ export const WebSettings = defineComponent({
     const { data: lanInfo } = useLanInfoQuery()
     const { setLanEnabled } = useLanSettingsController()
 
-    // This is the browser-facing authority the client actually uses for
-    // same-origin HTTP and WebSocket traffic. `initialServer` is not the
-    // steady-state server configuration: it is populated only for the
-    // one-time QR/login handoff, so reading the address from it leaves normal
-    // Electron and standalone-web sessions with no value.
     const currentUrl = window.location.origin
 
     // Intentional high-trust boundary: authenticated settings may read the
@@ -126,18 +106,12 @@ export const WebSettings = defineComponent({
         accessTokenActivation.value === 'after-restart'
           ? 'settings.web.token-pending-restart-hint'
           : 'settings.web.token-rotation-hint'
-      // For each LAN URL, build the QR-target that includes the access
-      // token. Scanning the QR opens the page with `?accessToken=...`.
-      const qrTargets = accessToken.value
-        ? lanUrls.map((url) => `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(accessToken.value ?? '')}`)
+      const currentAccessToken = accessToken.value
+      const qrTargets = currentAccessToken
+        ? lanUrls.map((url) => `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(currentAccessToken)}`)
         : []
       const showNetworkGroup = isElectron || lanUrls.length > 0
-      let lanStatusKey: 'settings.lan.restart-hint' | 'settings.lan.local-only' | null = null
-      if (isElectron && currentLanInfo) {
-        const lanAccessActive = !isLoopbackHost(currentLanInfo.host)
-        if (lanEnabled !== lanAccessActive) lanStatusKey = 'settings.lan.restart-hint'
-        else if (!lanAccessActive) lanStatusKey = 'settings.lan.local-only'
-      }
+      const lanStatusKey = isElectron && currentLanInfo ? currentLanStatusKey(lanEnabled, currentLanInfo.host) : null
       return (
         <>
           <SettingsGroup label={t('settings.web.server')}>
@@ -251,6 +225,15 @@ export const WebSettings = defineComponent({
 
 function isLoopbackHost(host: string): boolean {
   return host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
+}
+
+function currentLanStatusKey(
+  lanEnabled: boolean,
+  host: string,
+): 'settings.lan.restart-hint' | 'settings.lan.local-only' | null {
+  const lanAccessActive = !isLoopbackHost(host)
+  if (lanEnabled !== lanAccessActive) return 'settings.lan.restart-hint'
+  return lanAccessActive ? null : 'settings.lan.local-only'
 }
 
 interface AddressControlProps {

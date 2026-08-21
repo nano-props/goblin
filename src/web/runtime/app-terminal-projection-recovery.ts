@@ -52,14 +52,10 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
       this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
     })
     if (start.kind === 'reconnect') {
-      this.run(scope, start, async () => await this.dependencies.recoverSessions(scope.target))
+      this.run(scope, start, () => this.dependencies.recoverSessions(scope.target))
       return
     }
-    this.run(
-      scope,
-      { kind: 'minimum-revision', revision: 0 },
-      async () => await this.ensureInitialRecovery(scope.target),
-    )
+    this.run(scope, { kind: 'minimum-revision', revision: 0 }, () => this.ensureInitialRecovery(scope.target))
   }
 
   isFocusRefreshDue(target: RuntimeProjectionTarget): boolean {
@@ -73,18 +69,14 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
         this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
       })
     }
-    this.run(scope, requirement, async () => await this.dependencies.recoverSessions(scope.target))
+    this.run(scope, requirement, () => this.dependencies.recoverSessions(scope.target))
   }
 
   retry(scope: RuntimeProjectionScope): void {
     scope.commit(() => {
       this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
     })
-    this.run(
-      scope,
-      { kind: 'minimum-revision', revision: 0 },
-      async () => await this.dependencies.recoverSessions(scope.target),
-    )
+    this.run(scope, { kind: 'minimum-revision', revision: 0 }, () => this.dependencies.recoverSessions(scope.target))
   }
 
   private run(

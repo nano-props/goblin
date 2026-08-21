@@ -32,28 +32,7 @@ export interface WorkspaceSettingsEntry {
 
 export const WORKTREE_BOOTSTRAP_CONFIG_HASH_RE = /^sha256:[a-f0-9]{64}$/
 
-/**
- * The canonical list of valid `WorkspaceExternalAppItem.id` values
- * that the server is willing to persist as a "most recently chosen
- * external app" per worktree. Mirrors `WORKSPACE_EXTERNAL_APPS` in
- * `src/web/external-apps/catalog.tsx`; the canonical web list lives
- * in the web layer (where Vue components are wired up) and this
- * readonly tuple exists so the server can validate persisted ids
- * without pulling in the Vue side.
- *
- * `as const` preserves the literal union so callers can derive
- * `WorkspaceExternalAppId` below without a parallel enum.
- *
- * ============================================================================
- * Adding a new external app — see the checklist in
- * `src/system/editors.ts` (top of file) for the full 7-10 step
- * process. For WebStorm in particular, the id to add here would be
- * `'editor:webstorm'`. The compile-time guard in
- * `src/web/external-apps/catalog.tsx` will reject the build if
- * you add a new id to the web array without also adding it here
- * (and vice versa) — that's by design, leave the guard in place.
- * ============================================================================
- */
+/** Persistable external-app IDs shared with the web catalog without importing its Vue graph. */
 export const WORKSPACE_EXTERNAL_APP_IDS = ['terminal:ghostty', 'terminal:terminal', 'editor:vscode', 'finder'] as const
 
 export type WorkspaceExternalAppId = (typeof WORKSPACE_EXTERNAL_APP_IDS)[number]

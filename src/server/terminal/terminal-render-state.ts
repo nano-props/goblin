@@ -15,15 +15,8 @@ import {
 } from '#/server/terminal/terminal-control-sequence-scanner.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 
-// Per-session render state. Recovery hydration is generated from the
-// server-side headless xterm state, so "current screen" semantics stay in
-// xterm's parser instead of replaying historical erase/repaint bytes into each
-// newly-attached client.
-//
-// Realtime metadata intentionally uses a separate synchronous control-sequence
-// scanner. Title/bell events must be known while handling the PTY chunk so the
-// server can preserve title -> bell -> output ordering; @xterm/headless remains
-// the async visual screen/snapshot authority.
+// Headless xterm owns recovery snapshots. A synchronous scanner separately
+// preserves title → bell → output ordering for each PTY chunk.
 
 const HEADLESS_SCROLLBACK_ROWS = 10_000
 // Bytes bound retained output, while entries bound the Promise/closure overhead

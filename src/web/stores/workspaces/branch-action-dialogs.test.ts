@@ -258,5 +258,4 @@ describe('branchActionDialogsStore', () => {
       deleteAlsoUpstream: false,
     })
   })
-
 })

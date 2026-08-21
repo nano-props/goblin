@@ -83,12 +83,9 @@ describe('useBranchActionItems', () => {
   function renderBranchActionItems(options: { withWorktree?: boolean } = {}) {
     return renderComposableInJsdom(() => {
       const selectedBranch = branch()
-      return useBranchActionItems(
-        repo(selectedBranch, options.withWorktree ?? true),
-        selectedBranch,
-        branchActions(),
-        { workspacePaneRoute: undefined },
-      )
+      return useBranchActionItems(repo(selectedBranch, options.withWorktree ?? true), selectedBranch, branchActions(), {
+        workspacePaneRoute: undefined,
+      })
     })
   }
 })

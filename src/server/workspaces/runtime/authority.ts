@@ -168,18 +168,15 @@ export async function withWorkspaceRuntimeAdmission<T>(
   }
   const predecessor = owner.tail
   const acceptedRevision = owner.revision
-  let releaseTurn!: () => void
-  const turn = new Promise<void>((resolve) => {
-    releaseTurn = resolve
-  })
-  const tail = predecessor.then(async () => await turn)
+  const turn = Promise.withResolvers<void>()
+  const tail = predecessor.then(() => turn.promise)
   owner.tail = tail
   await predecessor
   try {
     if (owner.revision !== acceptedRevision) throw new WorkspaceRuntimeStaleError()
     return await runWorkspaceRuntimeAdmission(userId, workspaceId, clientId, admit)
   } finally {
-    releaseTurn()
+    turn.resolve()
     if (workspaceRuntimeAdmissionOwners.get(admissionKey) === owner && owner.tail === tail) {
       workspaceRuntimeAdmissionOwners.delete(admissionKey)
     }
@@ -728,17 +725,14 @@ async function runSerializedWorkspaceLifecycleOperation<T>(
   if (!state || state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) return null
   state.activeWorkspaceLifecycleOperations += 1
   const predecessor = state.workspaceLifecycleTail
-  let releaseTurn!: () => void
-  const turn = new Promise<void>((resolve) => {
-    releaseTurn = resolve
-  })
-  state.workspaceLifecycleTail = predecessor.then(async () => await turn)
+  const turn = Promise.withResolvers<void>()
+  state.workspaceLifecycleTail = predecessor.then(() => turn.promise)
   await predecessor
   try {
     if (state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) return null
     return await operation(state)
   } finally {
-    releaseTurn()
+    turn.resolve()
     releaseWorkspaceLifecycleOperation(input, state)
   }
 }
@@ -901,22 +895,30 @@ async function settleRemoteWorkspaceLifecycleAttempt(
   terminalCommitPlan: (result: RemoteWorkspaceConnectionResult) => RemoteWorkspaceTerminalCommitPlan,
   previousLifecycle: RemoteWorkspaceRuntimeLifecycle,
 ): Promise<RemoteWorkspaceLifecycleRunResult> {
-  let result: RemoteWorkspaceConnectionResult
-  try {
-    result = await resolve(controller.signal)
-  } catch (error) {
-    if (
-      state.currentWorkspaceRuntimeId !== workspaceRuntimeId ||
-      state.remoteAttemptController !== controller ||
-      state.remoteLifecycle.attemptId !== attemptId
-    ) {
-      return supersededRemoteWorkspaceLifecycleResult(state.currentWorkspaceRuntimeId, workspaceRuntimeId)
-    }
-    result = {
-      kind: 'failed',
-      lifecycle: { kind: 'failed', reason: 'unknown' },
-    }
-  }
+  const resolution = await resolve(controller.signal).then(
+    (result) => ({ kind: 'resolved', result }) as const,
+    () => {
+      if (
+        state.currentWorkspaceRuntimeId !== workspaceRuntimeId ||
+        state.remoteAttemptController !== controller ||
+        state.remoteLifecycle.attemptId !== attemptId
+      ) {
+        return {
+          kind: 'superseded',
+          result: supersededRemoteWorkspaceLifecycleResult(state.currentWorkspaceRuntimeId, workspaceRuntimeId),
+        } as const
+      }
+      return {
+        kind: 'resolved',
+        result: {
+          kind: 'failed',
+          lifecycle: { kind: 'failed', reason: 'unknown' },
+        } satisfies RemoteWorkspaceConnectionResult,
+      } as const
+    },
+  )
+  if (resolution.kind === 'superseded') return resolution.result
+  const { result } = resolution
 
   try {
     const committed = await commitRemoteWorkspaceLifecycleTerminal({

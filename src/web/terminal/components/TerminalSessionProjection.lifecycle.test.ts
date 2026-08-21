@@ -2,9 +2,7 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/terminal-session-projection.ts'
-import {
-  getTerminalSessionProjection,
-} from '#/web/terminal/components/TerminalSessionProjection.ts'
+import { getTerminalSessionProjection } from '#/web/terminal/components/TerminalSessionProjection.ts'
 import { requiredTerminalSession } from '#/web/test-utils/terminal-session-projection-access.ts'
 import {
   REPO_ROOT,

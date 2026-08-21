@@ -121,16 +121,14 @@ export async function gitCommandResultWithOptions(
   } catch (err: unknown) {
     // Distinguish three "we ended the process" reasons. The user-visible
     // copy is short on purpose — the client surfaces these via toast
-    // and the kbps user is rarely interested in the underlying signal.
+    // and the user rarely needs the underlying signal.
     if (err instanceof OperationCancelledError || opts?.signal?.aborted) {
       return { result: { ok: false, message: 'cancelled' }, execution: { status: 'cancelled' } }
     }
     if (err instanceof ExecaError) {
       if (err.timedOut) {
-        // No auto-clean of stray .lock files on timeout — we can't tell
-        // ours from a concurrent tool's, and a stale-clean is worse than
-        // the retry's "lock exists" stderr. Same conservative stance as
-        // stripNoise below; revisit with data if this actually bites.
+        // Do not clean stray .lock files on timeout: ownership is uncertain,
+        // and deleting another Git process's lock would corrupt coordination.
         return {
           result: { ok: false, message: `git timed out after ${(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000}s` },
           execution: { status: 'timed-out' },
@@ -159,10 +157,8 @@ function isProcessStartFailure(error: ExecaError): boolean {
  * Drop transport noise (only the specific advisory lines we know about) so
  * the real git error surfaces in single-line UI notifications.
  *
- * Conservative on purpose: an earlier version of this also dropped any
- * line starting with `warning:`, but git itself emits real diagnostics
- * with that prefix (`warning: not deleting branch ...`, `warning: refusing
- * to lose untracked file ...`) that the user must see.
+ * Git warnings remain visible because that prefix also carries actionable
+ * diagnostics such as refusing to delete a branch or lose an untracked file.
  *
  * If the only useful content is filtered out we fall back to the raw
  * stderr — losing nothing is more important than tidiness.

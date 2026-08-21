@@ -204,7 +204,7 @@ const RepoRefreshButton = defineComponent<{
   },
 })
 
-function RepoActivityIndicator({ activity: _activity, label }: { activity: RepoActivity; label: string }) {
+function RepoActivityIndicator({ label }: { activity: RepoActivity; label: string }) {
   return (
     <div class="flex items-center gap-2">
       <Tip label={label}>
@@ -228,7 +228,7 @@ function RepoActivityIndicator({ activity: _activity, label }: { activity: RepoA
   )
 }
 
-function RepoCompletionIndicator({ completion: _completion, label }: { completion: RepoCompletion; label: string }) {
+function RepoCompletionIndicator({ label }: { completion: RepoCompletion; label: string }) {
   return (
     <div class="flex items-center gap-2">
       <Tip label={label}>

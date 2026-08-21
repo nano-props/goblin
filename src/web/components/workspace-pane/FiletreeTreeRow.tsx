@@ -37,6 +37,7 @@ interface FiletreeTreeRowProps {
 export const FiletreeTreeRow: FunctionalComponent<FiletreeTreeRowProps> = (props) => {
   const { node } = props.row
   const isDirectory = node.kind === 'directory'
+  const onOpenFile = props.onOpenFile
   return (
     <div
       role="treeitem"
@@ -57,9 +58,7 @@ export const FiletreeTreeRow: FunctionalComponent<FiletreeTreeRowProps> = (props
       )}
       style={{ transform: `translateY(${props.virtualStart}px)` }}
       onClick={(event: MouseEvent) => handleTreeItemClick(event, node, props.isExpanded, props.onRowClick)}
-      onDblclick={
-        props.onOpenFile ? (event: MouseEvent) => handleItemDoubleClick(event, node, props.onOpenFile!) : undefined
-      }
+      onDblclick={onOpenFile ? (event: MouseEvent) => handleItemDoubleClick(event, node, onOpenFile) : undefined}
       onKeydown={(event: KeyboardEvent) => props.onKeydown(node, event)}
     >
       <div
@@ -94,15 +93,15 @@ export const FiletreeTreeRow: FunctionalComponent<FiletreeTreeRowProps> = (props
           {isDirectory ? <Folder size={12} aria-hidden="true" /> : <File size={12} aria-hidden="true" />}
         </span>
         <span class="min-w-0 flex-1 truncate text-current">{node.name}</span>
-        {!isDirectory && (props.onOpenFile || props.onDownloadFile || props.onRequestTrashFile) ? (
+        {!isDirectory && (onOpenFile || props.onDownloadFile || props.onRequestTrashFile) ? (
           <FiletreeActionMenu
             node={node}
             busy={props.isOpeningFile}
             onOpenFile={
-              props.onOpenFile
+              onOpenFile
                 ? (target) => {
                     props.onSelect(target)
-                    props.onOpenFile?.(target)
+                    onOpenFile(target)
                   }
                 : undefined
             }

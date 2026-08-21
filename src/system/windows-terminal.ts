@@ -29,7 +29,7 @@ function isUsableDirectory(p: string): boolean {
  * `cmd.exe` here — that would let the settings UI flag Windows Terminal as
  * available on stock Windows machines, and silently launch a bare cmd.exe
  * window when the user picked "Windows Terminal". If the user wants a
- * cmd.exe-based open they can pick a different backend (when we add one).
+ * cmd.exe-based launch is a separate terminal backend concern.
  */
 export function isWindowsTerminalInstalled(): boolean {
   if (process.platform !== 'win32') return false

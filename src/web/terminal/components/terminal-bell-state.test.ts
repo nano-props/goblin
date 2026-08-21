@@ -58,7 +58,6 @@ describe('terminal bell state', () => {
       terminalSessionId: 'term-111111111111111111111',
       session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })
-
   })
 
   test('prefers the server terminal title over process name in system notifications', async () => {
@@ -83,7 +82,6 @@ describe('terminal bell state', () => {
       terminalSessionId: 'term-111111111111111111111',
       session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })
-
   })
 
   test.each([
@@ -126,7 +124,6 @@ describe('terminal bell state', () => {
     expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
     expect(terminalClient.notifyBell).not.toHaveBeenCalled()
-
   })
 
   test('ignores bells from the visible focused terminal', async () => {
@@ -144,7 +141,6 @@ describe('terminal bell state', () => {
     expect(controller.hasBell(descriptor.terminalSessionId)).toBe(false)
     expect(notify).not.toHaveBeenCalled()
     expect(terminalClient.notifyBell).not.toHaveBeenCalled()
-
   })
 
   test('throttles repeated system notifications for the same terminal', async () => {
@@ -171,7 +167,6 @@ describe('terminal bell state', () => {
 
     expect(notify).toHaveBeenCalledTimes(1)
     expect(terminalClient.notifyBell).toHaveBeenCalledTimes(2)
-
   })
 
   test('supports clearing and removing tracked bell state', () => {
@@ -209,6 +204,5 @@ describe('terminal bell state', () => {
     await Promise.resolve()
 
     expect(terminalClient.notifyBell).toHaveBeenCalledTimes(2)
-
   })
 })

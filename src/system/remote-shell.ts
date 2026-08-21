@@ -1,14 +1,6 @@
-// Shared helpers for safely invoking processes that take a user-supplied
-// SSH alias and remote path as argv. Two concrete consumers today:
-//
-//   - `system/open-app.ts`     → `openRemoteByAppCli(app, cli, alias, path)`
-//     hands the alias + path to a VS Code-family CLI's `--remote` flag.
-//   - `system/remote-terminal.ts` → `buildRemoteTerminalInvocation(alias, path)`
-//     composes an `ssh -tt -- alias "sh -lc ..."` invocation.
-//
-// `isSafeRemoteAlias` and `isSafeRemoteAbsolutePath` are the safety gates.
-// Both reject any alias / path containing shell metacharacters or control
-// bytes, and cap lengths to defend against pathological inputs.
+// Safety gates and quoting for process invocations that carry a user-supplied
+// SSH alias or remote path. Inputs are length-bounded and reject control bytes;
+// shell strings additionally pass through the canonical POSIX quoting helper.
 
 export function isSafeRemoteAlias(alias: string): boolean {
   return alias.length > 0 && alias.length <= 255 && !/[\s\0/?#\\]/.test(alias)

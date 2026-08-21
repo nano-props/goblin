@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { Hono, type Context } from 'hono'
+import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
@@ -29,6 +29,7 @@ import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capab
 import { isJsonContentType } from '#/server/common/http-validate.ts'
 import { createTerminalCommandRoutes } from '#/server/routes/terminal-command.ts'
 import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
+import { pruneExpiredClipboardTempFiles, pruneStaleClipboardTempDirs } from '#/server/clipboard/write-paths.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -82,7 +83,7 @@ export function webStaticCacheControl(requestPath: string, response: Response): 
   return isHashedAsset ? HASHED_WEB_ASSET_CACHE_CONTROL : ENTRY_WEB_ASSET_CACHE_CONTROL
 }
 
-function requireJsonContentType(): ReturnType<typeof createAccessTokenMiddleware> {
+function requireJsonContentType(): MiddlewareHandler {
   return async (c, next) => {
     if (c.req.method !== 'POST') return await next()
     if (!isJsonContentType(c.req.header('content-type'))) {
@@ -294,9 +295,9 @@ export function createApp(options: ServerAppOptions): Hono {
   // interval keeps the event loop alive.
   const periodic = setInterval(
     () => {
-      void import('#/server/clipboard/write-paths.ts')
-        .then((m) => Promise.all([m.pruneStaleClipboardTempDirs(), m.pruneExpiredClipboardTempFiles()]))
-        .catch((err) => console.warn('[clipboard] periodic prune failed', err))
+      void Promise.all([pruneStaleClipboardTempDirs(), pruneExpiredClipboardTempFiles()]).catch((err) =>
+        console.warn('[clipboard] periodic prune failed', err),
+      )
     },
     60 * 60 * 1000,
   )

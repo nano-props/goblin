@@ -1,7 +1,7 @@
 // Main-side IPC bridge to the PTY worker subprocess. Implements the
 // `PtySupervisor` interface by translating high-level supervisor calls
 // into the small PTY-only wire protocol. The worker is spawned lazily on
-// first use. A crash terminates every PTY owned by that process, so a future
+// first use. A crash terminates every PTY owned by that process, so a later
 // spawn request creates the next worker instead of prestarting an empty one.
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -581,7 +581,7 @@ function defaultSpawnWorker(entry: string): TerminalWorkerChildProcess {
   return spawn(process.execPath, [entry], {
     env: process.env,
     stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
-  }) as TerminalWorkerChildProcess
+  })
 }
 
 function terminateWorkerProcess(worker: TerminalWorkerChildProcess): void {

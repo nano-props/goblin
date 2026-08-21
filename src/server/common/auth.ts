@@ -52,16 +52,7 @@ function createAccessTokenMiddlewareForChannels(token: string, allowQuery: boole
   }
 }
 
-/**
- * Read a single cookie from the request's Cookie header. Uses
- * Hono's `getCookie` (which percent-decodes values and handles
- * quoted / `=`-inside-value cases per RFC 6265) — the previous
- * inline parser split on the literal `=` and would have rejected
- * any token containing it. Since the access-token format is base36
- * (`[0-9a-z]`) no decoding actually fires today, but a future
- * format change (e.g. base64url) would have silently broken login
- * for the unlucky user with an `=` in their token.
- */
+/** Read one RFC-compatible cookie value through Hono's canonical parser. */
 function readCookie(c: Context, name: string): string {
   return getCookie(c, name) ?? ''
 }

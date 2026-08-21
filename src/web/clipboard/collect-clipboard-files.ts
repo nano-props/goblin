@@ -1,19 +1,4 @@
-/**
- * Collect file entries from a `ClipboardEvent.clipboardData` or
- * `DragEvent.dataTransfer`, mirroring the existing drop semantics.
- *
- * Prefers the modern `data.files` collection (browser already filtered
- * to `kind === 'file'` items). Falls back to `data.items` for repoOperationSchedulers
- * that surface clipboard blobs only there — even though `DataTransfer`
- * is a partial stub in jsdom, real browsers populate one or the other,
- * so trying both shapes is the right contract.
- *
- * Zero-byte entries with no filename (some platforms emit them as
- * placeholders for "there's clipboard data but no real file") are
- * filtered out. Named zero-byte files are legitimate filesystem entries
- * and must still be allowed through so the path-attempt tier can resolve
- * them.
- */
+/** Collect real files from either browser DataTransfer representation. */
 export function collectClipboardFiles(data: DataTransfer | null): File[] {
   if (!data) return []
   const files: File[] = []

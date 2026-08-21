@@ -10,8 +10,8 @@ export async function openBranchExternalTarget(
   workspaceRuntimeId: string,
   branch: { name: string; pullRequest?: PullRequestInfo },
 ): Promise<ExecResult> {
-  if (branch.pullRequest?.url) return await openExternalUrl(branch.pullRequest.url)
-  return await openRepoUrl(repoId, workspaceRuntimeId, { type: 'branch', branch: branch.name })
+  if (branch.pullRequest?.url) return openExternalUrl(branch.pullRequest.url)
+  return openRepoUrl(repoId, workspaceRuntimeId, { type: 'branch', branch: branch.name })
 }
 
 export async function openUpstreamBranchExternalTarget(
@@ -30,7 +30,7 @@ export async function openUpstreamBranchExternalTarget(
   }
   const branch = tracking.slice(remoteName.length + 1)
   if (!branch) return { ok: false, message: 'error.invalid-upstream-ref' }
-  return await openRepoUrl(repoId, workspaceRuntimeId, { type: 'branch', branch, remote: remoteName })
+  return openRepoUrl(repoId, workspaceRuntimeId, { type: 'branch', branch, remote: remoteName })
 }
 
 function resolveTrackingRemoteName(tracking: string, remotes: readonly string[]): string | null {

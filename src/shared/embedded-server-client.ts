@@ -24,23 +24,20 @@ async function executeEmbeddedServerJson<T>(
   decode: (value: unknown) => T,
   init?: RequestInit,
 ): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(new URL(path, runtime.url).toString(), {
-      ...init,
-      headers: {
-        [ACCESS_TOKEN_HEADER]: runtime.accessToken,
-        ...(init?.headers ?? {}),
-      },
-    })
-  } catch (error) {
+  const response = await fetch(new URL(path, runtime.url).toString(), {
+    ...init,
+    headers: {
+      [ACCESS_TOKEN_HEADER]: runtime.accessToken,
+      ...(init?.headers ?? {}),
+    },
+  }).catch((error: unknown) => {
     if (requestKind === 'query') throw error
     throw new CodedError({
       code: 'OUTCOME_UNCERTAIN',
       message: 'Embedded server request outcome is uncertain',
       cause: error,
     })
-  }
+  })
   if (!response.ok) throw new Error(`Embedded server request failed (${response.status})`)
   try {
     return decode(await response.json())

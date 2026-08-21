@@ -1,5 +1,3 @@
-// Single-page form for creating a linked worktree.
-
 import { GitBranch, GitBranchPlus, RadioTower } from '@lucide/vue'
 import type { LucideIcon } from '@lucide/vue'
 import { SelectRoot } from 'reka-ui'
@@ -141,13 +139,13 @@ export const CreateWorktreeForm = defineComponent<CreateWorktreeFormProps>({
       const onCreate = props.onCreate
       const onCancel = props.onCancel
       formPhase.value = 'creating'
-      let shouldClose = false
-      try {
-        const result = await onCreate({ input: nextInput })
-        shouldClose = result !== false
-      } finally {
-        formPhase.value = 'editing'
-      }
+      const shouldClose = await (async () => {
+        try {
+          return (await onCreate({ input: nextInput })) !== false
+        } finally {
+          formPhase.value = 'editing'
+        }
+      })()
       if (shouldClose) onCancel()
     }
 

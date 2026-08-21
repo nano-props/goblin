@@ -137,7 +137,7 @@ describe('settings routes', () => {
     })
     expect(mocks.handleUpdateUserSettings).toHaveBeenCalledWith(
       { prefs: { lang: 'ja' } },
-      { acceptLanguage: 'ja-JP,ja;q=0.9,en;q=0.8', signal: expect.any(AbortSignal) },
+      { acceptLanguage: 'ja-JP,ja;q=0.9,en;q=0.8' },
     )
   })
 

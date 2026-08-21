@@ -114,7 +114,7 @@ export async function runShowWorkspacePaneTabCommand({
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await showWorkspacePaneTabCommand({ workspaceId, target, tab, navigation })
+  return showWorkspacePaneTabCommand({ workspaceId, target, tab, navigation })
 }
 
 async function showWorkspacePaneTabCommand({
@@ -137,7 +137,7 @@ async function showWorkspacePaneTabCommand({
   }
   if (branchName === null) {
     return tab === 'terminal'
-      ? await runTerminalPrimaryActionCommand({
+      ? runTerminalPrimaryActionCommand({
           workspaceId,
           target,
           navigation,
@@ -145,7 +145,7 @@ async function showWorkspacePaneTabCommand({
       : false
   }
   if (tab === 'terminal')
-    return await runTerminalPrimaryActionCommand({
+    return runTerminalPrimaryActionCommand({
       workspaceId,
       target,
       navigation,
@@ -156,7 +156,7 @@ async function showWorkspacePaneTabCommand({
 export async function runTerminalPrimaryActionCommand(options: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   const target = options.target
   if (!workspacePaneCommandTargetHasFilesystem(target)) return false
-  return await dispatchTerminalRuntimePrimaryAction({
+  return dispatchTerminalRuntimePrimaryAction({
     target,
     currentWorkspaceId: options.workspaceId,
     navigation: options.navigation,
@@ -167,7 +167,7 @@ export async function runTerminalPrimaryActionCommand(options: TerminalPrimaryAc
 export async function runNewTerminalTabCommand(options: NewTerminalTabCommandOptions): Promise<boolean> {
   const target = options.target
   if (!workspacePaneCommandTargetHasFilesystem(target)) return false
-  return await dispatchNewTerminalRuntimeTabAction({
+  return dispatchNewTerminalRuntimeTabAction({
     target,
     currentWorkspaceId: options.workspaceId,
     navigation: options.navigation,
@@ -200,7 +200,7 @@ export async function runCloseCurrentWorkspacePaneTabCommand(
     options.presentationEffects?.onAbandon()
     return false
   }
-  return await runCloseWorkspacePaneTabCommand(options)
+  return runCloseWorkspacePaneTabCommand(options)
 }
 
 export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
@@ -231,7 +231,7 @@ export async function runSelectWorkspacePaneTabByIndexCommand(
   options: SelectWorkspacePaneTabByIndexCommandOptions,
 ): Promise<boolean> {
   if (!options.workspaceId) return false
-  return await dispatchSelectWorkspacePaneTabByIndexAction({
+  return dispatchSelectWorkspacePaneTabByIndexAction({
     ...options,
     location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,
@@ -240,7 +240,7 @@ export async function runSelectWorkspacePaneTabByIndexCommand(
 
 export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!options.workspaceId) return false
-  return await dispatchMoveWorkspacePaneTabAction({
+  return dispatchMoveWorkspacePaneTabAction({
     ...options,
     location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,

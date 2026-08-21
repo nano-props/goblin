@@ -1,9 +1,10 @@
 import * as v from 'valibot'
 import { normalizeTerminalCreateResult, TerminalCreateInputSchema } from '#/shared/terminal-validators.ts'
-import type { WorkspacePaneRuntimeOpenInput, WorkspacePaneRuntimeOpenResult } from '#/shared/workspace-pane-runtime.ts'
 import type {
   WorkspacePaneRuntimeCloseInput,
   WorkspacePaneRuntimeCloseResult,
+  WorkspacePaneRuntimeOpenInput,
+  WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,

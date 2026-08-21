@@ -258,7 +258,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
           bridge.focusTerminal,
         )
         ownedFocusLease = null
-        return await terminal.showTerminalSession(firstSession.terminalSessionId, routeRequest)
+        return terminal.showTerminalSession(firstSession.terminalSessionId, routeRequest)
       })
     } finally {
       ownedFocusLease?.release()

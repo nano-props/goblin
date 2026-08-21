@@ -152,7 +152,10 @@ describe('workspace pane destination navigation', () => {
 
   test.each([
     ['settings', (actions: ReturnType<typeof primaryNavigationActions>['actions']) => actions.openSettings('general')],
-    ['workspace', (actions: ReturnType<typeof primaryNavigationActions>['actions']) => actions.activateWorkspace(REPO_ID)],
+    [
+      'workspace',
+      (actions: ReturnType<typeof primaryNavigationActions>['actions']) => actions.activateWorkspace(REPO_ID),
+    ],
   ])('%s primary navigation supersedes pending destination navigation', async (_name, navigate) => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')

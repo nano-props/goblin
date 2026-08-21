@@ -54,10 +54,7 @@ describe('settings command handlers', () => {
     const { handleUpdateUserSettings } = await import('#/server/settings/write-paths.ts')
 
     await expect(
-      handleUpdateUserSettings(
-        { prefs: { lang: 'ja' } },
-        { acceptLanguage: 'ja-JP,ja;q=0.9,en;q=0.8', signal: new AbortController().signal },
-      ),
+      handleUpdateUserSettings({ prefs: { lang: 'ja' } }, { acceptLanguage: 'ja-JP,ja;q=0.9,en;q=0.8' }),
     ).resolves.toEqual({
       ok: true,
       prefs: updatedSettings,

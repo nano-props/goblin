@@ -45,7 +45,7 @@ type RecentWorkspacesUpdateResponse = {
 } & RuntimeRecentWorkspacesState
 
 export async function getSettingsSnapshot(options?: { signal?: AbortSignal }): Promise<SettingsSnapshot> {
-  return await fetchServerJson('/api/settings', decodeWith(SettingsSnapshotSchema), { signal: options?.signal })
+  return fetchServerJson('/api/settings', decodeWith(SettingsSnapshotSchema), { signal: options?.signal })
 }
 
 function resolveThemeStateFromUserSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
@@ -88,7 +88,7 @@ export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promi
   // authenticated, otherwise the token gate would render with raw
   // i18n keys (the client never has a bootstrap on the web path
   // and the server is not inlining anything into HTML anymore).
-  return await fetchServerJson('/api/i18n', decodeWith(I18nSnapshotSchema), { signal: options?.signal })
+  return fetchServerJson('/api/i18n', decodeWith(I18nSnapshotSchema), { signal: options?.signal })
 }
 
 export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
@@ -99,7 +99,7 @@ export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
   const filtered = hosts?.filter((host) => host.trim().length > 0)
-  return await postServerJson(
+  return postServerJson(
     '/api/settings/github-cli',
     filtered && filtered.length > 0 ? { hosts: filtered } : {},
     decodeWith(GitHubCliStateSchema),
@@ -107,7 +107,7 @@ export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliStat
 }
 
 export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
-  return await postServerJson(
+  return postServerJson(
     '/api/settings/github-cli/refresh',
     hosts && hosts.length > 0 ? { hosts } : {},
     decodeWith(GitHubCliStateSchema),
@@ -115,7 +115,7 @@ export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCli
 }
 
 export async function getLanInfo(): Promise<LanInfo> {
-  return await fetchServerJson('/api/settings/lan', decodeWith(LanInfoSchema))
+  return fetchServerJson('/api/settings/lan', decodeWith(LanInfoSchema))
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<boolean> {
@@ -123,13 +123,13 @@ export async function setLanEnabled(enabled: boolean): Promise<boolean> {
 }
 
 export async function getExternalAppsSnapshot(options?: { signal?: AbortSignal }): Promise<ExternalAppsSnapshot> {
-  return await fetchServerJson('/api/settings/external-apps', decodeWith(ExternalAppsSnapshotSchema), {
+  return fetchServerJson('/api/settings/external-apps', decodeWith(ExternalAppsSnapshotSchema), {
     signal: options?.signal,
   })
 }
 
 export async function refreshExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
-  return await postServerJson('/api/settings/external-apps/refresh', {}, decodeWith(ExternalAppsSnapshotSchema))
+  return postServerJson('/api/settings/external-apps/refresh', {}, decodeWith(ExternalAppsSnapshotSchema))
 }
 
 export async function addRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<RecentWorkspacesUpdateResponse> {
@@ -162,7 +162,7 @@ export async function setRecentWorkspaceExternalApp(input: {
   target: WorkspaceExternalAppTarget
   itemId: string
 }): Promise<WorkspaceSettingsState> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/settings/workspace-external-app-recent',
     {
       workspaceId: input.workspaceId,
@@ -177,7 +177,7 @@ export async function restoreServerWorkspace(
   clientId: string,
   options?: { activeWorkspaceId?: WorkspaceId | null; signal?: AbortSignal },
 ): Promise<WorkspaceRestoreResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/settings/workspace/restore',
     {
       clientId,
@@ -206,7 +206,7 @@ export async function restoreWorkspaceTabs(
   workspaceRuntimeId: string,
   options?: { signal?: AbortSignal },
 ): Promise<WorkspaceTabsRestoreResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/settings/workspace/tabs/restore',
     { clientId, workspaceId, workspaceRuntimeId },
     decodeWith(WorkspaceTabsRestoreResponseSchema),
@@ -237,5 +237,5 @@ export async function setGlobalShortcutDisabled(disabled: boolean): Promise<bool
 
 export async function setGlobalShortcut(accelerator: string): Promise<SetGlobalShortcutResult> {
   if (!canUseGlobalShortcutSettings()) throw new Error('Global shortcut unavailable')
-  return await invokeNativeIpcPath<SetGlobalShortcutResult>('settings.setGlobalShortcut', { accelerator })
+  return invokeNativeIpcPath<SetGlobalShortcutResult>('settings.setGlobalShortcut', { accelerator })
 }

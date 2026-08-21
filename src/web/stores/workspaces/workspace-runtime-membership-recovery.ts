@@ -53,8 +53,8 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   set: WorkspacesSet,
   get: WorkspacesGet,
 ): Promise<WorkspaceRuntimeMembershipRecoveryResult> {
-  const recovery = await runExclusiveWorkspaceRuntimeMembershipCommand(
-    async () => await reconcileOpenWorkspaceRuntimeMembershipsNow(set, get),
+  const recovery = await runExclusiveWorkspaceRuntimeMembershipCommand(() =>
+    reconcileOpenWorkspaceRuntimeMembershipsNow(set, get),
   )
   if (recovery.kind === 'superseded') return recovery
   const changedRemoteWorkspaceIds = new Set(

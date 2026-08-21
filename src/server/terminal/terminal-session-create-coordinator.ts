@@ -56,10 +56,10 @@ class TerminalSessionCreateCoordinator {
     input: TerminalSessionCreateAllocationInput,
     task: (allocation: { terminalSessionId: string }) => Promise<T>,
   ): Promise<T> {
-    return await task({ terminalSessionId: await this.allocateSessionIdForCreate(input) })
+    return await task({ terminalSessionId: this.allocateSessionIdForCreate(input) })
   }
 
-  private async allocateSessionIdForCreate(input: TerminalSessionCreateAllocationInput): Promise<string> {
+  private allocateSessionIdForCreate(input: TerminalSessionCreateAllocationInput): string {
     if (input.kind === 'primary') {
       const existingSessionId = this.manager.primaryTerminalSessionIdForFilesystemTarget(
         input.userId,

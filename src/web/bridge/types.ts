@@ -61,15 +61,7 @@ export interface ClientTerminal {
   onIdentity: (cb: (event: TerminalIdentityRealtimeEvent) => void) => () => void
   onLifecycle: (cb: (event: TerminalLifecycleRealtimeEvent) => void) => () => void
   onSessionsChanged: (cb: (event: TerminalSessionsChangedEvent) => void) => () => void
-  /**
-   * Subscribe to per-session close broadcasts from the server. Emitted
-   * after a successful `close` IPC alongside the broader
-   * `sessions-changed` event. The `TerminalSessionProjection` uses this
-   * to drop a stale local entry immediately, without waiting for the
-   * next reconcile — the critical fix for the "open new terminal and
-   * see the previous shell's `Restored session: …` line print twice"
-   * bug, where a lost close request left the server PTY alive.
-   */
+  /** Subscribe to authoritative per-session close broadcasts. */
   onSessionClosed: (cb: (event: TerminalSessionClosedEvent) => void) => () => void
 }
 
@@ -85,10 +77,7 @@ export interface ClientWorkspacePaneRuntime {
 }
 
 export interface ClientAppRealtimeLifecycle {
-  /**
-   * Force/probe reconnect for the shared app realtime WebSocket. Used by the
-   * app runtime projection owner on browser visibility recovery.
-   */
+  /** Probe reconnection for the shared realtime transport. */
   kickReconnect: () => void
   onRecovered: (cb: (clientId: string) => void) => () => void
 }
@@ -108,24 +97,9 @@ export interface ClientBridge {
   abortIpc(requestId: string): Promise<boolean>
   onEffectIntent(cb: (event: ClientEffectIntent) => void): () => void
   pathForFile(file: File): string
-  /**
-   * Persist clipboard / drop file blobs to a runtime-resolved location and
-   * return absolute paths the PTY can read. Electron writes under
-   * `<os.tmpdir>/goblin-clipboard-<pid>/`; web POSTs multipart to
-   * `/api/clipboard/files` and the server writes under
-   * `<serverDataDir()>/clipboard-tmp-<pid>/`. Returns `[]` on any failure
-   * so the resolver can count backend transfer failures separately from
-   * unsafe path filtering.
-   */
+  /** Persist clipboard blobs and return one readable absolute path per input file. */
   saveClipboardFiles(files: File[]): Promise<string[]>
-  /**
-   * Electron-only: atomically stage a freshly generated access token
-   * for the next embedded-server start. The running server and current
-   * authentication cookie remain authoritative until the user restarts.
-   * Throws (via the IPC reject path)
-   * when called from a non-Electron runtime; the Web settings page
-   * gates the rotation button on `kind() === 'electron'`.
-   */
+  /** Read or stage the Electron embedded-server access token projection. */
   getAccessTokenProjection(): Promise<AccessTokenProjection>
   rotateAccessToken(): Promise<AccessTokenProjection>
   host(): ClientHostBridge | null

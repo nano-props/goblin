@@ -5,13 +5,7 @@ import { INIT_COMMAND } from '#/server/g-command/commands/init.ts'
 import { VIEW_COMMANDS } from '#/server/g-command/commands/view.ts'
 import { TERM_COMMAND } from '#/server/g-command/commands/term.ts'
 
-// Registry of every `g` subcommand. To add a new command:
-//   1) Implement it (own file under `commands/` or inline here).
-//   2) Append it to `COMMANDS`.
-//
-// The CLI (`cli.ts`) does lookup-and-run only — it never references
-// individual command names. Adding/removing a command should never
-// require touching `cli.ts` beyond this file.
+// Canonical registry for `g` command dispatch and help output.
 const HELP_COMMAND: GoblinCommand = {
   name: 'help',
   summary: 'Show this help.',
@@ -33,8 +27,8 @@ export function formatUsage(commands: readonly GoblinCommand[]): string {
   // `command.usage ?? \`g ${command.name}\`` lets a command override
   // the default rendering (e.g. `g log <ref>`) without forcing every
   // command to spell it out.
-  const usages = commands.map((command) => `  ${command.usage ?? `g ${command.name}`}`)
-  const columnWidth = Math.max(...usages.map((usage) => stringWidth(usage))) + 2
-  const rows = commands.map((command, index) => `${padTerminalTextEnd(usages[index]!, columnWidth)}${command.summary}`)
+  const entries = commands.map((command) => ({ command, usage: `  ${command.usage ?? `g ${command.name}`}` }))
+  const columnWidth = Math.max(...entries.map(({ usage }) => stringWidth(usage))) + 2
+  const rows = entries.map(({ command, usage }) => `${padTerminalTextEnd(usage, columnWidth)}${command.summary}`)
   return ['Goblin terminal command', '', 'Usage:', ...rows].join('\n')
 }

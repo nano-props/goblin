@@ -52,7 +52,7 @@ export async function handleSetFetchInterval(
 
 export async function handleUpdateUserSettings(
   input: UpdateUserSettingsInput,
-  options: { acceptLanguage?: string; signal: AbortSignal },
+  options: { acceptLanguage?: string },
 ): Promise<UserSettingsUpdateResponse> {
   const patch = input.prefs
   const settings = await updateUserSettings(patch)

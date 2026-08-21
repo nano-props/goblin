@@ -305,14 +305,12 @@ describe('useBranchActions', () => {
       await requiredAction(result.value.actions.openFinder, 'openFinder')()
     })
 
-    expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(
-      {
-        kind: 'git-worktree',
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        root: workspaceIdForTest('goblin+file:///tmp/local-feature'),
-      },
-    )
+    expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith({
+      kind: 'git-worktree',
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      root: workspaceIdForTest('goblin+file:///tmp/local-feature'),
+    })
   })
 
   test('clears local pending state when the branch action target changes', async () => {

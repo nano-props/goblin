@@ -1,6 +1,3 @@
-// Persistent Git workspace navigator pane. ScrollArea container
-// around the shared GitWorkspaceNavigatorView.
-
 import { GitWorkspaceNavigatorView } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorView.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import type { FunctionalComponent } from 'vue'

@@ -1,5 +1,3 @@
-// Shared data layer for every Git workspace navigator surface.
-
 import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import type { BranchViewMode } from '#/shared/api-types.ts'

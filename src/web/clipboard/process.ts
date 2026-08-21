@@ -46,7 +46,7 @@ export type PastePreview = { kind: 'no-op' } | { kind: 'text'; text: string } | 
  * Decide which channel wins when both `text/plain` and `Files` are
  * present on the same paste event.
  *
- * Signals, in priority workspaceOrder:
+ * Signals, in priority order:
  * - **Tab character** (`\t`): strongest signal of tabular data
  *   (Excel / Numbers / Sheets TSV). Single-row and multi-row copies
  *   always contain tabs, so this branch reliably keeps tabular data

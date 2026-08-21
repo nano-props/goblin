@@ -71,8 +71,9 @@ function isCommandMissing(err: unknown): boolean {
 
 function errorMessageFromUnknown(err: unknown): string | null {
   if (typeof err !== 'object' || err === null) return null
-  const maybe = err as { stderr?: unknown; message?: unknown }
-  if (typeof maybe.stderr === 'string' && maybe.stderr.trim()) return maybe.stderr.trim()
-  if (typeof maybe.message === 'string' && maybe.message.trim()) return maybe.message.trim()
+  const stderr = Reflect.get(err, 'stderr')
+  if (typeof stderr === 'string' && stderr.trim()) return stderr.trim()
+  const message = Reflect.get(err, 'message')
+  if (typeof message === 'string' && message.trim()) return message.trim()
   return null
 }

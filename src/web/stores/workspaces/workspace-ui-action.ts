@@ -23,13 +23,10 @@ export async function dispatchWorkspaceUiAction(
 }
 
 export async function runWorkspaceUiAction(action: () => Promise<ExecResult>): Promise<ExecResult | null> {
-  let result: ExecResult
-  try {
-    result = await action()
-  } catch (error) {
+  const result = await action().catch((error: unknown): ExecResult => {
     if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) throw error
-    result = { ok: false, message: error instanceof Error ? error.message : String(error) }
-  }
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  })
   if (!result.ok && result.message === 'cancelled') return null
   return result
 }

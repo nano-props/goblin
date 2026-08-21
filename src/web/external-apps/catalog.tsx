@@ -75,18 +75,7 @@ export const WORKSPACE_EXTERNAL_APPS = [
   ...WORKSPACE_EXTERNAL_FINDER_APPS,
 ] as const satisfies readonly WorkspaceExternalAppItem[]
 
-// Compile-time guard: every item id in WORKSPACE_EXTERNAL_APPS must
-// be a member of the shared `WorkspaceExternalAppId` union, otherwise
-// the server-side normalizer would reject the value as unknown. This
-// is a two-way check — both `RegisteredIds extends
-// WorkspaceExternalAppId` (catches an id in the web array that isn't
-// in the shared set) and `WorkspaceExternalAppId extends
-// RegisteredIds` (catches a shared set entry that has no matching
-// web item, which would be a dead id the user can never pick).
-//
-// Adding a new editor (e.g. WebStorm as `'editor:webstorm'`) requires
-// updating BOTH sides — the guard will fail to typecheck if either
-// side is missed. See the full checklist in `src/system/editors.ts`.
+// Keep the UI catalog and shared persisted ID union exhaustive in both directions.
 type RegisteredIds = (typeof WORKSPACE_EXTERNAL_APPS)[number]['id']
 type AssertAllRegisteredIdsAreKnown = RegisteredIds extends WorkspaceExternalAppId
   ? WorkspaceExternalAppId extends RegisteredIds

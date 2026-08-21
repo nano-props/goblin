@@ -163,14 +163,13 @@ function decodeUriPathSegments(uriPath: string): string[] | null {
   const decoded: string[] = []
   for (const encoded of uriPath.slice(1).split('/')) {
     if (!encoded || !isEncodedSegmentSyntax(encoded)) return null
-    let segment: string
     try {
-      segment = decodeURIComponent(encoded)
+      const segment = decodeURIComponent(encoded)
+      if (!isValidDecodedSegment(segment)) return null
+      decoded.push(segment)
     } catch {
       return null
     }
-    if (!isValidDecodedSegment(segment)) return null
-    decoded.push(segment)
   }
   return decoded
 }

@@ -63,6 +63,7 @@ import {
 type FetchIntervalListener = (sec: number) => void
 type UserSettingsReadOutcome =
   { kind: 'missing' } | { kind: 'current'; data: UserSettingsData; needsRewrite: boolean } | { kind: 'invalid' }
+type UserSettingsJsonReadOutcome = Awaited<ReturnType<typeof readUserSettingsJson>> | { kind: 'invalid' }
 
 let settingsData: UserSettingsData | null = null
 let settingsLoadPromise: Promise<UserSettingsData> | null = null
@@ -100,19 +101,21 @@ function cloneWorkspace(workspace: ServerWorkspaceState): ServerWorkspaceState {
 }
 
 async function readUserSettingsFile(): Promise<UserSettingsReadOutcome> {
-  let persisted: Awaited<ReturnType<typeof readUserSettingsJson>>
-  try {
-    persisted = await readUserSettingsJson()
-  } catch (error) {
+  const persisted = await readUserSettingsJson().catch((error: unknown): UserSettingsJsonReadOutcome => {
     if (error instanceof SyntaxError) return { kind: 'invalid' }
     throw error
-  }
+  })
+  if (persisted.kind === 'invalid') return persisted
   if (persisted.kind === 'missing') return { kind: 'missing' }
   const raw = persisted.value
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { kind: 'invalid' }
-  const current = currentSettingsData(raw as Record<string, unknown>)
+  if (!isUnknownRecord(raw)) return { kind: 'invalid' }
+  const current = currentSettingsData(raw)
   if (!current) return { kind: 'invalid' }
   return { kind: 'current', data: current, needsRewrite: !isDeepStrictEqual(current, raw) }
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 function defaultUserSettingsData(): UserSettingsData {

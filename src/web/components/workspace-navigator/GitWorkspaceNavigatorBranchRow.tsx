@@ -1,5 +1,3 @@
-// Adapts repository, operation, and terminal projections into BranchRow props.
-
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { BranchRow } from '#/web/components/workspace-navigator/BranchRow.tsx'

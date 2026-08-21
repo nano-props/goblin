@@ -428,14 +428,13 @@ function worktreeRemovedFollowupResult(
 }
 
 function remoteWorktreeRemovalResultForUser(result: RemoteWorktreeRemovalResult): RepoMutationResult {
-  let message = result.message
-  if (!result.ok && result.failureExecution) {
-    const failure = { ok: false, message: result.message }
-    message =
-      result.failureStage === 'worktree-remove'
+  const failure = { ok: false, message: result.message }
+  const message =
+    !result.ok && result.failureExecution
+      ? result.failureStage === 'worktree-remove'
         ? worktreeCommandFailureForUser(failure, result.failureExecution, 'remove').message
         : commandFailureForUser(failure, result.failureExecution).message
-  }
+      : result.message
   const normalized = { ok: result.ok, message }
   if (result.worktreeRemoved === true) {
     return worktreeRemovedFollowupResult(normalized, result.branchEffect ?? 'none')
@@ -444,13 +443,12 @@ function remoteWorktreeRemovalResultForUser(result: RemoteWorktreeRemovalResult)
 }
 
 function publicBranchDeleteResult(result: BranchDeleteResult): RepoMutationExecResult {
-  let publicResult: RepoMutationExecResult = result.failureExecution
+  const publicResult: RepoMutationExecResult = result.failureExecution
     ? commandFailureForUser({ ok: result.ok, message: result.message }, result.failureExecution)
     : { ok: result.ok, message: result.message }
-  if (!result.ok && result.branchEffect === 'local-delete-confirmed') {
-    publicResult = withRecoveryMessage(publicResult, 'error.local-branch-deleted-followup-failed')
-  }
-  return publicResult
+  return !result.ok && result.branchEffect === 'local-delete-confirmed'
+    ? withRecoveryMessage(publicResult, 'error.local-branch-deleted-followup-failed')
+    : publicResult
 }
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
@@ -465,7 +463,7 @@ async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
 }
 
 function classifyPathProbeError(err: unknown): string {
-  const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: unknown }).code) : ''
+  const code = typeof err === 'object' && err ? String(Reflect.get(err, 'code') ?? '') : ''
   if (code === 'ENOENT') return 'error.path-not-found'
   if (code === 'ENOTDIR') return 'error.path-not-directory'
   if (code === 'EACCES' || code === 'EPERM') return 'error.path-permission-denied'

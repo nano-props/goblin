@@ -397,7 +397,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
       scope: string
       epochCapability: WorkspaceRuntimeEpochCapability
     },
-    commit: (snapshot: WorkspacePaneTabsSnapshot) => undefined,
+    commit: (snapshot: WorkspacePaneTabsSnapshot) => void,
   ): Promise<void> {
     assertWorkspaceRuntimeEpochCapability(
       input.epochCapability,
@@ -437,11 +437,10 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     const lease = physicalWorktreeAdmissionLease(capability)
     const workspaceIds = new Set(this.physicalWorktreeTargets(capability).map((ref) => ref.target.workspaceId))
     await Promise.all(
-      [...workspaceIds].map(
-        async (workspaceId) =>
-          await this.runWorkspaceTabsOperation(workspaceId, (layout) => {
-            layout.clearPhysicalIdentity(workspaceId, lease)
-          }),
+      [...workspaceIds].map((workspaceId) =>
+        this.runWorkspaceTabsOperation(workspaceId, (layout) => {
+          layout.clearPhysicalIdentity(workspaceId, lease)
+        }),
       ),
     )
   }
@@ -540,23 +539,17 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
             assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
             layout.commitProjectionTargets({
               ...scope,
-              targets: currentEntries.map((entry) => {
-                return requiredProjectionForRuntimeTarget(currentTargets, currentProviders, entry.target)
-              }),
-              physicalTargets: capturedWorktrees
-                .filter(({ worktreePath }) => projectedWorktreePaths.includes(worktreePath))
-                .flatMap(({ worktreePath, capability }) =>
-                  currentEntries.flatMap((entry) => {
-                    const projection = requiredProjectionForRuntimeTarget(
-                      currentTargets,
-                      currentProviders,
-                      entry.target,
-                    )
-                    return projection.nativeWorktreePath === worktreePath
-                      ? [{ target: projection.target, lease: physicalWorktreeAdmissionLease(capability) }]
-                      : []
-                  }),
-                ),
+              targets: currentEntries.map((entry) =>
+                requiredProjectionForRuntimeTarget(currentTargets, currentProviders, entry.target),
+              ),
+              physicalTargets: capturedWorktrees.flatMap(({ worktreePath, capability }) =>
+                currentEntries.flatMap((entry) => {
+                  const projection = requiredProjectionForRuntimeTarget(currentTargets, currentProviders, entry.target)
+                  return projection.nativeWorktreePath === worktreePath
+                    ? [{ target: projection.target, lease: physicalWorktreeAdmissionLease(capability) }]
+                    : []
+                }),
+              ),
               epochCapability: input.epochCapability,
             })
             return await layout.snapshot({
@@ -579,9 +572,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     worktreePaths: readonly string[],
   ): Promise<PhysicalWorktreeExecutionCapability[]> {
     return uniqueSortedCapabilities(
-      await Promise.all(
-        worktreePaths.map(async (worktreePath) => await this.capturePhysicalWorktree(input, worktreePath)),
-      ),
+      await Promise.all(worktreePaths.map((worktreePath) => this.capturePhysicalWorktree(input, worktreePath))),
     )
   }
 

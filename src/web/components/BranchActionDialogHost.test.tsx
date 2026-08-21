@@ -124,7 +124,8 @@ function render(element: VNode) {
   const result = renderInJsdom(<VueQueryClientScope client={appQueryClient}>{element}</VueQueryClientScope>)
   return {
     ...result,
-    rerender: (next: VNode) => result.rerender(<VueQueryClientScope client={appQueryClient}>{next}</VueQueryClientScope>),
+    rerender: (next: VNode) =>
+      result.rerender(<VueQueryClientScope client={appQueryClient}>{next}</VueQueryClientScope>),
   }
 }
 

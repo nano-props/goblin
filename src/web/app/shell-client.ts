@@ -45,7 +45,7 @@ export function pathForDroppedFile(file: File): string {
  * Transport, HTTP, and response-contract failures reject.
  */
 export async function saveClipboardFiles(files: File[]): Promise<string[]> {
-  return await getClientBridge().saveClipboardFiles(files)
+  return getClientBridge().saveClipboardFiles(files)
 }
 
 function isAllowedExternalUrl(url: string, allowHttp: boolean): boolean {
@@ -58,14 +58,7 @@ function isAllowedExternalUrl(url: string, allowHttp: boolean): boolean {
 }
 
 function openBrowserUrl(url: string): ExecResult {
-  // window.open() with `noopener` returns null by spec even when the new tab
-  // does open — that is the whole point of `noopener`: sever the opener's
-  // reference to prevent reverse tabnabbing. Popup blockers and sandboxed
-  // iframes also surface as null. With noopener required for security, we
-  // cannot distinguish "opened" from "blocked" synchronously, so trust the
-  // browser. The URL has already been validated by isAllowedExternalUrl.
-  // Mirrors shell-ipc.ts's desktop behaviour, which likewise reports
-  // success based on the platform call rather than an observable side effect.
+  // With `noopener`, browsers do not synchronously reveal whether the external tab opened.
   window.open(url, '_blank', 'noopener,noreferrer')
   return { ok: true, message: url }
 }
@@ -76,38 +69,38 @@ function openExternalUrlInBrowser(url: string, allowHttp: boolean): ExecResult {
 
 async function openExternalUrlWithPolicy(url: string, allowHttp: boolean): Promise<ExecResult> {
   const bridge = getClientBridge()
-  if (bridge.kind() === 'electron') return await requiredNativeHost().openExternalUrl({ url, allowHttp })
+  if (bridge.kind() === 'electron') return requiredNativeHost().openExternalUrl({ url, allowHttp })
   return openExternalUrlInBrowser(url, allowHttp)
 }
 
 export async function openAppSettings(page: SettingsPage = 'general'): Promise<boolean> {
-  return await requiredNativeHost().openSettingsWindow({ page })
+  return requiredNativeHost().openSettingsWindow({ page })
 }
 
 export async function openProjectGitHub(): Promise<ExecResult> {
-  return await openExternalUrlWithPolicy(PROJECT_GITHUB_URL, false)
+  return openExternalUrlWithPolicy(PROJECT_GITHUB_URL, false)
 }
 
 export async function openExternalUrl(url: string): Promise<ExecResult> {
-  return await openExternalUrlWithPolicy(url, true)
+  return openExternalUrlWithPolicy(url, true)
 }
 
 export async function chooseLocalWorkspacePath(options: DirectoryPickerOptions = {}): Promise<string | null> {
-  return await chooseDirectoryPath('Open Workspace', options)
+  return chooseDirectoryPath('Open Workspace', options)
 }
 
 export async function chooseCloneParentPath(options: DirectoryPickerOptions = {}): Promise<string | null> {
-  return await chooseDirectoryPath('Choose Clone Destination', options)
+  return chooseDirectoryPath('Choose Clone Destination', options)
 }
 
 async function chooseDirectoryPath(title: string, options: DirectoryPickerOptions): Promise<string | null> {
   options.signal?.throwIfAborted()
   const selection = requiredNativeHost().openDirectoryDialog({ title })
-  return options.signal ? await waitForPromiseWithSignal(selection, options.signal) : await selection
+  return options.signal ? waitForPromiseWithSignal(selection, options.signal) : selection
 }
 
 export async function consumeExternalOpenPaths(): Promise<string[]> {
   const bridge = getClientBridge()
   if (bridge.kind() === 'web') return []
-  return await requiredNativeHost().consumeExternalOpenPaths()
+  return requiredNativeHost().consumeExternalOpenPaths()
 }

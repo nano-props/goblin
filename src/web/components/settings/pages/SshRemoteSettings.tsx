@@ -1,3 +1,4 @@
+import { defineComponent } from 'vue'
 import {
   SettingsCard,
   SettingsGroup,
@@ -35,4 +36,3 @@ export const SshRemoteSettings = defineComponent({
     )
   },
 })
-import { defineComponent } from 'vue'

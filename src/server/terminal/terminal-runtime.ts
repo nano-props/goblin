@@ -1,13 +1,5 @@
-// Server-side terminal runtime. Single holder of the business state
-// for a Goblin server instance: the session manager, the session service, the
-// realtime broker, the connection-state tracker, and the realtime
-// dispatch table. Exposes a `ServerTerminalHost` to the Hono realtime
-// route. Holds no PTY state itself — the `PtySupervisor` injected at
-// construction owns the PTY pool (in-process or worker-backed).
-//
-// Layering: this file is the server-side "write" layer for the
-// terminal feature. Routes call into it; nothing inside it calls out
-// to the route layer.
+// Composes the server-side terminal business runtime. Native PTY resources
+// remain owned by the injected supervisor.
 
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionCoordinates, type TerminalSessionsChangedEvent } from '#/shared/terminal-types.ts'
@@ -367,13 +359,19 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async commitGitCapabilityRemoval({ runtimeCapability }) {
       const { userId, workspaceId, workspaceRuntimeId } = runtimeCapability
       const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-      let durableLayoutChanged: boolean
-      try {
-        runtimeCapability.assertCurrent()
-        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, runtimeCapability)
-      } catch (error) {
-        return { kind: 'failed-before-commit', error }
+      const durableLayoutResult = await (async () => {
+        try {
+          runtimeCapability.assertCurrent()
+          const changed = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, runtimeCapability)
+          return { kind: 'success', changed } as const
+        } catch (error) {
+          return { kind: 'failure', error } as const
+        }
+      })()
+      if (durableLayoutResult.kind === 'failure') {
+        return { kind: 'failed-before-commit', error: durableLayoutResult.error }
       }
+      const durableLayoutChanged = durableLayoutResult.changed
 
       // The accepted durable CAS is the capability-removal commit point.
       // Register overlay retirement before detaching terminal authority; the

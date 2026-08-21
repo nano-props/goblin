@@ -1,6 +1,4 @@
-import type { Lang, LangPref } from '#/shared/settings.ts'
-
-const SUPPORTED_LANGS = ['zh', 'ko', 'ja', 'en'] as const satisfies readonly Lang[]
+import { LANG_VALUES, type Lang, type LangPref } from '#/shared/settings.ts'
 
 function localeCandidates(input: string | null | undefined): string[] {
   return String(input ?? '')
@@ -10,7 +8,7 @@ function localeCandidates(input: string | null | undefined): string[] {
 }
 
 function matchSupportedLang(locale: string): Lang | null {
-  for (const supported of SUPPORTED_LANGS) {
+  for (const supported of LANG_VALUES) {
     if (locale === supported || locale.startsWith(`${supported}-`)) return supported
   }
   return null
@@ -25,6 +23,5 @@ export function resolveAutoLang(locale: string | null | undefined): Lang {
 }
 
 export function resolvePreferredLang(pref: LangPref, locale: string | null | undefined): Lang {
-  if (pref === 'en' || pref === 'zh' || pref === 'ko' || pref === 'ja') return pref
-  return resolveAutoLang(locale)
+  return pref === 'auto' ? resolveAutoLang(locale) : pref
 }

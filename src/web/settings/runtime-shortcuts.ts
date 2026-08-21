@@ -27,9 +27,8 @@ export function useShortcutSettingsController() {
       await setGlobalShortcutDisabled(disabled)
     },
   )
-  const globalShortcutMutation = useSettingsMutation(
-    'global shortcut update',
-    async (accelerator: string) => await setGlobalShortcut(accelerator),
+  const globalShortcutMutation = useSettingsMutation('global shortcut update', (accelerator: string) =>
+    setGlobalShortcut(accelerator),
   )
   return {
     setShortcutsDisabled(disabled: boolean): void {

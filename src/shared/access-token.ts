@@ -1,19 +1,4 @@
-/**
- * Shared constants for the access-token auth surface.
- *
- * The server (`src/server/common/auth.ts`) and the client
- * (`src/web/lib/server-fetch.ts`, `src/web/clipboard/http-backend.ts`,
- * `src/shared/embedded-server-client.ts`, `src/main/preload.cjs`)
- * all need to agree on the cookie / header / WS-query / URL-param
- * names. Putting the strings in one place prevents the kind of
- * "rename the header on one side, forget the other" bug that
- * produced the original `internalSecret` leak in the first place.
- *
- * This module is intentionally zero-dependency: it exports only
- * string / number constants. `src/shared/access-token-file.ts`
- * uses the file-name constant; everything else imports the wire
- * names.
- */
+/** Shared names and limits for the access-token authentication boundary. */
 
 /** HTTP cookie name set by `POST /api/login`. */
 export const ACCESS_TOKEN_COOKIE = 'goblin_access_token'
@@ -39,10 +24,7 @@ export const ACCESS_TOKEN_URL_PARAM = 'accessToken'
  *  in-memory state) for as long as the file is on disk. */
 export const ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 
-/** File name (under `dataDir`) that holds the persistent access
- *  token. Server and native host share this constant; the file
- *  reader (`access-token-file.ts`) imports it back from here so the
- *  string lives in exactly one place. */
+/** File name under the server data directory that holds the persistent access token. */
 export const ACCESS_TOKEN_FILE_NAME = 'server-token'
 
 export type AccessTokenProjection = {

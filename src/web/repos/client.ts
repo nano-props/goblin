@@ -110,7 +110,7 @@ export async function getRepoRemoteBranches(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RemoteTrackingBranchIdentity[]> {
-  return await postServerJson(
+  return postServerJson(
     '/api/repo/remote-branches',
     { cwd, workspaceRuntimeId },
     decodeWith(RepoRemoteBranchesResponseSchema),
@@ -123,7 +123,7 @@ export async function getRepoSnapshot(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RepoSnapshotResponse> {
-  return await runRepoReadWithStableErrorKey(
+  return runRepoReadWithStableErrorKey(
     () =>
       postServerJson('/api/repo/snapshot', { cwd, workspaceRuntimeId }, decodeWith(RepoSnapshotResponseSchema), {
         signal,
@@ -138,7 +138,7 @@ export async function getRepoPullRequests(
   scope: RepoPullRequestScope,
   signal?: AbortSignal,
 ): Promise<RepoPullRequestsResponse> {
-  return await runRepoReadWithStableErrorKey(
+  return runRepoReadWithStableErrorKey(
     () =>
       postServerJson(
         '/api/repo/pull-requests',
@@ -155,7 +155,7 @@ export async function getRepoWorktreeStatus(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RepoWorktreeStatusSnapshot> {
-  return await runRepoReadWithStableErrorKey(
+  return runRepoReadWithStableErrorKey(
     () =>
       postServerJson(
         '/api/repo/worktree-status',
@@ -172,7 +172,7 @@ export async function getRepoOperations(
   workspaceRuntimeId: string,
   options?: { includeSettled?: boolean; signal?: AbortSignal },
 ): Promise<RepoOperationsSnapshot> {
-  return await postServerJson(
+  return postServerJson(
     '/api/repo/operations',
     { cwd, workspaceRuntimeId, includeSettled: options?.includeSettled },
     decodeWith(RepoOperationsResponseSchema),
@@ -185,7 +185,7 @@ export async function fetchRepo(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/repo/fetch',
     { cwd, workspaceRuntimeId },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -203,7 +203,7 @@ export async function pullRepoBranch(
   worktreePath?: string,
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/repo/pull',
     { cwd, workspaceRuntimeId, branch, worktreePath },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -217,7 +217,7 @@ export async function pushRepoBranch(
   branch: string,
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/repo/push',
     { cwd, workspaceRuntimeId, branch },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -235,7 +235,7 @@ export async function createRepoWorktree(
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
 ): Promise<CreateWorktreeExecResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/repo/create-worktree',
     { cwd, workspaceRuntimeId, ...input, worktreeBootstrap },
     decodeWith(CreateWorktreeExecResultResponseSchema),
@@ -250,7 +250,7 @@ export async function getRepoWorktreeBootstrapPreview(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorktreeBootstrapPreviewResult> {
-  return await postServerJson(
+  return postServerJson(
     '/api/repo/worktree-bootstrap-preview',
     { cwd, workspaceRuntimeId },
     decodeWith(WorktreeBootstrapPreviewResponseSchema),
@@ -265,7 +265,7 @@ export async function deleteRepoBranch(
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/repo/delete-branch',
     { cwd, workspaceRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -288,7 +288,7 @@ export async function removeRepoWorktree(
   },
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/repo/remove-worktree',
     { cwd, workspaceRuntimeId, ...options },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -307,7 +307,7 @@ export async function getRepoPatch(
   worktreePath: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return await postServerJson(
+  return postServerJson(
     '/api/repo/patch',
     { cwd, workspaceRuntimeId, worktreePath },
     decodeWith(ExecResultResponseSchema),

@@ -20,14 +20,16 @@ export function useActionFeedback(): {
 
   function trigger(onSelect: () => boolean | Promise<boolean> | void | Promise<void>): void {
     if (!scopeActive) return
-    let result: ReturnType<typeof onSelect>
-    try {
-      result = onSelect()
-    } catch {
-      return
-    }
+    const invocation = (() => {
+      try {
+        return { ok: true as const, result: onSelect() }
+      } catch {
+        return { ok: false as const }
+      }
+    })()
+    if (!invocation.ok) return
 
-    void Promise.resolve(result)
+    void Promise.resolve(invocation.result)
       .then((accepted) => {
         if (!scopeActive || !accepted || succeeded.value) return
         succeeded.value = true

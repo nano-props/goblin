@@ -63,9 +63,8 @@ function isAbortSignal(value: unknown): value is AbortSignal {
   return (
     !!value &&
     typeof value === 'object' &&
-    'aborted' in value &&
-    'addEventListener' in value &&
-    typeof (value as { addEventListener?: unknown }).addEventListener === 'function'
+    Reflect.has(value, 'aborted') &&
+    typeof Reflect.get(value, 'addEventListener') === 'function'
   )
 }
 
@@ -95,8 +94,7 @@ export async function getGitHubRepoRef(
       .map((remote) => ({ name: remote.name, repo: parseGitHubRemoteUrl(remote.fetchUrl) }))
       .filter((remote): remote is { name: string; repo: GitHubRepoRef } => remote.repo !== null)
     return pickGitHubRepoRef(remotes, upstream)
-  } catch (err) {
-    if (signal?.aborted || isAbortError(err)) return null
+  } catch {
     return null
   }
 }
@@ -125,8 +123,8 @@ function graphqlError(
 
 function graphqlErrorMessage(errors: unknown[]): string {
   const first = errors[0]
-  if (first && typeof first === 'object' && 'message' in first) {
-    const message = (first as { message?: unknown }).message
+  if (first && typeof first === 'object') {
+    const message = Reflect.get(first, 'message')
     if (typeof message === 'string' && message) return message
   }
   return 'GitHub GraphQL returned errors'
@@ -141,17 +139,20 @@ function isAbortError(err: unknown): boolean {
 function ghErrorText(err: unknown): string {
   if (!err || typeof err !== 'object') return String(err)
   const parts = [
-    typeof (err as { shortMessage?: unknown }).shortMessage === 'string'
-      ? (err as { shortMessage: string }).shortMessage
-      : '',
-    typeof (err as { stderr?: unknown }).stderr === 'string' ? (err as { stderr: string }).stderr : '',
-    typeof (err as { stdout?: unknown }).stdout === 'string' ? (err as { stdout: string }).stdout : '',
+    stringProperty(err, 'shortMessage'),
+    stringProperty(err, 'stderr'),
+    stringProperty(err, 'stdout'),
     err instanceof Error ? err.message : String(err),
   ]
   return parts
     .map((part) => part.trim())
     .filter((part, index, array) => part.length > 0 && array.indexOf(part) === index)
     .join('\n')
+}
+
+function stringProperty(value: object, key: string): string {
+  const property = Reflect.get(value, key)
+  return typeof property === 'string' ? property : ''
 }
 
 function ghErrorStatus(message: string): number | undefined {

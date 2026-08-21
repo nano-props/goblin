@@ -148,34 +148,31 @@ describe('GitWorkspaceNavigatorView', () => {
   test.each([
     ['rebase', 'worktree-state.rebase-branch'],
     ['bisect', 'worktree-state.bisect'],
-  ] as const)(
-    'replaces the retained branch row with its detached %s worktree state',
-    (kind, expectedLabel) => {
-      const branch = createRepoBranch('feature/in-progress')
-      seedRepoWithReadModelForTest({
-        id: REPO_ID,
-        branches: [branch],
-        currentBranchName: null,
-        worktrees: [
-          {
-            path: WORKTREE_PATH,
-            head: { kind: 'detached' },
-            headOid: '0123456789abcdef0123456789abcdef01234567',
-            operation: { kind },
-            materializedBranch: branch.name,
-            isSource: false,
-            isPrimary: false,
-            isLocked: false,
-          },
-        ],
-      })
+  ] as const)('replaces the retained branch row with its detached %s worktree state', (kind, expectedLabel) => {
+    const branch = createRepoBranch('feature/in-progress')
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+      currentBranchName: null,
+      worktrees: [
+        {
+          path: WORKTREE_PATH,
+          head: { kind: 'detached' },
+          headOid: '0123456789abcdef0123456789abcdef01234567',
+          operation: { kind },
+          materializedBranch: branch.name,
+          isSource: false,
+          isPrimary: false,
+          isLocked: false,
+        },
+      ],
+    })
 
-      renderGitWorkspaceNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
-      expect(screen.getByText(expectedLabel)).toBeTruthy()
-      expect(screen.queryByText(branch.name)).toBeNull()
-    },
-  )
+    expect(screen.getByText(expectedLabel)).toBeTruthy()
+    expect(screen.queryByText(branch.name)).toBeNull()
+  })
 
   test('opens a materialized branch status through its worktree target', async () => {
     const destination = createRepoBranch('feature/destination')

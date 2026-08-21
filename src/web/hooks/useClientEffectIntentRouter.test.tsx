@@ -697,9 +697,7 @@ describe('useClientEffectIntentRouter', () => {
       })),
       selectTerminal: vi.fn(),
       focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(() =>
-        Promise.resolve({ kind: 'not-committed' as const, message: null }),
-      ),
+      closeTerminalByDescriptor: vi.fn(() => Promise.resolve({ kind: 'not-committed' as const, message: null })),
     })
     renderInJsdom(<HookHost />)
     seedInitialObservedWorkspacePaneRouteForTest({

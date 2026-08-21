@@ -18,11 +18,7 @@ import type {
 
 type MaybePromise<T> = T | Promise<T>
 
-// Re-export the broker's socket interface as the host's socket
-// interface. They are structurally identical; the host's contract
-// for a realtime socket is the same as the broker's contract for
-// one. Defining the alias here (instead of duplicating the shape)
-// keeps the two layers in lockstep when the wire protocol grows.
+// The terminal host uses the broker's realtime socket contract directly.
 import type { ServerAppRealtimeHost, ServerAppRealtimeSocket } from '#/server/realtime/app-realtime-host.ts'
 export type TerminalRealtimeSocket = ServerAppRealtimeSocket
 export type ServerTerminalSocket = ServerAppRealtimeSocket

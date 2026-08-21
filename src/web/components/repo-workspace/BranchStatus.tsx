@@ -229,8 +229,6 @@ export const BranchStatus = defineComponent<Props>({
       const upstreamTone: Tone = branch.trackingGone || !branch.tracking ? 'attention' : 'brand'
       const syncTone: Tone = !branch.tracking ? 'attention' : branch.behind > 0 ? 'attention' : 'success'
       const worktreeLocked = worktree?.isLocked
-      // The "dirty worktree" signal moved to its own row below; the worktree
-      // row only needs to surface lock state on its own.
       const worktreeTone: Tone = worktreeLocked ? 'attention' : worktree ? 'brand' : 'neutral'
       const worktreeValue = worktree ? (
         <div class="inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle">
@@ -278,19 +276,7 @@ export const BranchStatus = defineComponent<Props>({
           {protectedBranch && <StatusChip>{t('branch-status.protected')}</StatusChip>}
         </>
       ) : undefined
-      // Surface the same pull/push/delete actions the sidebar branch row
-      // exposes via its "..." menu, so users don't have to leave the status
-      // tab for common operations. Anchored on the branch row (rather than
-      // its own row) to keep the rest of the tab purely informational.
-      //
-      // `mainItems` comes from the shared action surface and its tab-nav
-      // entries (changes/files/history) explicitly append, since most callers
-      // of that surface (sidebar menu, shortcuts) aren't anchored to any
-      // particular tab. From inside the status tab
-      // itself we *are* anchored — swap those entries for the local
-      // handlers above so opening a tab from this menu follows the same
-      // "insert right after status" placement as the inline links in this
-      // panel (worktree path, changes count).
+      // Status-local tab actions preserve the panel's anchored tab placement.
       const statusTabAnchoredOpeners: Partial<Record<BranchActionItem['id'], () => void>> = {
         files: openFilesTab,
         changes: openChangesTab,

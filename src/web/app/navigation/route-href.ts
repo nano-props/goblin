@@ -33,12 +33,8 @@ export function parsedWorkspacePaneRouteFromTargetHref(
   if (!currentPath.startsWith(prefix)) return undefined
   const [kind, encodedValue, ...rest] = currentPath.slice(prefix.length).split('/')
   if (!encodedValue || rest.length > 0) return undefined
-  let value: string
-  try {
-    value = decodeURIComponent(encodedValue)
-  } catch {
-    return undefined
-  }
+  const value = decodedURIComponent(encodedValue)
+  if (value === null) return undefined
   if (kind === 'tab') {
     return isWorkspacePaneStaticTabType(value)
       ? { kind: 'static', tab: value }
@@ -46,6 +42,14 @@ export function parsedWorkspacePaneRouteFromTargetHref(
   }
   if (kind === 'terminal') return { kind: 'terminal', terminalSessionId: value }
   return undefined
+}
+
+function decodedURIComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return null
+  }
 }
 
 export function routeReturnSearch(

@@ -1,87 +1,14 @@
-// One-pixel divider primitive shared across the app.
-//
-// All inline 1px separators (vertical seams between toolbar siblings,
-// horizontal rules between popover sections) used to be hand-rolled
-// `<div class="h-px bg-separator">` / `<span class="border-l
-// border-separator">` strings. They drifted in height (h-4 vs h-5) and
-// implementation (background fill vs left/right border) across files —
-// this primitive consolidates them.
-//
-// Variants are kept narrow on purpose: this is *only* the 1px line
-// between two sibling elements. Larger surface dividers (the workspace
-// toolbar's own `border-b`, the sidebar's `border-r`, list `divide-y`) continue
-// to use Tailwind border utilities — they belong to the surrounding
-// container's box, not to a separate child element.
-//
-// Orientation:
-//   • horizontal (default): h-px w-full. Use between stacked groups
-//     inside popovers/menus. Primitive-specific separators remain
-//     Reka-wrapped when they participate in keyboard navigation.
-//   • vertical: w-px h-<size>. Use as an inline seam between toolbar
-//     siblings. Most callers wrap the rendered element in a `relative`
-//     parent and add `absolute left-0|right-0 top-1/2 -translate-y-1/2`
-//     via `class` to overlay the seam without consuming layout width.
-//
-// Size:
-//   • sm (default): vertical = h-4 (16px). Matches the tab-strip /
-//     leading-action chrome height (h-7 / h-8 wrappers) across
-//     WorkspacePicker, WorkspacePane, and the Zen Mode seam.
-//   • md: vertical = h-5 (20px). Reserved for any future 40px+
-//     toolbar that needs a chunkier seam — no current caller.
-//
-// The element renders `aria-hidden="true"` because separators here are
-// decorative chrome — surrounding labels carry the actual semantics, and
-// AT skips `aria-hidden` subtrees regardless of any `role` set on them.
-// Tests should query for `[data-slot="separator"]` (and
-// `[data-orientation="vertical"|"horizontal"]` when orientation matters)
-// rather than asserting on implementation-detail class strings.
-
-import { cva, type VariantProps } from 'class-variance-authority'
 import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 
-const separatorVariants = cva('pointer-events-none shrink-0 bg-separator', {
-  variants: {
-    orientation: {
-      horizontal: 'w-full',
-      vertical: 'w-px',
-    },
-    size: {
-      sm: '',
-      md: '',
-    },
-  },
-  compoundVariants: [
-    { orientation: 'horizontal', size: 'sm', class: 'h-px' },
-    { orientation: 'horizontal', size: 'md', class: 'h-px' },
-    { orientation: 'vertical', size: 'sm', class: 'h-4' },
-    { orientation: 'vertical', size: 'md', class: 'h-5' },
-  ],
-  defaultVariants: {
-    orientation: 'horizontal',
-    size: 'sm',
-  },
-})
-
-type SeparatorVariantProps = VariantProps<typeof separatorVariants>
+type SeparatorOrientation = 'horizontal' | 'vertical'
 
 interface SeparatorProps extends HTMLAttributes {
-  orientation?: SeparatorVariantProps['orientation']
-  size?: SeparatorVariantProps['size']
+  orientation?: SeparatorOrientation
 }
 
 const Separator: FunctionalComponent<SeparatorProps> = (props, { attrs }) => {
-  // `aria-hidden` is intentional: separators here are decorative chrome
-  // (the surrounding labels carry the semantics). Skipping `role="separator"`
-  // / `aria-orientation` keeps the ARIA story consistent — both would be
-  // ignored by AT under aria-hidden anyway.
-  //
-  // `data-orientation` / `data-size` fall back to the resolved variant so
-  // the data attributes stay in sync with the applied CVA classes even
-  // when a caller passes the prop as `null` (the destructure default
-  // already covers `undefined`; CVA's `VariantProps` type permits both).
   const resolvedOrientation = props.orientation ?? 'horizontal'
-  const resolvedSize = props.size ?? 'sm'
   const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
   return (
     <div
@@ -89,14 +16,17 @@ const Separator: FunctionalComponent<SeparatorProps> = (props, { attrs }) => {
       aria-hidden="true"
       data-slot="separator"
       data-orientation={resolvedOrientation}
-      data-size={resolvedSize}
-      class={cn(separatorVariants({ orientation: resolvedOrientation, size: resolvedSize }), classValue)}
+      class={cn(
+        'pointer-events-none shrink-0 bg-separator',
+        resolvedOrientation === 'horizontal' ? 'h-px w-full' : 'h-4 w-px',
+        classValue,
+      )}
     />
   )
 }
 
-Separator.props = ['orientation', 'size']
+Separator.props = ['orientation']
 Separator.inheritAttrs = false
 
-export { Separator, separatorVariants }
+export { Separator }
 export type { SeparatorProps }

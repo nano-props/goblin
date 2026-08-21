@@ -46,15 +46,12 @@ export interface AcceleratorShortcutDefinition {
   labelParams?: Record<string, string | number>
 }
 
-export interface ClientMenuCommandContext {}
-
 export interface ClientMenuCommandDefinition {
   id: ClientMenuCommandId
   menuLabelKey: DictKey
   helpLabelKey?: DictKey
-  accelerator?: string | ((context: ClientMenuCommandContext) => string | undefined)
-  enabled?: (context: ClientMenuCommandContext) => boolean
-  intent: ClientEffectIntent | ((context: ClientMenuCommandContext) => ClientEffectIntent)
+  accelerator?: string
+  intent: ClientEffectIntent
 }
 
 export interface BranchActionShortcutDefinition {
@@ -104,7 +101,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     { type: 'open-settings-requested', page: 'general' },
     {
       helpLabelKey: 'help.row.settings',
-      accelerator: () => SETTINGS_SHORTCUT_MAC,
+      accelerator: SETTINGS_SHORTCUT_MAC,
     },
   ),
   clientMenuCommand(
@@ -170,7 +167,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     { type: 'open-settings-requested', page: 'general' },
     {
       helpLabelKey: 'help.row.settings',
-      accelerator: () => SETTINGS_SHORTCUT_NON_MAC,
+      accelerator: SETTINGS_SHORTCUT_NON_MAC,
     },
   ),
   clientMenuCommand(
@@ -288,27 +285,6 @@ export function clientMenuCommandById(id: ClientMenuCommandId): ClientMenuComman
   return command
 }
 
-export function resolveClientMenuCommandAccelerator(
-  command: Pick<ClientMenuCommandDefinition, 'accelerator'>,
-  context: ClientMenuCommandContext,
-): string | undefined {
-  return typeof command.accelerator === 'function' ? command.accelerator(context) : command.accelerator
-}
-
-export function resolveClientMenuCommandIntent(
-  command: Pick<ClientMenuCommandDefinition, 'intent'>,
-  context: ClientMenuCommandContext,
-): ClientEffectIntent {
-  return typeof command.intent === 'function' ? command.intent(context) : command.intent
-}
-
-export function resolveClientMenuCommandEnabled(
-  command: Pick<ClientMenuCommandDefinition, 'enabled'>,
-  context: ClientMenuCommandContext,
-): boolean | undefined {
-  return command.enabled?.(context)
-}
-
 function keyboardShortcut<Action extends ClientKeyboardShortcutAction>(
   matches: KeyboardShortcutMatch[],
   action: Action,
@@ -359,7 +335,7 @@ function keyboardShortcutMatch(
 function clientMenuAcceleratorShortcuts(ids: ClientMenuCommandId[]): AcceleratorShortcutDefinition[] {
   return ids.map((id) => {
     const command = clientMenuCommandById(id)
-    const accelerator = resolveClientMenuCommandAccelerator(command, {})
+    const { accelerator } = command
     if (!accelerator || !command.helpLabelKey)
       throw new Error(`Client menu command ${id} is missing help shortcut metadata`)
     return { accelerator, labelKey: command.helpLabelKey }
