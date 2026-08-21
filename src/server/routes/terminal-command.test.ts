@@ -55,6 +55,14 @@ function createTestApp(host: ServerTerminalCommandHost = terminalCommandHost()) 
   })
 }
 
+function createTestTransport(host: ServerTerminalCommandHost) {
+  const app = createTestApp(host)
+  return createHttpTransport(
+    { GOBLIN_SERVER_URL: 'http://127.0.0.1:32100', GOBLIN_SERVER_ACCESS_TOKEN: 'secret' },
+    async (input, init) => await app.fetch(new Request(input, init)),
+  )
+}
+
 describe('terminal command routes', () => {
   beforeEach(() => {
     disconnectAllClientIntentSockets()
@@ -72,11 +80,7 @@ describe('terminal command routes', () => {
 
   test('serves the terminal list through the real g-command transport', async () => {
     const host = terminalCommandHost()
-    const app = createTestApp(host)
-    const transport = createHttpTransport(
-      { GOBLIN_SERVER_URL: 'http://127.0.0.1:32100', GOBLIN_SERVER_ACCESS_TOKEN: 'secret' },
-      async (input, init) => await app.fetch(new Request(input, init)),
-    )
+    const transport = createTestTransport(host)
 
     const result = await transport.postJson(
       '/api/terminal-command',
@@ -169,11 +173,7 @@ describe('terminal command routes', () => {
         })
       }),
     }
-    const app = createTestApp(host)
-    const transport = createHttpTransport(
-      { GOBLIN_SERVER_URL: 'http://127.0.0.1:32100', GOBLIN_SERVER_ACCESS_TOKEN: 'secret' },
-      async (input, init) => await app.fetch(new Request(input, init)),
-    )
+    const transport = createTestTransport(host)
     const stdout = vi.fn()
     const stderr = vi.fn()
 

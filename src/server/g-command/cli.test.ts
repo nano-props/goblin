@@ -72,47 +72,17 @@ describe('g command cli', () => {
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('g help'))
   })
 
-  test('g delta posts a view intent for the changes tab', async () => {
+  test.each(['delta', 'info', 'log'] as const)('g %s posts through the consolidated endpoint', async (command) => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
     postJson.mockResolvedValue({ output: '' })
 
-    const code = await runGoblinCommand(['delta'], {}, io, transport)
+    const code = await runGoblinCommand([command], {}, io, transport)
 
     expect(code).toBe(0)
     expect(postJson).toHaveBeenCalledWith(
       '/api/terminal-command',
-      { command: 'delta', payload: { args: [] } },
-      expect.any(Function),
-    )
-  })
-
-  test('g info posts a view intent for the status tab', async () => {
-    const { io } = makeIo()
-    const { transport, postJson } = makeTransport()
-    postJson.mockResolvedValue({ output: '' })
-
-    const code = await runGoblinCommand(['info'], {}, io, transport)
-
-    expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith(
-      '/api/terminal-command',
-      { command: 'info', payload: { args: [] } },
-      expect.any(Function),
-    )
-  })
-
-  test('g log posts a view intent for the history tab', async () => {
-    const { io } = makeIo()
-    const { transport, postJson } = makeTransport()
-    postJson.mockResolvedValue({ output: '' })
-
-    const code = await runGoblinCommand(['log'], {}, io, transport)
-
-    expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith(
-      '/api/terminal-command',
-      { command: 'log', payload: { args: [] } },
+      { command, payload: { args: [] } },
       expect.any(Function),
     )
   })
@@ -180,7 +150,7 @@ describe('g command cli', () => {
     )
   })
 
-  test('surfaces server-side errors with non-zero exit code', async () => {
+  test('surfaces command errors with a non-zero exit code', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
     postJson.mockRejectedValue(new Error('no Goblin window is currently listening'))
@@ -189,17 +159,6 @@ describe('g command cli', () => {
 
     expect(code).toBe(1)
     expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('no Goblin window'))
-  })
-
-  test('surfaces transport-level errors with non-zero exit code', async () => {
-    const { io } = makeIo()
-    const { transport, postJson } = makeTransport()
-    postJson.mockRejectedValue(new Error('connection refused'))
-
-    const code = await runGoblinCommand(['delta'], {}, io, transport)
-
-    expect(code).toBe(1)
-    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('connection refused'))
   })
 
   test('g term shows the current built-in terminal', async () => {
