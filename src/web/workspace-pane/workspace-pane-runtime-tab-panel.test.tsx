@@ -97,7 +97,7 @@ afterEach(() => {
 })
 
 describe('workspace pane runtime tab panel', () => {
-  test('renders terminal runtime panel through the runtime panel registry', () => {
+  test('renders the terminal runtime panel with projection recovery', () => {
     const { container, retryWorkspace } = renderPanel()
 
     const panel = container.querySelector('#workspace-terminal-panel')

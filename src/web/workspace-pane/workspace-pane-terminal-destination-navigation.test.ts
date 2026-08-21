@@ -127,7 +127,7 @@ describe('workspace pane terminal destination navigation', () => {
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('keeps detached worktree and non-Git root terminals in their filesystem route families', async () => {
+  test('keeps a detached worktree terminal in its filesystem route family', async () => {
     seedRepoWithReadModelForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
       async () => true,
@@ -149,8 +149,14 @@ describe('workspace pane terminal destination navigation', () => {
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       { navigationGeneration: expect.any(Number) },
     )
+  })
 
+  test('keeps a non-Git root terminal in its filesystem route family', async () => {
     seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async () => true,
+    )
+    const navigation = navigationWith({ commitFilesystemWorkspacePaneRoute })
     seedTerminalPaneTab(null)
     const rootLocation = workspacePaneLocationForRoot(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     await expect(
@@ -164,7 +170,7 @@ describe('workspace pane terminal destination navigation', () => {
         navigation,
       }),
     ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
-    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenLastCalledWith(
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
       rootLocation,
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       { navigationGeneration: expect.any(Number) },

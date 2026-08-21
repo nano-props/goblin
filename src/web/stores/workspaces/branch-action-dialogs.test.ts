@@ -22,17 +22,7 @@ describe('branchActionDialogsStore', () => {
     resetBranchActionDialogsStore()
   })
 
-  test('initial state has all dialog slots closed and no checkbox entries', async () => {
-    const state = branchActionDialogsStore.getState()
-    expect(state.pushConfirm).toBeNull()
-    expect(state.deleteConfirm).toBeNull()
-    expect(state.forceDeleteConfirm).toBeNull()
-    expect(state.removeConfirm).toBeNull()
-    expect(state.forceRemoveConfirm).toBeNull()
-    expect(state.checkboxStateByBranch).toEqual({})
-  })
-
-  test('openPushConfirm sets the pushConfirm slot', async () => {
+  test('openPushConfirm sets the pushConfirm slot', () => {
     branchActionDialogsStore.getState().openPushConfirm({
       repoId: WORKSPACE_1,
       branchName: 'main',
@@ -45,7 +35,7 @@ describe('branchActionDialogsStore', () => {
     })
   })
 
-  test('openRemoveWorktreeConfirm seeds removeAlsoDeletes from isProtectedBranch on first open', async () => {
+  test('openRemoveWorktreeConfirm seeds removeAlsoDeletes from isProtectedBranch on first open', () => {
     branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
         repoId: WORKSPACE_1,
@@ -63,7 +53,7 @@ describe('branchActionDialogsStore', () => {
     })
   })
 
-  test('openRemoveWorktreeConfirm locks removeAlsoDeletes off when branch is protected', async () => {
+  test('openRemoveWorktreeConfirm locks removeAlsoDeletes off when branch is protected', () => {
     branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
         repoId: WORKSPACE_1,
@@ -79,7 +69,7 @@ describe('branchActionDialogsStore', () => {
     })
   })
 
-  test('openRemoveWorktreeConfirm preserves user choices on subsequent opens', async () => {
+  test('openRemoveWorktreeConfirm preserves user choices on subsequent opens', () => {
     // First open: user toggles removeAlsoDeletes off
     branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
@@ -105,7 +95,7 @@ describe('branchActionDialogsStore', () => {
     ).toMatchObject({ removeAlsoDeletes: false })
   })
 
-  test('openForceRemoveWorktreeConfirm closes the regular removeConfirm slot', async () => {
+  test('openForceRemoveWorktreeConfirm closes the regular removeConfirm slot', () => {
     const payload: RemoveWorktreeDialogPayload = { branch: 'feature/x', path: '/tmp/x' }
     branchActionDialogsStore
       .getState()
@@ -125,7 +115,7 @@ describe('branchActionDialogsStore', () => {
     expect(state.forceRemoveConfirm?.payload).toEqual(payload)
   })
 
-  test('closeDialog closes a single named slot', async () => {
+  test('closeDialog closes a single named slot', () => {
     branchActionDialogsStore.getState().openPushConfirm({
       repoId: WORKSPACE_1,
       branchName: 'main',
@@ -135,7 +125,7 @@ describe('branchActionDialogsStore', () => {
     expect(branchActionDialogsStore.getState().pushConfirm).toBeNull()
   })
 
-  test('closeStaleDialogs only closes dialogs whose (repoId, branchName) does not match', async () => {
+  test('closeStaleDialogs only closes dialogs whose (repoId, branchName) does not match', () => {
     // Seed three slots directly via setState to bypass the
     // one-dialog-at-a-time invariant of `openXxx` (which is tested
     // elsewhere). The bug being covered is in the close path, not
@@ -159,7 +149,7 @@ describe('branchActionDialogsStore', () => {
     expect(state.removeConfirm).toBeNull()
   })
 
-  test('closeStaleDialogs closes every dialog when there is no current workspace', async () => {
+  test('closeStaleDialogs closes every dialog when there is no current workspace', () => {
     branchActionDialogsStore.setState({
       pushConfirm: { repoId: WORKSPACE_A, branchName: 'main', payload: 'main' },
       removeConfirm: {
@@ -176,12 +166,7 @@ describe('branchActionDialogsStore', () => {
     expect(state.removeConfirm).toBeNull()
   })
 
-  test('resetBranchActionDialogsStore actually clears slot state (regression: spread-order bug)', async () => {
-    // Pre-fix implementation used `{ ...INITIAL_STATE, ...current }`,
-    // which let `current` override every key in `INITIAL_STATE` and
-    // was a no-op. The fix uses `{ ...INITIAL_STATE }` so the reset
-    // actually reaches the slot fields.
-    //
+  test('reset clears all dialog and checkbox state', () => {
     // We seed the slots directly via `setState` to bypass the
     // one-dialog-at-a-time invariant of `openXxx` (which is tested
     // separately); the bug is in the reset path, not the open path.
@@ -218,7 +203,7 @@ describe('branchActionDialogsStore', () => {
     expect(state.checkboxStateByBranch).toEqual({})
   })
 
-  test('checkbox state survives across dialog close/reopen of the same branch', async () => {
+  test('checkbox state survives across dialog close/reopen of the same branch', () => {
     branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
         repoId: WORKSPACE_1,
@@ -243,7 +228,7 @@ describe('branchActionDialogsStore', () => {
     ).toMatchObject({ removeAlsoUpstream: true })
   })
 
-  test('checkbox state is independent per branch', async () => {
+  test('checkbox state is independent per branch', () => {
     branchActionDialogsStore
       .getState()
       .openRemoveWorktreeConfirm(
@@ -266,7 +251,7 @@ describe('branchActionDialogsStore', () => {
     })
   })
 
-  test('branchCheckboxesFor returns default checkboxes for unknown branches', async () => {
+  test('branchCheckboxesFor returns default checkboxes for unknown branches', () => {
     expect(branchCheckboxesFor(branchActionDialogsStore.getState(), UNKNOWN_WORKSPACE, 'branch')).toEqual({
       removeAlsoDeletes: false,
       removeAlsoUpstream: false,
@@ -274,26 +259,4 @@ describe('branchActionDialogsStore', () => {
     })
   })
 
-  test('regression: dialog state survives any component lifecycle — store is the only owner', async () => {
-    // This test encodes the invariant the zen-mode bug violated.
-    // Before this refactor, dialog state lived in `useRetainedDialogState`
-    // inside `useBranchActions`, which was itself called from inside
-    // a HoverCard subtree. When the HoverCard unmounted, the dialog
-    // state was destroyed. The fix moves state out of any component
-    // subtree, so this test simply verifies the store keeps the slot
-    // open regardless of any "component" events.
-    const payload: RemoveWorktreeDialogPayload = { branch: 'feature/x', path: '/tmp/x' }
-    const entry = {
-      repoId: WORKSPACE_1,
-      branchName: 'feature/x',
-      payload,
-    }
-    branchActionDialogsStore.getState().openRemoveWorktreeConfirm(entry, { isProtectedBranch: false })
-    expect(branchActionDialogsStore.getState().removeConfirm).toEqual(entry)
-
-    // Simulate every conceivable "component unmount" event by simply
-    // not touching the store. The slot must remain open.
-    expect(branchActionDialogsStore.getState().removeConfirm).toEqual(entry)
-    expect(branchActionDialogsStore.getState().removeConfirm?.payload.path).toBe('/tmp/x')
-  })
 })

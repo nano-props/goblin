@@ -1,10 +1,5 @@
 // @vitest-environment jsdom
 
-// Unit tests for the presentational GitWorkspaceNavigatorList. Its contract is
-// "given branches + a highlighted name + callbacks, paint rows and
-// bubble events up". We stub BranchActionsMenu and the terminal bell/output
-// hook so the suite stays focused on the list.
-
 import {
   createRepoBranch,
   createGitRepoPresentationForTest,
@@ -48,12 +43,15 @@ vi.mock('#/web/components/workspace-navigator/WorktreeActionsMenu.tsx', () => ({
   ),
 }))
 
-const terminalStoreMocks = vi.hoisted(() => ({ targetKeys: [] as { readonly value: string | null }[] }))
+const terminalStoreMocks = vi.hoisted(() => ({
+  targetKeys: [] as { readonly value: string | null }[],
+  outputActive: false,
+}))
 
 vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
   useTerminalFilesystemTargetOutputActive: (targetKey: { readonly value: string | null }) => {
     terminalStoreMocks.targetKeys.push(targetKey)
-    return { value: false }
+    return { value: terminalStoreMocks.outputActive }
   },
   useTerminalFilesystemTargetBellCount: () => ({ value: 0 }),
 }))
@@ -61,6 +59,7 @@ vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
 afterEach(() => {
   vi.clearAllMocks()
   terminalStoreMocks.targetKeys = []
+  terminalStoreMocks.outputActive = false
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
 })
 
@@ -94,14 +93,13 @@ describe('GitWorkspaceNavigatorList', () => {
 
   test('renders the emptyState slot when branches is empty', () => {
     const repo = gitWorkspaceNavigatorRepo([], '')
-    const onSelect = vi.fn()
 
     const { container } = renderInJsdom(
       <GitWorkspaceNavigatorList
         repo={repo}
         rows={[]}
         highlightedBranch={null}
-        onSelectBranch={onSelect}
+        onSelectBranch={() => {}}
         onOpenBranchStatus={() => {}}
         emptyState={<div data-testid="empty">nothing here</div>}
       />,
@@ -109,13 +107,9 @@ describe('GitWorkspaceNavigatorList', () => {
 
     expect(container.querySelector('ul')).toBeNull()
     expect(container.querySelector('[data-testid="empty"]')?.textContent).toBe('nothing here')
-    expect(onSelect).not.toHaveBeenCalled()
   })
 
   test('renders the emptyState slot when repo is null', () => {
-    // `branches` is non-empty so the `!repo` branch is the one that
-    // short-circuits — passing `branches={[]}` would exercise the
-    // empty-list early-return instead.
     const { container } = renderInJsdom(
       <GitWorkspaceNavigatorList
         repo={null}
@@ -160,12 +154,7 @@ describe('GitWorkspaceNavigatorList', () => {
   })
 
   test('renders a detached worktree like a branch row without its path and opens target tabs from its menu', async () => {
-    const worktree: WorkspaceRepoWorktreeSnapshot = {
-      ...createRepoWorktreeSnapshotForTest('feature/detached', '/tmp/detached-worktree'),
-      head: { kind: 'detached' },
-      operation: null,
-      materializedBranch: null,
-    }
+    const worktree = detachedWorktree()
     const repo = gitWorkspaceNavigatorRepo([createRepoBranch('main')], 'main', [worktree])
     const onOpenWorktreeTab = vi.fn()
 
@@ -221,6 +210,26 @@ describe('GitWorkspaceNavigatorList', () => {
         (targetKey) => targetKey.value === formatTerminalFilesystemTargetKeyForPath(repo.id, repo.id),
       ),
     ).toBe(true)
+  })
+
+  test('shows terminal output activity on detached worktree state rows', () => {
+    terminalStoreMocks.outputActive = true
+    const worktree = detachedWorktree()
+    const repo = gitWorkspaceNavigatorRepo([createRepoBranch('main')], 'main', [worktree])
+
+    const { container } = renderInJsdom(
+      <GitWorkspaceNavigatorList
+        repo={repo}
+        rows={[{ kind: 'worktree', branch: null, worktree }]}
+        highlightedBranch={null}
+        highlightedWorktreePath={null}
+        onSelectBranch={() => {}}
+        onOpenBranchStatus={() => {}}
+        emptyState={null}
+      />,
+    )
+
+    expect(container.querySelector('[data-testid="terminal-output-activity-indicator"]')).not.toBeNull()
   })
 
   test('highlights the row whose name matches highlightedBranch', () => {
@@ -319,4 +328,13 @@ function gitWorkspaceNavigatorRepo(
       worktrees,
     },
   )
+}
+
+function detachedWorktree(): WorkspaceRepoWorktreeSnapshot {
+  return {
+    ...createRepoWorktreeSnapshotForTest('feature/detached', '/tmp/detached-worktree'),
+    head: { kind: 'detached' },
+    operation: null,
+    materializedBranch: null,
+  }
 }

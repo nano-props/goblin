@@ -45,37 +45,80 @@ describe('CompactWorkspaceLayout', () => {
     expect(compactPane(container, 'workspace')?.hasAttribute('inert')).toBe(false)
   })
 
-  test('retains the outgoing workspace pane content for the slide-out transition', async () => {
+  test.each([
+    {
+      pane: 'workspace',
+      initialActivePane: 'workspace',
+      nextActivePane: 'navigator',
+      initialSidebar: 'navigator',
+      nextSidebar: 'navigator',
+      initialWorkspace: 'workspace-a',
+      nextWorkspace: 'workspace-b',
+    },
+    {
+      pane: 'navigator',
+      initialActivePane: 'navigator',
+      nextActivePane: 'workspace',
+      initialSidebar: 'navigator-a',
+      nextSidebar: 'navigator-b',
+      initialWorkspace: 'workspace',
+      nextWorkspace: 'workspace',
+    },
+  ] as const)('retains the outgoing $pane pane content for the slide-out transition', async (scenario) => {
     useFakeTimers()
     const { container, rerender } = renderInJsdom(
       <CompactWorkspaceLayout
-        activePane="workspace"
-        sidebarPane={<button type="button">navigator</button>}
-        workspacePane={<div data-testid="workspace-a">workspace-a</div>}
+        activePane={scenario.initialActivePane}
+        sidebarPane={<div>{scenario.initialSidebar}</div>}
+        workspacePane={<div>{scenario.initialWorkspace}</div>}
         transitionScopeKey="repo-a"
       />,
     )
-
-    expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
 
     await rerender(
       <CompactWorkspaceLayout
-        activePane="navigator"
-        sidebarPane={<button type="button">navigator</button>}
-        workspacePane={<div data-testid="workspace-b">workspace-b</div>}
+        activePane={scenario.nextActivePane}
+        sidebarPane={<div>{scenario.nextSidebar}</div>}
+        workspacePane={<div>{scenario.nextWorkspace}</div>}
         transitionScopeKey="repo-a"
       />,
     )
 
-    expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
-    expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
-    expect(compactPane(container, 'workspace')?.textContent).not.toContain('workspace-b')
+    const outgoingPane = compactPane(container, scenario.pane)
+    const initialContent = scenario.pane === 'navigator' ? scenario.initialSidebar : scenario.initialWorkspace
+    const nextContent = scenario.pane === 'navigator' ? scenario.nextSidebar : scenario.nextWorkspace
+    expect(outgoingPane?.textContent).toContain(initialContent)
+    expect(outgoingPane?.textContent).not.toContain(nextContent)
 
     await flushTestUpdates(() => {
       vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
     })
 
+    expect(outgoingPane?.textContent).toContain(nextContent)
+  })
+
+  test('does not retain outgoing pane content across transition scopes', async () => {
+    useFakeTimers()
+    const { container, rerender } = renderInJsdom(
+      <CompactWorkspaceLayout
+        activePane="workspace"
+        sidebarPane={<div>navigator</div>}
+        workspacePane={<div>workspace-a</div>}
+        transitionScopeKey="repo-a"
+      />,
+    )
+
+    await rerender(
+      <CompactWorkspaceLayout
+        activePane="navigator"
+        sidebarPane={<div>navigator</div>}
+        workspacePane={<div>workspace-b</div>}
+        transitionScopeKey="repo-b"
+      />,
+    )
+
     expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-b')
+    expect(compactPane(container, 'workspace')?.textContent).not.toContain('workspace-a')
   })
 })
 

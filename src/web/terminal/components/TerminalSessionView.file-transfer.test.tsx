@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 
-import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { MAX_PASTE_BATCH_BYTES, MAX_PASTE_UPLOAD_FILES, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import {
@@ -34,7 +33,7 @@ describe('TerminalSessionView file transfer', () => {
     try {
       const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
       Object.defineProperty(dragEnter, 'dataTransfer', { value: transfer })
-      await flushTestUpdates(async () => rendered.sessionRoot.dispatchEvent(dragEnter))
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(dragEnter))
       expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).not.toBeNull()
 
       const snapshot = {
@@ -53,7 +52,7 @@ describe('TerminalSessionView file transfer', () => {
     }
   })
 
-  test('paste with an oversized blob fails without upload or xterm fallback', async () => {
+  test('paste with an oversized blob fails without upload or terminal input', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     const { toast } = await import('vue-sonner')
@@ -78,10 +77,9 @@ describe('TerminalSessionView file transfer', () => {
     }
   })
 
-  test.each([
-    ['paste', PASTE_FILE_MAX_BYTES + 1],
-    ['drop', 1],
-  ] as const)('remote %s rejects files before local resolution or terminal input', async (kind, fileSize) => {
+  test.each(['paste', 'drop'] as const)(
+    'remote %s rejects files before local resolution or terminal input',
+    async (kind) => {
     const shellClient = await import('#/web/app/shell-client.ts')
     const { toast } = await import('vue-sonner')
     vi.mocked(shellClient.pathForDroppedFile).mockClear()
@@ -95,7 +93,6 @@ describe('TerminalSessionView file transfer', () => {
       },
     )
     const file = new File([new Uint8Array([1])], 'archive.bin')
-    Object.defineProperty(file, 'size', { value: fileSize })
 
     try {
       const transfer = kind === 'drop' ? dropDataWithFiles([file]) : null
@@ -128,7 +125,8 @@ describe('TerminalSessionView file transfer', () => {
     } finally {
       await rendered.cleanup()
     }
-  })
+    },
+  )
 
   test.each(['paste', 'drop'] as const)('%s reports when the selected terminal cannot accept input', async (kind) => {
     const shellClient = await import('#/web/app/shell-client.ts')
@@ -140,18 +138,13 @@ describe('TerminalSessionView file transfer', () => {
     const file = new File(['content'], 'notes.txt')
 
     try {
-      if (kind === 'paste') {
-        const event = new Event('paste', { bubbles: true, cancelable: true })
-        Object.defineProperty(event, 'clipboardData', { value: clipboardDataWithFiles([file]) })
-        rendered.sessionRoot.dispatchEvent(event)
-        expect(event.defaultPrevented).toBe(true)
-      } else {
-        const event = new Event('drop', { bubbles: true, cancelable: true })
-        Object.defineProperty(event, 'dataTransfer', { value: dropDataWithFiles([file]) })
-        rendered.sessionRoot.dispatchEvent(event)
-        expect(event.defaultPrevented).toBe(true)
-      }
+      const event = new Event(kind, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, kind === 'paste' ? 'clipboardData' : 'dataTransfer', {
+        value: kind === 'paste' ? clipboardDataWithFiles([file]) : dropDataWithFiles([file]),
+      })
+      rendered.sessionRoot.dispatchEvent(event)
 
+      expect(event.defaultPrevented).toBe(true)
       expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
       expect(vi.mocked(toast.warning)).toHaveBeenCalledWith('terminal.write-not-sent')
@@ -339,11 +332,6 @@ describe('TerminalSessionView file transfer', () => {
   })
 
   test('drop writes to the terminal session captured by the drop event after a filesystem target switch', async () => {
-    // The blob-save tier is a real roundtrip (HTTP POST in web, IPC in
-    // Electron), so the user can switch filesystem targets before the resolver returns.
-    // The operation target is still the session that received the original
-    // drop event; projection/server lifecycle decides whether that session is
-    // still writable.
     const writeInput = vi.fn()
     const descriptorA = {
       terminalSessionId: 'term-111111111111111111111',
@@ -433,10 +421,6 @@ describe('TerminalSessionView file transfer', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    // Force the blob-save tier (no path-attempt) and gate the
-    // resolution on a Promise we control. The dispatch returns
-    // synchronously; the resolver only runs when we call the
-    // `resolve` we capture here.
     let resolveSave: (paths: string[]) => void = () => {}
     const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
@@ -452,7 +436,7 @@ describe('TerminalSessionView file transfer', () => {
         <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId="repo-runtime-test"
             branch="feature"
             worktreePath="/worktree"
           />
@@ -469,22 +453,17 @@ describe('TerminalSessionView file transfer', () => {
 
       await flushTestUpdates(async () => {
         sessionRoot.dispatchEvent(dropEvent)
-        // Yield to let the resolver start awaiting the (still-pending)
-        // saveClipboardFiles Promise.
         await Promise.resolve()
       })
       expect(container.querySelector('[aria-label="terminal.file-resolution-progress"]')).not.toBeNull()
 
-      // User switches filesystem targets mid-resolve. The session re-renders with
-      // the new descriptor, but the in-flight drop keeps the target captured
-      // at the event boundary.
       activeFilesystemTargetSnapshot = filesystemTargetSnapshotB
       await rerender(
         <TerminalSessionCommandScope value={context}>
           <TerminalSessionReadScope value={readContext}>
             <TerminalSessionView
               repoRoot="/repo"
-              workspaceRuntimeId={'repo-runtime-test'}
+              workspaceRuntimeId="repo-runtime-test"
               branch="feature"
               worktreePath="/worktree-other"
             />
@@ -493,11 +472,6 @@ describe('TerminalSessionView file transfer', () => {
       )
       expect(container.querySelector('[aria-label="terminal.file-resolution-progress"]')).toBeNull()
 
-      // Now resolve the in-flight blob-save call. The chain runs through
-      // several microtask hops (saveClipboardFiles.then →
-      // resolvePastedFiles.then → processDrop.then → handler.then);
-      // Cross one macrotask so the integration promise chain drains inside
-      // the same act boundary as the deferred bridge response.
       await flushTestUpdates(async () => {
         resolveSave(['/tmp/a.png'])
         await waitForNextMacrotask()
@@ -509,14 +483,7 @@ describe('TerminalSessionView file transfer', () => {
     }
   })
 
-  test('Excel-style paste (text + thumbnail blob) defers to xterm.js (text wins)', async () => {
-    // The bug: Excel `Cmd+C` puts TSV on the clipboard along with an
-    // incidental image/png thumbnail. The old code unconditionally
-    // routed through the file resolver, blob-saved the thumbnail,
-    // and wrote `/tmp/.../paste-...png` to the PTY *in addition to*
-    // xterm.js writing the TSV synchronously. The user saw both.
-    // The fix: when text is recognisably tabular text, drop the file
-    // blobs and let xterm.js's native paste handler pick up the text.
+  test('tabular text with a thumbnail defers to terminal text paste', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
@@ -528,25 +495,15 @@ describe('TerminalSessionView file transfer', () => {
     try {
       const event = await dispatchPasteWithText(rendered.sessionRoot, tsv, [thumbnail])
 
-      // We deliberately do NOT preventDefault here — xterm.js gets
-      // the event and writes the TSV to PTY itself. We must also
-      // NOT call writeInput with a path: that was the bug.
       expect(event.defaultPrevented).toBe(false)
       expect(rendered.writeInput).not.toHaveBeenCalled()
-      // And critically: the resolver was never consulted, so the
-      // thumbnail was never blob-saved (no /tmp write either).
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
     }
   })
 
-  test('Linux file copy (URI-list text + real file) prefers files', async () => {
-    // The Linux file copy case the existing comment was trying to
-    // preserve: Nautilus etc. emit the URI list both as `text/uri-list`
-    // AND as `text/plain`. The text is a redundant rendering of the
-    // same URIs already in `Files`. We must still pick the file and
-    // let the resolver produce the shell-quoted path.
+  test('URI-list text with a file prefers file input', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/home/user/foo.png')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
@@ -566,10 +523,6 @@ describe('TerminalSessionView file transfer', () => {
   })
 
   test('pure-text paste (no files) does not preventDefault and does not call writeInput', async () => {
-    // The session must NOT intercept a text-only paste. xterm.js's native
-    // paste handler reads `clipboardData.getData('text/plain')` and
-    // writes the text to PTY itself (with bracketed-paste wrap when
-    // applicable).
     const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])

@@ -62,6 +62,21 @@ describe('invalidation broker', () => {
     expect(second.send).not.toHaveBeenCalled()
   })
 
+  test('removes a socket after delivery fails', () => {
+    const socket = {
+      send: vi.fn(() => {
+        throw new Error('socket closed')
+      }),
+      close: vi.fn(),
+    }
+    registerInvalidationSocket(socket)
+
+    publishRepoReadInvalidation({ repoId: workspaceId, domain: 'metadata' })
+    publishRepoReadInvalidation({ repoId: workspaceId, domain: 'metadata' })
+
+    expect(socket.send).toHaveBeenCalledOnce()
+  })
+
   test('publishes workspace runtime invalidations with canonical workspace identity', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     registerInvalidationSocket(socket, 'user_a')

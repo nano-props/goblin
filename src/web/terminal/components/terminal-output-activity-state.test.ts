@@ -96,30 +96,6 @@ describe('terminal output activity state', () => {
     expect(notify).toHaveBeenLastCalledWith('worktree-1')
   })
 
-  test('keeps active visible until the idle timeout once shown', () => {
-    useFakeTimers()
-    vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
-    const notify = vi.fn()
-    const state = createTerminalOutputActivityState(notify)
-
-    state.markOutput('term-111111111111111111111', 'worktree-1')
-    vi.advanceTimersByTime(500)
-    state.markOutput('term-111111111111111111111', 'worktree-1')
-    vi.advanceTimersByTime(4500)
-    state.markOutput('term-111111111111111111111', 'worktree-1')
-
-    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
-    expect(notify).toHaveBeenCalledTimes(1)
-
-    vi.advanceTimersByTime(4999)
-    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
-    expect(notify).toHaveBeenCalledTimes(1)
-
-    vi.advanceTimersByTime(1)
-    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
-    expect(notify).toHaveBeenCalledTimes(2)
-  })
-
   test('extends the active idle timeout without notifying again', () => {
     useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))

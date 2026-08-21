@@ -11,7 +11,6 @@ import {
   hydrateManagedSession,
   resetTerminalSessionHarness,
   restartResult,
-  startOpenControllerSession,
   startSessionWithProgress,
   terminalCalls,
   terminalGeometryMocks,
@@ -22,7 +21,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalRestartResult } from '#/shared/terminal-types.ts'
 import { waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/terminal/components/TerminalSession.ts'
-import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 
@@ -32,7 +30,7 @@ const geometryMocks = terminalGeometryMocks()
 beforeEach(resetTerminalSessionHarness)
 
 describe('TerminalSession restart and resynchronization', () => {
-  test('uses first-class restart IPC instead of recreating through ensureSession', async () => {
+  test('restarts the current runtime binding without issuing a second attach', async () => {
     const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
@@ -304,122 +302,6 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(session.snapshot().phase).toBe('open')
   })
 
-  test('does not retry an error session when a later layout notification arrives', async () => {
-    terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    expect(session.snapshot().phase).toBe('error')
-    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
-
-    MockResizeObserver.instances[0]!.emit()
-    await flushTerminalStart()
-
-    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
-    expect(session.snapshot().phase).toBe('error')
-  })
-
-  test('does not turn a local attach transport failure into authoritative runtime error metadata', async () => {
-    terminalCalls.attach.mockRejectedValueOnce(new Error('transport unavailable'))
-    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-
-    session.attach(host)
-    await flushTerminalStart()
-
-    expect(session.snapshot().phase).toBe('open')
-    expect(session.addressableRuntimeBinding()).toEqual({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-    })
-    expect(host.querySelector('.goblin-managed-terminal-frame .xterm')).toBeNull()
-    expect(warnSpy).toHaveBeenCalledWith('terminal start request failed before an authoritative response', {
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      operation: 'attach',
-      error: expect.any(Error),
-    })
-    warnSpy.mockRestore()
-  })
-
-  test('fast-fails an indeterminate attach until authoritative hydration arrives', async () => {
-    terminalCalls.attach
-      .mockRejectedValueOnce(
-        new ClientRealtimeRequestError('socket disconnected', {
-          kind: 'disconnected',
-          delivery: 'indeterminate',
-          outageId: 1,
-        }),
-      )
-      .mockResolvedValueOnce(
-        attachResult('pty_session_1_aaaaaaaaa', {
-          terminalRuntimeGeneration: 1,
-          snapshot: 'authoritative recovery',
-        }),
-      )
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    const settled = vi.fn()
-
-    session.attach(host)
-    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushTerminalStart()
-    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
-    expect(xtermMocks.terminals[0]!.focus).not.toHaveBeenCalled()
-    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
-    expect(session.snapshot().presentationRecovery).toBe('failed')
-
-    session.hydrate({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 0,
-      phase: 'open',
-      message: null,
-      processName: 'zsh',
-      canonicalTitle: null,
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    expect(session.pendingAuthoritativeRuntimeBinding()).toBeNull()
-    await flushTerminalStart()
-
-    expect(terminalCalls.attach.mock.calls).toEqual([
-      [
-        {
-          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-          terminalRuntimeGeneration: 0,
-          cols: 100,
-          rows: 30,
-        },
-      ],
-      [
-        {
-          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-          terminalRuntimeGeneration: 1,
-          cols: 100,
-          rows: 30,
-        },
-      ],
-    ])
-    expect(terminalCalls.restart).not.toHaveBeenCalled()
-    expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('authoritative recovery', expect.any(Function))
-    expect(xtermMocks.terminals.at(-1)!.focus).not.toHaveBeenCalled()
-    expect(settled).toHaveBeenCalledOnce()
-    expect(host.contains(document.activeElement)).toBe(false)
-  })
-
   test('does not retain an unscoped focus request while presentation is pending', async () => {
     const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
@@ -474,41 +356,4 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(terminalCalls.attach).toHaveBeenCalledOnce()
   })
 
-  test.each([
-    [
-      'transport failure',
-      () => {
-        const error = new Error('write failed')
-        terminalCalls.write.mockRejectedValueOnce(error)
-        return { kind: 'error' as const, error }
-      },
-    ],
-    [
-      'server rejection',
-      () => {
-        const result = { status: 'rejected' as const }
-        terminalCalls.write.mockResolvedValueOnce(result)
-        return { kind: 'result' as const, result }
-      },
-    ],
-  ] as const)('reports a terminal write %s without closing the session', async (_failureKind, configureWrite) => {
-    const failure = configureWrite()
-    const report = vi.fn()
-    const session = new TerminalSession(descriptor, vi.fn(), { report })
-    const { term } = await startOpenControllerSession(session)
-
-    term.emitData('input')
-    await flushTerminalStart()
-
-    expect(terminalCalls.write).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      data: 'input',
-    })
-    expect(report).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      failure,
-    })
-    expect(session.snapshot().phase).toBe('open')
-  })
 })

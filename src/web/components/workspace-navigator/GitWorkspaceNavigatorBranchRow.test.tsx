@@ -13,11 +13,6 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-
-vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => ({ value: false }),
-}))
 
 vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
   useTerminalFilesystemTargetOutputActive: (targetKey: { readonly value: string | null }) => {
@@ -51,24 +46,15 @@ beforeEach(() => {
 })
 
 describe('GitWorkspaceNavigatorBranchRow', () => {
-  test('forwards `branchActionBusy=true` when an in-flight branch action targets this branch', () => {
+  test.each([
+    ['an in-flight action targets this branch', 'feature/a', true],
+    ['an in-flight action targets another branch', 'feature/other', false],
+    ['the operation state is idle', null, false],
+  ] as const)('forwards the branch busy projection when %s', (_scenario, target, expected) => {
     const repo = branchListRowRepo()
-    repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/a' }
+    if (target) repo.branchAction = { ...repo.branchAction, phase: 'running', target }
     renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
-    expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: true }))
-  })
-
-  test('forwards `branchActionBusy=false` when an in-flight branch action targets a different branch', () => {
-    const repo = branchListRowRepo()
-    repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/other' }
-    renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
-    expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
-  })
-
-  test('forwards `branchActionBusy=false` when the operations state is idle', () => {
-    const repo = branchListRowRepo()
-    renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
-    expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
+    expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: expected }))
   })
 
   test('forwards terminal output activity from the worktree terminal snapshot', () => {
@@ -92,7 +78,7 @@ describe('GitWorkspaceNavigatorBranchRow', () => {
 
     renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'main')} />)
 
-    expect(terminalStoreMocks.targetKey?.value).toBe(formatTerminalFilesystemTargetKeyForPath(repo.id, repo.id))
+    expect(terminalStoreMocks.targetKey?.value).toBe('goblin+file:///tmp/repo\0goblin+file:///tmp/repo')
   })
 })
 

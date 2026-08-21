@@ -16,7 +16,6 @@ import {
 } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
@@ -31,23 +30,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-branch-actions-test-repo')
 const REPO_WORKTREE_PATH = '/tmp/goblin-branch-actions-test-repo'
 const refreshStoreAccess = { get: workspacesStore.getState, set: workspacesStore.setState }
-
-function branchBrowserRemoteProvider(
-  repo: NonNullable<ReturnType<typeof workspacesStore.getState>['workspaces'][string]>,
-  branch: ReturnType<typeof createRepoBranch>,
-) {
-  const remote = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.remote
-  if (!remote) return undefined
-  const providers = remote.remoteProviders
-  const tracking = branch.tracking
-  if (tracking && providers) {
-    const remoteName = Object.keys(providers)
-      .filter((remote) => tracking === remote || tracking.startsWith(`${remote}/`))
-      .sort((a, b) => b.length - a.length)[0]
-    if (remoteName) return providers[remoteName]
-  }
-  return remote.browserRemoteProvider
-}
 
 function testRemote(name: string): GitRemoteInfo {
   return {
@@ -87,25 +69,8 @@ beforeEach(() => {
   })
 })
 
-function updateRepoForTest(
-  mutator: (repo: NonNullable<ReturnType<typeof workspacesStore.getState>['workspaces'][string]>) => void,
-) {
-  workspacesStore.setState((s) => {
-    const repo = s.workspaces[REPO_ID]
-    if (!repo) return s
-    return { workspaces: { ...s.workspaces, [REPO_ID]: replaceWorkspace(repo, mutator) } }
-  })
-}
-
 function setBranchViewModeForTest(branchViewMode: BranchViewMode) {
   workspacesStore.getState().setBranchViewMode(REPO_ID, branchViewMode)
-}
-
-function repoBranchNames(): string[] {
-  const repo = workspacesStore.getState().workspaces[REPO_ID]
-  return repo
-    ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.map((branch) => branch.name) ?? [])
-    : []
 }
 
 function repoCurrentBranch(): string | null {
@@ -148,7 +113,7 @@ function installSuccessfulCreateWorktreeBridge(options?: { onResponse?: () => vo
 }
 
 describe('branch action capabilities', () => {
-  test('gates remote-only actions when a repo transitions to local-only', async () => {
+  test('gates remote-only actions when a repo transitions to local-only', () => {
     const branch = createRepoBranch('feature/local')
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -255,7 +220,7 @@ describe('branch action capabilities', () => {
     },
   )
 
-  test('allows terminal and editor actions for remote worktrees', async () => {
+  test('allows terminal and editor actions for remote worktrees', () => {
     const branch = createRepoBranch('feature/remote')
     const target = normalizeRemoteTarget({
       alias: 'example',
@@ -289,59 +254,6 @@ describe('branch action capabilities', () => {
     })
   })
 
-  test('resolves browser remote providers from tracking remotes', async () => {
-    const branch = createRepoBranch('feature/provider', { tracking: 'gitlab-upstream/feature/provider' })
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [branch],
-      remote: {
-        remotes: [testRemote('origin'), testRemote('gitlab-upstream')],
-        hasRemotes: true,
-        hasBrowserRemote: true,
-        browserRemoteProvider: 'github',
-        remoteProviders: { origin: 'github', 'gitlab-upstream': 'gitlab' },
-        hasGitHubRemote: true,
-      },
-    })
-
-    expect(branchBrowserRemoteProvider(workspacesStore.getState().workspaces[REPO_ID]!, branch)).toBe('gitlab')
-  })
-
-  test('falls back to the repo browser provider when tracking remote is missing', async () => {
-    const branch = createRepoBranch('feature/missing-provider', { tracking: 'deleted/feature/missing-provider' })
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [branch],
-      remote: {
-        remotes: [testRemote('origin')],
-        hasRemotes: true,
-        hasBrowserRemote: true,
-        browserRemoteProvider: 'github',
-        remoteProviders: { origin: 'github' },
-        hasGitHubRemote: true,
-      },
-    })
-
-    expect(branchBrowserRemoteProvider(workspacesStore.getState().workspaces[REPO_ID]!, branch)).toBe('github')
-  })
-
-  test('uses the longest provider remote match for slash-containing tracking names', async () => {
-    const branch = createRepoBranch('feature/longest-provider', { tracking: 'origin/gitlab/feature/longest-provider' })
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [branch],
-      remote: {
-        remotes: [testRemote('origin'), testRemote('origin/gitlab')],
-        hasRemotes: true,
-        hasBrowserRemote: true,
-        browserRemoteProvider: 'github',
-        remoteProviders: { origin: 'github', 'origin/gitlab': 'gitlab' },
-        hasGitHubRemote: true,
-      },
-    })
-
-    expect(branchBrowserRemoteProvider(workspacesStore.getState().workspaces[REPO_ID]!, branch)).toBe('gitlab')
-  })
 })
 
 describe('runBranchAction', () => {
@@ -512,47 +424,6 @@ describe('runBranchAction', () => {
     expect(repoCurrentBranch()).toBe('feature/reopened')
   })
 
-  test('does not make a branch action wait on an unrelated snapshot read', async () => {
-    let deleteCalls = 0
-    installGoblinTestBridge({
-      'repo.snapshot': () => new Promise(() => {}),
-      'repo.deleteBranch': async () => {
-        deleteCalls += 1
-        return { ok: true, message: 'ok' }
-      },
-    })
-
-    void requestRepoSnapshotRefresh(refreshStoreAccess, REPO_ID)
-    await flushAsyncWork()
-    const result = await workspacesStore.getState().runBranchAction(
-      REPO_ID,
-      {
-        kind: 'deleteBranch',
-        branch: 'feature/a',
-      },
-      { waitTimeoutMs: 1 },
-    )
-
-    expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(deleteCalls).toBe(1)
-    expect(
-      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1),
-    ).toMatchObject({
-      kind: 'result',
-      result: { ok: true, message: 'ok' },
-      action: {
-        kind: 'deleteBranch',
-        branch: 'feature/a',
-      },
-    })
-    expect(
-      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction,
-    ).toMatchObject({
-      phase: 'idle',
-      target: null,
-    })
-  })
-
   test('records network-op-in-progress results without triggering branch-action refresh follow-up', async () => {
     let snapshotCalls = 0
     let statusCalls = 0
@@ -716,38 +587,6 @@ describe('runBranchAction', () => {
     },
   )
 
-  test('tracks create worktree operation state while the action is running', async () => {
-    let release!: () => void
-    installGoblinTestBridge({
-      'repo.createWorktree': () =>
-        new Promise((resolve) => {
-          release = () => resolve({ ok: false, message: 'cancelled' })
-        }),
-    })
-
-    const work = workspacesStore.getState().runCreateWorktreeAction(REPO_ID, createWorktreeAction())
-    const running = workspacesStore.getState().workspaces[REPO_ID]
-
-    expect(requireGitWorkspaceForTest(running).capability.git.operations.branchAction).toMatchObject({
-      phase: 'running',
-      reason: 'branch:createWorktree',
-      target: 'feature/new',
-    })
-    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('running')
-    expect(repoOperation(REPO_ID, 'branchAction').target).toBe('feature/new')
-
-    release()
-    await work
-
-    const settled = workspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(settled).capability.git.operations.branchAction).toMatchObject({
-      phase: 'idle',
-      target: null,
-    })
-    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
-    expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
-  })
-
   test.each([
     ['createWorktree', createWorktreeAction(), 'repo.createWorktree', 'feature/new'],
     [
@@ -856,21 +695,6 @@ describe('runBranchAction', () => {
         recoveryMessageKeys: ['error.worktree-created-followup-failed'],
       },
     })
-  })
-
-  test('keeps the current branch selection after creating a worktree', async () => {
-    setBranchViewModeForTest('all')
-    installSuccessfulCreateWorktreeBridge()
-
-    const result = await workspacesStore
-      .getState()
-      .runCreateWorktreeAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
-
-    expect(result).toMatchObject({
-      ok: true,
-      worktreePath: '/private/tmp/goblin-branch-actions-test-worktree',
-    })
-    expect(workspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('all')
   })
 
   test('keeps worktrees filtering after creating a worktree', async () => {

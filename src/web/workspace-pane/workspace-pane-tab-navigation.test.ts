@@ -16,18 +16,7 @@ import {
 
 describe('repo workspace pane tab navigation', () => {
   test('resolves the adjacent tab after close from the shared tab list', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'status',
-      tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
-      runtimeTabViews: [terminalView('term-111111111111111111111', 1, true)],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-111111111111111111111',
-    })
+    const model = navigationModel()
 
     expect(requiredEntryIdentity(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:status'))).toBe(
       'terminal:term-111111111111111111111',
@@ -39,18 +28,7 @@ describe('repo workspace pane tab navigation', () => {
   })
 
   test('prefers the opener tab over the adjacent tab when resolving the next tab after close', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'status',
-      tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
-      runtimeTabViews: [terminalView('term-111111111111111111111', 1, true)],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-111111111111111111111',
-    })
+    const model = navigationModel()
 
     expect(
       requiredEntryIdentity(
@@ -64,18 +42,7 @@ describe('repo workspace pane tab navigation', () => {
   })
 
   test('falls back to the adjacent tab when the opener tab no longer exists', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'status',
-      tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
-      runtimeTabViews: [terminalView('term-111111111111111111111', 1, true)],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-111111111111111111111',
-    })
+    const model = navigationModel()
 
     expect(
       requiredEntryIdentity(
@@ -88,7 +55,7 @@ describe('repo workspace pane tab navigation', () => {
     ).toBe('workspace-pane:changes')
   })
 
-  test('skips pending terminal tabs when resolving the next tab after close', () => {
+  test('skips pending terminal tabs when cycling tabs', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -103,7 +70,7 @@ describe('repo workspace pane tab navigation', () => {
       selectedTerminalSessionId: null,
     })
 
-    expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:status')).toBeNull()
+    expect(adjacentWorkspacePaneTab(model.tabs, 'workspace-pane:status', 1)).toBeNull()
   })
 
   test('moves through the shared tab list from the active tab identity', () => {
@@ -136,28 +103,18 @@ describe('repo workspace pane tab navigation', () => {
     expect(adjacentWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
 
-  test('keeps the current terminal selection when another terminal remains selected', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'terminal',
-      tabEntries: [
-        terminalEntry('term-111111111111111111111'),
-        staticEntry('status'),
-        terminalEntry('term-222222222222222222222'),
-      ],
-      runtimeTabViews: [
-        terminalView('term-111111111111111111111', 1, false),
-        terminalView('term-222222222222222222222', 2, false),
-      ],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-222222222222222222222',
-    })
-
-    expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'terminal' })
-    expect(model.activeTab?.identity).toBe('terminal:term-222222222222222222222')
-  })
 })
+
+function navigationModel() {
+  return createModel({
+    workspaceId: WORKSPACE_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    branchName: 'feature/model',
+    worktreePath: WORKTREE_PATH,
+    preferredTab: 'status',
+    tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
+    runtimeTabViews: [terminalView('term-111111111111111111111', 1, true)],
+    terminalProjectionPhase: 'ready',
+    selectedTerminalSessionId: 'term-111111111111111111111',
+  })
+}

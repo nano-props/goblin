@@ -16,7 +16,7 @@ const LINKED_LOCATION = linkedLocation('/worktree-a', WORKSPACE_RUNTIME_ID)
 describe('workspace pane action queue', () => {
   beforeEach(() => resetWorkspacePaneActionQueueForTest())
 
-  test('serializes the same admitted location and cleans up on idle', async () => {
+  test('serializes the same admitted location and releases its owner on idle', async () => {
     const actionOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const firstStarted = Promise.withResolvers<void>()
@@ -110,7 +110,7 @@ describe('workspace pane action queue', () => {
     'allows a different %s location to progress independently',
     async (_resource, occupiedLocation, otherLocation) => {
       const release = Promise.withResolvers<void>()
-      const first = runWorkspacePaneAction(occupiedLocation, async () => await release.promise)
+      const first = runWorkspacePaneAction(occupiedLocation, () => release.promise)
       let otherRan = false
 
       await runWorkspacePaneAction(otherLocation, () => {

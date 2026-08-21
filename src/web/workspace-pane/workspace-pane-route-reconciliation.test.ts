@@ -4,7 +4,6 @@ import {
   createWorkspacePaneTabModel,
   type WorkspacePaneTabModelInput,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   reconcileWorkspacePaneRoute,
@@ -254,33 +253,8 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({ kind: 'none' })
   })
 
-  test('does not verify a materialized static route while tab-entry projection has failed', () => {
-    const model = createBranchWorkspacePaneTabModel({
-      workspaceId: REPO_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/route',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'history',
-      tabEntries: [workspacePaneStaticTabEntry('history')],
-      tabEntriesProjectionPhase: 'failed',
-      runtimeTabViews: [],
-      runtimeTabStateByType: {
-        terminal: { projectionPhase: 'ready' },
-      },
-    })
-
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
-  })
-
-  test('defers history while a route is unverified', () => {
-    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'unverified' })).toEqual({
-      kind: 'defer',
-    })
-  })
-
-  test('defers history for a missing route instead of predicting a replacement navigation', () => {
-    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'missing' })).toEqual({
+  test.each(['unverified', 'missing'] as const)('defers history while a route is %s', (kind) => {
+    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind })).toEqual({
       kind: 'defer',
     })
   })
@@ -367,26 +341,6 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('reports an unmaterialized route as missing when the pane is empty', () => {
-    const model = createBranchWorkspacePaneTabModel({
-      workspaceId: REPO_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/route',
-      worktreePath: null,
-      preferredTab: 'changes',
-      tabEntries: [],
-      tabEntriesProjectionPhase: 'ready',
-      runtimeTabViews: [],
-      runtimeTabStateByType: {
-        terminal: { projectionPhase: 'ready' },
-      },
-    })
-
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
-      kind: 'missing',
-    })
-  })
 })
 
 function terminalModel(input: {

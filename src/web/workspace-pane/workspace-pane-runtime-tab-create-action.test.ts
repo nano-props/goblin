@@ -201,20 +201,6 @@ describe('workspace pane runtime tab create action', () => {
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
   })
 
-  test('fails closed when a canonical terminal trails an otherwise ready runtime projection', async () => {
-    terminalProjectionHydrationStore.getState().markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
-    setWorkspacePaneTabsForTargetQueryData({
-      ...PANE_TARGET,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
-    })
-
-    await expect(
-      dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn() }),
-    ).resolves.toMatchObject({ ok: false })
-    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
-  })
-
   test('navigates a detached worktree create to its real filesystem surface', async () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const routeRequest = createdTerminalRouteRequest()
@@ -369,9 +355,9 @@ describe('workspace pane runtime tab create action', () => {
     const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
 
     const dispatch = dispatchTerminalCreate({
-      showCreatedTerminalTab: async (_terminalSessionId, _presentation, routeRequest) => {
+      showCreatedTerminalTab: (_terminalSessionId, _presentation, routeRequest) => {
         routeStarted.resolve(routeRequest)
-        return await navigation.promise
+        return navigation.promise
       },
       focusTerminal,
     })
@@ -755,9 +741,9 @@ function holdTerminalCreateCommand(): {
 } {
   const input = Promise.withResolvers<HeldTerminalCreateCommandInput>()
   const result = Promise.withResolvers<TerminalCreateCommandResult>()
-  terminalCreateCommandMocks.runCreateTerminalTabCommand.mockImplementationOnce(async (commandInput) => {
+  terminalCreateCommandMocks.runCreateTerminalTabCommand.mockImplementationOnce((commandInput) => {
     input.resolve(commandInput)
-    return await result.promise
+    return result.promise
   })
   return { input, result }
 }

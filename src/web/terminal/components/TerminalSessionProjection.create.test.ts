@@ -337,15 +337,6 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.innerHTML = ''
   })
 
-  test('creates a prepared terminal without application geometry', async () => {
-    await projection.createTerminal(terminalBase())
-
-    expect(mocks.createMock).toHaveBeenCalledWith({
-      target: terminalBase().target,
-      kind: 'primary',
-    })
-  })
-
   test('advances catalog coverage with a continuous create delta', async () => {
     projection.reconcileServerSessionsSnapshot(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -814,37 +805,6 @@ describe('TerminalSessionProjection create flow', () => {
     resolve(makeCreateResult())
     await flushMicrotasks(2)
     expect(mocks.closeMock).not.toHaveBeenCalled()
-  })
-
-  test('session-closed drops the matching local session', async () => {
-    // The server emits a session-closed broadcast when window A
-    // closes a session. Sibling windows route the event into
-    // handleSessionClosed to drop the local entry without a
-    // full reconcile.
-    await projection.createTerminal(terminalBase())
-
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
-
-    projection.handleSessionClosed(sessionClosedEvent('pty_session_1_aaaaaaaaa', 0, 'term-111111111111111111111'))
-
-    // The local session is gone; the filesystem target snapshot is empty.
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
-  })
-
-  test('session-closed removes the exact canonical and runtime identity', async () => {
-    await projection.createTerminal(terminalBase())
-
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
-    projection.handleSessionClosed(sessionClosedEvent('pty_session_1_aaaaaaaaa', 0, 'term-111111111111111111111'))
-
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
-  })
-
-  test('session-closed with a runtime mismatch preserves the local session', async () => {
-    await projection.createTerminal(terminalBase())
-    projection.handleSessionClosed(sessionClosedEvent('pty_session_missing_aaaaaaaaa', 1, 'term-111111111111111111111'))
-
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })
 
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {

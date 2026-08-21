@@ -16,21 +16,29 @@ function viewport(height: number): VisualViewport {
   return target as VisualViewport
 }
 
+async function withVisualViewport(height: number, callback: () => Promise<void>): Promise<void> {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'visualViewport')
+  Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport(height) })
+  try {
+    await callback()
+  } finally {
+    if (descriptor) Object.defineProperty(window, 'visualViewport', descriptor)
+    else Reflect.deleteProperty(window, 'visualViewport')
+  }
+}
+
 beforeEach(resetTerminalSessionHarness)
 
-test('does not reveal output-side cursor movement through the session view event boundary', async () => {
-  const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
-  Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport(300) })
-
-  try {
+test('reveals on terminal resize but not cursor output, and stops after disposal', async () => {
+  await withVisualViewport(300, async () => {
     const { session, term } = await startOpenControllerSession()
-    try {
-      const element: HTMLElement = term.element
-      vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(terminalRect(400, 800))
-      const marker = element.querySelector<HTMLElement>('[aria-hidden="true"]')
-      if (!marker) throw new Error('terminal viewport reveal marker was not installed')
-      marker.scrollIntoView = vi.fn()
+    const element: HTMLElement = term.element
+    vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(terminalRect(400, 800))
+    const marker = element.querySelector<HTMLElement>('[aria-hidden="true"]')
+    if (!marker) throw new Error('terminal viewport reveal marker was not installed')
+    marker.scrollIntoView = vi.fn()
 
+    try {
       term.buffer.active.cursorY = 20
       term.focus()
       await vi.runAllTimersAsync()
@@ -49,18 +57,14 @@ test('does not reveal output-side cursor movement through the session view event
       term.resize(term.cols - 1, term.rows)
       await vi.runAllTimersAsync()
       expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
-
-      session.dispose()
-      term.buffer.active.cursorY = 27
-      term.emitCursorMove()
-      term.resize(term.cols - 1, term.rows)
-      await vi.runAllTimersAsync()
-      expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
     } finally {
       session.dispose()
     }
-  } finally {
-    if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
-    else Reflect.deleteProperty(window, 'visualViewport')
-  }
+
+    term.buffer.active.cursorY = 27
+    term.emitCursorMove()
+    term.resize(term.cols - 1, term.rows)
+    await vi.runAllTimersAsync()
+    expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
+  })
 })

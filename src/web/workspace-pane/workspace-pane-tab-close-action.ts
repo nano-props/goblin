@@ -199,7 +199,7 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   const completion = closeContext
     ? confirmWorkspacePaneRuntimeTabClose(confirmed, closeContext)
     : Promise.resolve<WorkspacePaneTabCloseOutcome>({ kind: 'not-committed', message: null })
-  return await completeWorkspacePaneTabClose({
+  return completeWorkspacePaneTabClose({
     completion,
     target: closeTarget,
     closingIdentity: confirmedIdentity,

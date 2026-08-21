@@ -8,7 +8,7 @@ const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posi
 const WORKTREE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo/worktree' }, 'posix')!
 
 describe('createServerWorkspacePaneTabsClient', () => {
-  test('returns the canonical snapshot for list', async () => {
+  test('routes list and returns its snapshot unchanged', async () => {
     const snapshot = { revision: 7, entries: [] }
     const request = vi.fn(async () => snapshot)
     const client = createServerWorkspacePaneTabsClient(realtimeWithRequest(request))

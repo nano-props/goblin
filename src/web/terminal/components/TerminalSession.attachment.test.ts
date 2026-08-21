@@ -80,6 +80,48 @@ describe('TerminalSession attachment and presentation', () => {
     expect(term.getSelection).not.toHaveBeenCalled()
   })
 
+  test('tracks server title changes separately from process name', async () => {
+    const host = createTerminalHost()
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+    notify.mockClear()
+
+    session.handleServerTitle('~/Developer/goblin — npm run dev')
+
+    expect(session.snapshot()).toMatchObject({
+      phase: 'open',
+      processName: 'zsh',
+      canonicalTitle: '~/Developer/goblin — npm run dev',
+    })
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  test('preserves a hydrated title when attaching a viewer session', () => {
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      processName: 'zsh',
+      canonicalTitle: '~/Developer/goblin — npm run dev',
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+
+    session.attach(host)
+
+    expect(session.snapshot()).toMatchObject({
+      processName: 'zsh',
+      canonicalTitle: '~/Developer/goblin — npm run dev',
+    })
+  })
+
   test('does not open xterm until authoritative hydration supplies an addressable binding', async () => {
     const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())

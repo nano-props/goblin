@@ -1,17 +1,4 @@
-// Pure presentational navigator list. Renders the ordered branch/worktree
-// row model and scrolls the highlighted row into view as
-// it changes. The Git workspace navigator pane owns the data source,
-// the navigation glue, and the outer container
-// — this component owns the per-list action-menu state and the
-// scroll-into-view side effect.
-//
-// Notes on the abstraction boundary:
-//   • does NOT read the store; receives `repo` and ordered `rows` from the parent
-//   • does NOT wrap in ScrollArea (the pane owns its scroll container)
-//   • owns the per-list `actionMenuOpen` so the "row is no longer rendered
-//     ⇒ close the menu" invariant lives next to the rows that draw it
-//   • scrolls the highlighted row after Vue has committed the row ref
-//   • the highlight comes from route context through the data wrapper
+// Presentational list owning row action-menu lifetime and highlighted-row scrolling.
 
 import { defineComponent, ref, watch } from 'vue'
 import type { PropType, VNodeChild } from 'vue'

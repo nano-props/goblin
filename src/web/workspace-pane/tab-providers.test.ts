@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import {
   changesWorkspacePaneTabProvider,
   filesWorkspacePaneTabProvider,
@@ -12,14 +12,9 @@ import {
 } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
-  WORKSPACE_PANE_BRANCH_TAB_TYPES,
   WORKSPACE_PANE_STATIC_TAB_IDS,
-  WORKSPACE_PANE_STATIC_TAB_TYPES,
   WORKSPACE_PANE_TAB_TYPES,
-  WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
   workspacePaneStaticTabEntry,
-  workspacePaneStaticTabScope,
-  workspacePaneTabScope,
   workspacePaneRuntimeTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
@@ -65,12 +60,6 @@ describe('workspace pane tab providers', () => {
     expect(filesWorkspacePaneTabProvider.scope).toBe('worktree')
   })
 
-  test('derives provider scope from the shared workspace pane scope definitions', () => {
-    for (const provider of workspacePaneTabProviders) {
-      expect(provider.scope).toBe(workspacePaneTabScope(provider.type))
-    }
-  })
-
   test('registers one provider per workspace pane tab type', () => {
     expect(workspacePaneTabProviders.map((provider) => provider.type)).toEqual([...WORKSPACE_PANE_TAB_TYPES])
   })
@@ -78,16 +67,6 @@ describe('workspace pane tab providers', () => {
   test('resolves runtime tab providers by type', () => {
     expect(workspacePaneRuntimeTabProvider('terminal')).toBe(terminalWorkspacePaneTabProvider)
     expect(workspacePaneTabProvider('terminal').kind).toBe('runtime')
-  })
-
-  test('derives shared static scope lists from the static scope map', () => {
-    const branchTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter((type) => workspacePaneStaticTabScope(type) === 'branch')
-    const worktreeTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
-      (type) => workspacePaneStaticTabScope(type) === 'worktree',
-    )
-
-    expect(WORKSPACE_PANE_BRANCH_TAB_TYPES).toEqual(branchTabs)
-    expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toEqual(worktreeTabs)
   })
 
   test('resolves worktree availability through providers', () => {

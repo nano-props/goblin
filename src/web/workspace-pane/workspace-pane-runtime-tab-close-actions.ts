@@ -39,11 +39,11 @@ export function workspacePaneRuntimeTabCloseConfirmRequest(
   return terminalCloseConfirmRequest(input)
 }
 
-export async function confirmWorkspacePaneRuntimeTabClose(
+export function confirmWorkspacePaneRuntimeTabClose(
   confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
   context: TerminalWorkspacePaneRuntimeTabCloseContext,
 ): Promise<WorkspacePaneTabCloseOutcome> {
-  return await confirmTerminalClose(confirmed, context)
+  return context.closeTerminalByDescriptor(confirmed.sessionId, confirmed.target)
 }
 
 export function workspacePaneRuntimeTabConfirmedCloseIdentity(
@@ -66,11 +66,4 @@ function terminalCloseConfirmRequest(
     target: input.target,
     processName,
   }
-}
-
-async function confirmTerminalClose(
-  confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
-  context: TerminalWorkspacePaneRuntimeTabCloseContext,
-): Promise<WorkspacePaneTabCloseOutcome> {
-  return await context.closeTerminalByDescriptor(confirmed.sessionId, confirmed.target)
 }

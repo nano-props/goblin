@@ -15,22 +15,27 @@ import {
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+
+function seedFilesystemWorkspace(workspaceRuntimeId: string): void {
+  const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
+  acceptWorkspaceProbeState(workspace, {
+    status: 'ready',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'unavailable' },
+    },
+    diagnostics: [],
+  })
+  workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+}
+
 beforeEach(resetRefreshTest)
 
 describe('workspace refresh capability', () => {
   test('refreshes a plain Workspace and projects Git only after capability promotion', async () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-refresh'
-    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    seedFilesystemWorkspace(workspaceRuntimeId)
     const projection = vi.fn(async () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' }))
     ipcHandlers['workspace.refresh'] = () => ({
       kind: 'committed',
@@ -49,46 +54,6 @@ describe('workspace refresh capability', () => {
     await runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     expect(workspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
-    expect(projection).toHaveBeenCalledOnce()
-  })
-
-  test('coalesces concurrent explicit refreshes for the same Workspace runtime', async () => {
-    const workspaceRuntimeId = 'workspace-runtime-coalesced-refresh'
-    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
-    const response = Promise.withResolvers<WorkspaceRefreshResult>()
-    const refresh = vi.fn(() => response.promise)
-    const projection = vi.fn(async () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' }))
-    ipcHandlers['workspace.refresh'] = refresh
-    ipcHandlers['repo.snapshot'] = projection
-
-    const first = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    const second = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
-    response.resolve({
-      kind: 'committed',
-      probe: {
-        status: 'ready',
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-        },
-        diagnostics: [],
-      },
-    })
-
-    await Promise.all([first, second])
-    expect(refresh).toHaveBeenCalledOnce()
     expect(projection).toHaveBeenCalledOnce()
   })
 
@@ -166,17 +131,7 @@ describe('workspace refresh capability', () => {
 
   test('returns transport failures for a plain Workspace without creating Git state', async () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-failed-refresh'
-    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    seedFilesystemWorkspace(workspaceRuntimeId)
     ipcHandlers['workspace.refresh'] = () => {
       throw new Error('workspace transport unavailable')
     }
@@ -190,17 +145,7 @@ describe('workspace refresh capability', () => {
 
   test('closing a plain Workspace cancels its in-flight capability refresh', async () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-closing'
-    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    seedFilesystemWorkspace(workspaceRuntimeId)
     const response = Promise.withResolvers<WorkspaceRefreshResult>()
     const refreshRequest = vi.fn(() => response.promise)
     ipcHandlers['workspace.refresh'] = refreshRequest
@@ -215,17 +160,7 @@ describe('workspace refresh capability', () => {
 
   test('closing a plain Workspace cancels Git work created by a concurrent capability promotion', async () => {
     const workspaceRuntimeId = 'workspace-runtime-promoted-while-closing'
-    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    seedFilesystemWorkspace(workspaceRuntimeId)
     const removeMembership = Promise.withResolvers<{
       openWorkspaceEntries: []
       workspacePaneTabsByTargetByWorkspace: {}

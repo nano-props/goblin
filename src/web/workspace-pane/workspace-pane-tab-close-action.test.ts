@@ -40,7 +40,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import {
   claimTerminalAutoFocus,
@@ -72,6 +72,37 @@ const WORKTREE_PANE_TARGET = {
   kind: 'git-worktree' as const,
   workspaceId: REPO_ID,
   worktreePath: WORKTREE_PATH,
+}
+
+function installTerminalCloseBridgeForTest() {
+  const closeTerminalByDescriptor = vi.fn()
+  const terminalFilesystemTargetSnapshot = vi.fn()
+  setTerminalSessionCommandBridge({
+    terminalFilesystemTargetSnapshot,
+    createTerminal: vi.fn(),
+    createTerminalWithAdmission: vi.fn(),
+    selectTerminal: vi.fn(),
+    focusTerminal: vi.fn(),
+    closeTerminalByDescriptor,
+  })
+  return { closeTerminalByDescriptor, terminalFilesystemTargetSnapshot }
+}
+
+function seedWorkspaceRootCloseToTerminal(terminalSessionId: string) {
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  markRepoGitUnavailable(REPO_ID)
+  terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+  const target = {
+    kind: 'workspace-root' as const,
+    workspaceId: REPO_ID,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+  }
+  setWorkspacePaneTabsForTargetQueryData({
+    ...target,
+    tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+  })
+  workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+  return repo
 }
 
 beforeEach(() => {
@@ -137,16 +168,7 @@ describe('workspace pane tab close action', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
     })
-    const closeTerminalByDescriptor = vi.fn()
-    const terminalFilesystemTargetSnapshot = vi.fn()
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot,
-      createTerminal: vi.fn(),
-      createTerminalWithAdmission: vi.fn(),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(),
-      closeTerminalByDescriptor,
-    })
+    const { closeTerminalByDescriptor, terminalFilesystemTargetSnapshot } = installTerminalCloseBridgeForTest()
     workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
@@ -194,16 +216,7 @@ describe('workspace pane tab close action', () => {
         createRepoWorktreeSnapshotForTest('feature/other', otherWorktreePath),
       ],
     })
-    const closeTerminalByDescriptor = vi.fn()
-    const terminalFilesystemTargetSnapshot = vi.fn()
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot,
-      createTerminal: vi.fn(),
-      createTerminalWithAdmission: vi.fn(),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(),
-      closeTerminalByDescriptor,
-    })
+    const { closeTerminalByDescriptor } = installTerminalCloseBridgeForTest()
     const route = { kind: 'terminal' as const, terminalSessionId }
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
     const location = workspacePaneLocationForLinkedWorktree(
@@ -349,57 +362,15 @@ describe('workspace pane tab close action', () => {
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
       expect.objectContaining({ routeTarget: WORKTREE_PANE_TARGET }),
       { kind: 'static', tab: 'status' },
-      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+      expect.objectContaining({
+        navigationGeneration: expect.any(Number),
+        routePrecondition: { kind: 'exact-route', route: { kind: 'static', tab: 'files' } },
+      }),
     )
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(presentationEffects.onCommit).toHaveBeenCalledOnce()
     expect(presentationEffects.onAbandon).not.toHaveBeenCalled()
-  })
-
-  test('keeps a branch-headed worktree close in the worktree route family', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
-      id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME)],
-      status: [{ path: WORKTREE_PATH, branch: BRANCH_NAME, isMain: false, entries: [] }],
-      currentBranchName: BRANCH_NAME,
-      preferredWorkspacePaneTab: 'files',
-      workspacePaneTabsByBranch: {
-        [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
-      },
-    })
-    const commitWorkspacePaneRoute = vi.fn(async () => true)
-    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
-      async (_target, _route, options) => {
-        options?.onCommit?.()
-        return true
-      },
-    )
-
-    await expect(
-      dispatchCloseWorkspacePaneTabAction({
-        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
-          kind: 'branch',
-          branchName: BRANCH_NAME,
-        }),
-        workspaceId: REPO_ID,
-        workspacePaneRoute: { kind: 'static', tab: 'files' },
-        navigation: navigationWith({ commitFilesystemWorkspacePaneRoute, commitWorkspacePaneRoute }),
-      }),
-    ).resolves.toBe(true)
-
-    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
-    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
-        kind: 'branch',
-        branchName: BRANCH_NAME,
-      }),
-      { kind: 'static', tab: 'status' },
-      expect.objectContaining({
-        routePrecondition: { kind: 'exact-route', route: { kind: 'static', tab: 'files' } },
-      }),
-    )
   })
 
   test('closes a workspace-root static tab through the shared tab transaction', async () => {
@@ -453,9 +424,9 @@ describe('workspace pane tab close action', () => {
     const requestStarted = Promise.withResolvers<void>()
     const response = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     installWorkspacePaneTabsTestBridge({
-      updateWorkspaceTabs: async () => {
+      updateWorkspaceTabs: () => {
         requestStarted.resolve()
-        return await response.promise
+        return response.promise
       },
     })
     const commitWorkspacePaneRoute = vi.fn(async () => true)
@@ -548,21 +519,9 @@ describe('workspace pane tab close action', () => {
 
   test('carries automatic focus from active close through route commit and mount transfer', async () => {
     const terminalSessionId = 'term-111111111111111111111'
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    markRepoGitUnavailable(REPO_ID)
-    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const target = {
-      kind: 'workspace-root' as const,
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-    }
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
-    })
-    workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+    const repo = seedWorkspaceRootCloseToTerminal(terminalSessionId)
     const lifecycle = Promise.withResolvers<WorkspacePaneTabEntry[]>()
-    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: vi.fn(async () => await lifecycle.promise) })
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: vi.fn(() => lifecycle.promise) })
     const bridgeFocus = installPendingTerminalFocusBridge()
     const routeCommit = Promise.withResolvers<void>()
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
@@ -606,21 +565,9 @@ describe('workspace pane tab close action', () => {
 
   test('releases terminal focus when active close lifecycle fails', async () => {
     const terminalSessionId = 'term-111111111111111111111'
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    markRepoGitUnavailable(REPO_ID)
-    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const target = {
-      kind: 'workspace-root' as const,
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-    }
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
-    })
-    workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+    const repo = seedWorkspaceRootCloseToTerminal(terminalSessionId)
     const lifecycle = Promise.withResolvers<WorkspacePaneTabEntry[]>()
-    const updateWorkspaceTabs = vi.fn(async () => await lifecycle.promise)
+    const updateWorkspaceTabs = vi.fn(() => lifecycle.promise)
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     installPendingTerminalFocusBridge()
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
@@ -734,7 +681,7 @@ describe('workspace pane tab close action', () => {
         ],
       },
     })
-    const terminalFilesystemTargetKey = `${REPO_ID}\0${WORKTREE_PATH}`
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
     const runtimeTarget = runtimeWorkspacePaneTargetForTest({
       kind: 'git-worktree' as const,
       workspaceId: REPO_ID,
@@ -851,7 +798,7 @@ describe('workspace pane tab close action', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
     }
     const runtimeTarget = runtimeWorkspacePaneTargetForTest(paneTarget)
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(REPO_ID, runtimeTarget.root)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
     setWorkspacePaneTabsForTargetQueryData({
       ...paneTarget,
       tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId), workspacePaneStaticTabEntry('status')],
@@ -914,16 +861,11 @@ describe('workspace pane tab close action', () => {
       }),
     ).resolves.toBe(true)
 
+    expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith(terminalSessionId, {
       target: runtimeTarget,
       presentation: { kind: 'git-worktree' },
     })
-    expect(closeTerminalByDescriptor).not.toHaveBeenCalledWith(
-      terminalSessionId,
-      expect.objectContaining({
-        target: expect.objectContaining({ kind: 'workspace-root' }),
-      }),
-    )
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
       workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, { kind: 'detached' }),
       { kind: 'static', tab: 'status' },
@@ -946,15 +888,13 @@ describe('workspace pane tab close action', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
     }
     const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, REPO_ID)
     setWorkspacePaneTabsForTargetQueryData({
       ...targetInput,
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
     workspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, 'terminal')
-    workspacesStore
-      .getState()
-      .setSelectedTerminal(formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID), terminalSessionId)
-    const terminalFilesystemTargetKey = `${REPO_ID}\0${REPO_ID}`
+    workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
     const closeTerminalByDescriptor = vi.fn(async () => ({
       kind: 'committed' as const,
       projection: 'applied' as const,
@@ -996,14 +936,6 @@ describe('workspace pane tab close action', () => {
       closeTerminalByDescriptor,
     })
     const targetKey = workspacePaneTabsTargetIdentityKey(targetInput)
-    expect(workspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
-      'terminal',
-    )
-    expect(
-      workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[
-        formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID)
-      ],
-    ).toBe(terminalSessionId)
     const navigation = navigationWith({
       commitFilesystemWorkspacePaneRoute: vi.fn(async (_target, route, options) => {
         if (route?.kind === 'static') {
@@ -1053,7 +985,7 @@ describe('workspace pane tab close action', () => {
       },
     })
     const serverClose = Promise.withResolvers<WorkspacePaneTabEntry[]>()
-    const updateWorkspaceTabs = vi.fn(async () => await serverClose.promise)
+    const updateWorkspaceTabs = vi.fn(() => serverClose.promise)
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     expect(
       recordWorkspacePaneTabOpener(

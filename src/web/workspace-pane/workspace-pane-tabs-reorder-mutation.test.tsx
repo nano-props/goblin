@@ -81,7 +81,7 @@ afterEach(() => {
 describe('useWorkspacePaneTabsReorderMutation', () => {
   test('waits for the server and then applies its canonical snapshot without an optimistic write', async () => {
     const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
-    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await serverTabs.promise })
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: () => serverTabs.promise })
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const canonicalServerTabs = [staticEntry('history'), terminalEntry('term-111111111111111111111')]
@@ -178,14 +178,14 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
     const blocker = Promise.withResolvers<void>()
-    void runWorkspacePaneAction(linkedLocation(), async () => await blocker.promise)
+    void runWorkspacePaneAction(linkedLocation(), () => blocker.promise)
     const onSettled = vi.fn()
 
     await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))
     await expect(
       queryClient.fetchQuery({
         queryKey: workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
-        queryFn: async () => await Promise.reject(new Error('tabs unavailable')),
+        queryFn: () => Promise.reject(new Error('tabs unavailable')),
         staleTime: 0,
         retry: false,
       }),
@@ -207,7 +207,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     const location = linkedLocation()
     renderMutationHook({ location, canonicalTabs: sourceTabs })
     const blocker = Promise.withResolvers<void>()
-    const coordinatorBlocker = runWorkspacePaneAction(location, async () => blocker.promise)
+    const coordinatorBlocker = runWorkspacePaneAction(location, () => blocker.promise)
     const onSettled = vi.fn()
 
     await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))
@@ -394,8 +394,8 @@ function sourceLocation(): WorkspacePaneLocation {
 function installDeferredUpdateWorkspaceTabs(): DeferredUpdateWorkspaceTabsRequest[] {
   const requests: DeferredUpdateWorkspaceTabsRequest[] = []
   installWorkspacePaneTabsTestBridge({
-    updateWorkspaceTabs: async (input) =>
-      await new Promise<WorkspacePaneTabEntry[]>((resolve, reject) => requests.push({ input, resolve, reject })),
+    updateWorkspaceTabs: (input) =>
+      new Promise<WorkspacePaneTabEntry[]>((resolve, reject) => requests.push({ input, resolve, reject })),
   })
   return requests
 }

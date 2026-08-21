@@ -42,11 +42,32 @@ describe('terminal write failure feedback', () => {
     })
   })
 
-  test('reports a later outage independently and maps failure kinds', () => {
+  test('reports a later outage independently', () => {
     const reporter = createTerminalWriteFailureReporter()
-    reporter.report({
-      terminalRuntimeSessionId: 'pty_session_first_123456',
-      failure: {
+    for (const outageId of [1, 2]) {
+      reporter.report({
+        terminalRuntimeSessionId: 'pty_session_first_123456',
+        failure: {
+          kind: 'error',
+          error: new ClientRealtimeRequestError('unavailable', {
+            kind: 'unavailable',
+            delivery: 'not-sent',
+            outageId,
+          }),
+        },
+      })
+    }
+
+    expect(mocks.warning.mock.calls).toEqual([
+      ['terminal.write-not-sent', { id: 'terminal-write-failure:terminal.write-not-sent' }],
+      ['terminal.write-not-sent', { id: 'terminal-write-failure:terminal.write-not-sent' }],
+    ])
+  })
+
+  test.each([
+    [
+      'not-sent transport failure',
+      {
         kind: 'error',
         error: new ClientRealtimeRequestError('unavailable', {
           kind: 'unavailable',
@@ -54,38 +75,21 @@ describe('terminal write failure feedback', () => {
           outageId: 1,
         }),
       },
-    })
-    reporter.report({
-      terminalRuntimeSessionId: 'pty_session_first_123456',
-      failure: {
-        kind: 'error',
-        error: new ClientRealtimeRequestError('unavailable again', {
-          kind: 'unavailable',
-          delivery: 'not-sent',
-          outageId: 2,
-        }),
-      },
-    })
-    reporter.report({
-      terminalRuntimeSessionId: 'pty_session_first_123456',
-      failure: { kind: 'result', result: { status: 'rejected' } },
-    })
-    reporter.report({
-      terminalRuntimeSessionId: 'pty_session_second_123456',
-      failure: { kind: 'result', result: { status: 'indeterminate' } },
-    })
-    reporter.report({
-      terminalRuntimeSessionId: 'pty_session_second_123456',
-      failure: { kind: 'error', error: new Error('write failed') },
-    })
+      'terminal.write-not-sent',
+    ],
+    ['server rejection', { kind: 'result', result: { status: 'rejected' } }, 'terminal.write-blocked-rejected'],
+    [
+      'indeterminate result',
+      { kind: 'result', result: { status: 'indeterminate' } },
+      'terminal.write-delivery-uncertain',
+    ],
+    ['unexpected error', { kind: 'error', error: new Error('write failed') }, 'terminal.write-delivery-uncertain'],
+  ] as const)('maps %s to the expected feedback', (_scenario, failure, message) => {
+    const reporter = createTerminalWriteFailureReporter()
 
-    expect(mocks.warning.mock.calls).toEqual([
-      ['terminal.write-not-sent', { id: 'terminal-write-failure:terminal.write-not-sent' }],
-      ['terminal.write-not-sent', { id: 'terminal-write-failure:terminal.write-not-sent' }],
-      ['terminal.write-blocked-rejected', { id: 'terminal-write-failure:terminal.write-blocked-rejected' }],
-      ['terminal.write-delivery-uncertain', { id: 'terminal-write-failure:terminal.write-delivery-uncertain' }],
-      ['terminal.write-delivery-uncertain', { id: 'terminal-write-failure:terminal.write-delivery-uncertain' }],
-    ])
+    reporter.report({ terminalRuntimeSessionId: 'pty_session_first_123456', failure })
+
+    expect(mocks.warning).toHaveBeenCalledWith(message, { id: `terminal-write-failure:${message}` })
   })
 
   test('does not report shutdown as an outage', () => {

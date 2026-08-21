@@ -25,9 +25,8 @@ describe('planTerminalComposerEdit', () => {
     expect(plan.caret).toBe(12)
   })
 
-  test('replaces a non-collapsed selection for either command', () => {
-    expect(planTerminalComposerEdit('abcdef', 2, 4, 'word').value).toBe('abef')
-    expect(planTerminalComposerEdit('abcdef', 2, 4, 'line').value).toBe('abef')
+  test.each(['word', 'line'] as const)('replaces a non-collapsed selection for the %s command', (command) => {
+    expect(planTerminalComposerEdit('abcdef', 2, 4, command).value).toBe('abef')
   })
 
   test('returns an empty plan at a line boundary', () => {
@@ -40,14 +39,16 @@ describe('planTerminalComposerEdit', () => {
 describe('terminalComposerEditCommandForEvent', () => {
   const baseEvent = { code: 'KeyW', ctrlKey: true, altKey: false, metaKey: false, shiftKey: false }
 
-  test('recognizes only exact desktop Mac Ctrl+W/Ctrl+U chords', () => {
-    expect(terminalComposerEditCommandForEvent(baseEvent, true)).toBe('word')
-    expect(terminalComposerEditCommandForEvent({ ...baseEvent, code: 'KeyU' }, true)).toBe('line')
-    expect(terminalComposerEditCommandForEvent(baseEvent, false)).toBeNull()
-    expect(terminalComposerEditCommandForEvent({ ...baseEvent, altKey: true }, true)).toBeNull()
-    expect(terminalComposerEditCommandForEvent({ ...baseEvent, metaKey: true }, true)).toBeNull()
-    expect(terminalComposerEditCommandForEvent({ ...baseEvent, shiftKey: true }, true)).toBeNull()
-    expect(terminalComposerEditCommandForEvent({ ...baseEvent, code: 'KeyX' }, true)).toBeNull()
+  test.each([
+    ['Mac Ctrl+W', baseEvent, true, 'word'],
+    ['Mac Ctrl+U', { ...baseEvent, code: 'KeyU' }, true, 'line'],
+    ['non-Mac Ctrl+W', baseEvent, false, null],
+    ['Alt modifier', { ...baseEvent, altKey: true }, true, null],
+    ['Meta modifier', { ...baseEvent, metaKey: true }, true, null],
+    ['Shift modifier', { ...baseEvent, shiftKey: true }, true, null],
+    ['unsupported key', { ...baseEvent, code: 'KeyX' }, true, null],
+  ] as const)('maps %s to $3', (_scenario, event, isDesktopMac, expected) => {
+    expect(terminalComposerEditCommandForEvent(event, isDesktopMac)).toBe(expected)
   })
 })
 

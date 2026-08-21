@@ -20,82 +20,68 @@ const terminalSessionId = 'term-111111111111111111111'
 const lineageA = 'pty_lineage_a_aaaaaaaa'
 const lineageB = 'pty_lineage_b_aaaaaaaa'
 
+function projectionWithRestartingSession() {
+  const projection = new TerminalSessionProjection()
+  projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+  projection.reconcileServerSessions(
+    { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+    [
+      makeServerSession('pty_generation_race_aaaa', terminalSessionId, {
+        terminalRuntimeGeneration: 1,
+      }),
+    ],
+    'client_local',
+  )
+  requiredTerminalSession(projection, terminalSessionId).restart()
+  return projection
+}
+
 describe('TerminalSessionProjection races', () => {
   test('does not delete a durable session when the retiring generation exits during restart', () => {
-    const localProjection = new TerminalSessionProjection()
-    localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-    localProjection.reconcileServerSessions(
-      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-      [
-        makeServerSession('pty_generation_race_aaaa', 'term-111111111111111111111', {
-          terminalRuntimeGeneration: 1,
-        }),
-      ],
-      'client_local',
-    )
-    const session = requiredTerminalSession(localProjection, 'term-111111111111111111111')
-    session.restart()
+    const projection = projectionWithRestartingSession()
+    try {
+      projection.handleExit({
+        terminalRuntimeSessionId: 'pty_generation_race_aaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        tabsBeforeRetirement: null,
+      })
 
-    localProjection.handleExit({
-      terminalRuntimeSessionId: 'pty_generation_race_aaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-111111111111111111111',
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      tabsBeforeRetirement: null,
-    })
-
-    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-    localProjection.destroy()
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+    } finally {
+      projection.destroy()
+    }
   })
 
   test('does not delete a durable session when its retiring runtime closes during restart', () => {
-    const localProjection = new TerminalSessionProjection()
-    localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-    localProjection.reconcileServerSessions(
-      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-      [
-        makeServerSession('pty_generation_race_aaaa', 'term-111111111111111111111', {
-          terminalRuntimeGeneration: 1,
-        }),
-      ],
-      'client_local',
-    )
-    const session = requiredTerminalSession(localProjection, 'term-111111111111111111111')
-    session.restart()
+    const projection = projectionWithRestartingSession()
+    try {
+      projection.handleSessionClosed(sessionClosedEvent('pty_generation_race_aaaa', 1, terminalSessionId))
 
-    localProjection.handleSessionClosed(sessionClosedEvent('pty_generation_race_aaaa', 1, 'term-111111111111111111111'))
-
-    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-    localProjection.destroy()
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+    } finally {
+      projection.destroy()
+    }
   })
 
   test('does not apply or retain a bell from the retiring runtime during restart', () => {
-    const localProjection = new TerminalSessionProjection()
-    localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-    localProjection.reconcileServerSessions(
-      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-      [
-        makeServerSession('pty_generation_race_aaaa', 'term-111111111111111111111', {
-          terminalRuntimeGeneration: 1,
-        }),
-      ],
-      'client_local',
-    )
-    const session = requiredTerminalSession(localProjection, 'term-111111111111111111111')
-    session.restart()
+    const projection = projectionWithRestartingSession()
+    try {
+      projection.handleServerBell({
+        terminalRuntimeSessionId: 'pty_generation_race_aaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        processName: 'zsh',
+        canonicalTitle: null,
+      })
 
-    localProjection.handleServerBell({
-      terminalRuntimeSessionId: 'pty_generation_race_aaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-111111111111111111111',
-      workspaceId: REPO_ROOT,
-      processName: 'zsh',
-      canonicalTitle: null,
-    })
-
-    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(0)
-    localProjection.destroy()
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(0)
+    } finally {
+      projection.destroy()
+    }
   })
 
   test('drops a bell that arrives before its runtime binding is known', () => {
@@ -124,7 +110,7 @@ describe('TerminalSessionProjection races', () => {
     localProjection.destroy()
   })
 
-  test('does not let a delayed partial create effect regress or replace a newer active binding', () => {
+  test('ignores older and foreign partial effects for a newer active binding', () => {
     const projection = new TerminalSessionProjection()
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(

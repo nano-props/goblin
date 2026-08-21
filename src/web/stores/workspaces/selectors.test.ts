@@ -6,16 +6,6 @@ import {
   workspaceRestoreStatusFromStore,
   workspaceSessionPersistenceOpenFromStore,
 } from '#/web/stores/workspaces/selector-state.ts'
-import {
-  appNavigationStoreActionsFromStore,
-  clientEffectIntentStoreActionsFromStore,
-  workspacePickerStoreActionsFromStore,
-  restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
-  restorableWorkspaceLayoutStoreActionsFromStore,
-  runtimeCoherentWorkspaceNavigationStoreActionsFromStore,
-  runtimeCoherentWorkspaceOpenStoreActionsFromStore,
-  runtimeCoherentWorkspaceProjectionStoreActionsFromStore,
-} from '#/web/stores/workspaces/selector-actions.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
@@ -60,80 +50,6 @@ describe('workspace selectors', () => {
       selectedTerminalSessionIdByTerminalFilesystemTarget: {
         'goblin+file:///tmp/repo\0goblin+file:///tmp/repo': 'term-111111111111111111111',
       },
-    })
-  })
-
-  test('compares action bundles by function identity', () => {
-    const fnA = () => {}
-    expect(
-      restorableWorkspaceLayoutStoreActionsFromStore({
-        toggleZenMode: fnA as never,
-        resetLayout: fnA as never,
-      }),
-    ).toEqual({
-      toggleZenMode: fnA,
-      resetLayout: fnA,
-    })
-    expect(
-      restorableWorkspaceLayoutPreferenceStoreActionsFromStore({
-        toggleZenMode: fnA as never,
-        resetLayout: fnA as never,
-      }),
-    ).toEqual({
-      toggleZenMode: fnA,
-      resetLayout: fnA,
-    })
-    expect(
-      runtimeCoherentWorkspaceOpenStoreActionsFromStore({
-        openWorkspaceMembership: fnA as never,
-      }),
-    ).toEqual({
-      openWorkspaceMembership: fnA,
-    })
-    expect(
-      runtimeCoherentWorkspaceNavigationStoreActionsFromStore({
-        closeWorkspace: fnA as never,
-      }),
-    ).toEqual({
-      closeWorkspace: fnA,
-    })
-    expect(
-      runtimeCoherentWorkspaceProjectionStoreActionsFromStore({
-        openWorkspaceMembership: fnA as never,
-        closeWorkspace: fnA as never,
-      }),
-    ).toEqual({
-      openWorkspaceMembership: fnA,
-      closeWorkspace: fnA,
-    })
-    expect(
-      appNavigationStoreActionsFromStore({
-        closeWorkspace: fnA as never,
-        peekWorkspaceNavigation: fnA as never,
-        commitWorkspaceNavigation: fnA as never,
-      }),
-    ).toEqual({
-      closeWorkspace: fnA,
-      peekWorkspaceNavigation: fnA,
-      commitWorkspaceNavigation: fnA,
-    })
-    expect(
-      workspacePickerStoreActionsFromStore({
-        openWorkspaceMembership: fnA as never,
-      }),
-    ).toEqual({
-      openWorkspaceMembership: fnA,
-    })
-    expect(
-      clientEffectIntentStoreActionsFromStore({
-        openWorkspaceMembership: fnA as never,
-        resetLayout: fnA as never,
-        toggleZenMode: fnA as never,
-      }),
-    ).toEqual({
-      openWorkspaceMembership: fnA,
-      resetLayout: fnA,
-      toggleZenMode: fnA,
     })
   })
 

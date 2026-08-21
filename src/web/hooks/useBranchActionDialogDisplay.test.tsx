@@ -111,7 +111,7 @@ async function dropBranch(branchName: string): Promise<void> {
 }
 
 describe('useBranchActionDialogDisplay', () => {
-  test('resolves the mounted target and persisted checkbox state from required read models', async () => {
+  test('resolves the mounted target and persisted checkbox state from required read models', () => {
     setupRepo()
     const entry: BranchActionDialogEntry<RemoveWorktreeDialogPayload> = {
       repoId: REPO_ID,
@@ -132,7 +132,7 @@ describe('useBranchActionDialogDisplay', () => {
     })
   })
 
-  test('projects branch action state from server operations', async () => {
+  test('projects branch action state from server operations', () => {
     const repo = setupRepo()
     setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
       lastFetchAt: null,
@@ -192,7 +192,7 @@ describe('useBranchActionDialogDisplay', () => {
     expect(handle.current.displayContext).toBeNull()
   })
 
-  test('owns exactly one observer per read model and releases them on unmount', async () => {
+  test('owns exactly one observer per read model and releases them on unmount', () => {
     const repo = setupRepo()
     const entry: BranchActionDialogEntry<string> = {
       repoId: REPO_ID,

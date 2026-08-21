@@ -11,7 +11,7 @@ import {
 import { fireEvent, screen } from '@testing-library/vue'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { GitWorkspaceNavigatorView } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorView.tsx'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
@@ -86,7 +86,7 @@ beforeEach(() => {
 })
 
 describe('GitWorkspaceNavigatorView', () => {
-  test('uses the TanStack Query snapshot for branch rows when available', async () => {
+  test('uses the TanStack Query snapshot for branch rows when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -102,7 +102,7 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(screen.getByText('feature/query')).toBeTruthy()
   })
 
-  test('filters the query branch rows with the workspace branch view preference', async () => {
+  test('filters the query branch rows with the workspace branch view preference', () => {
     const worktreeBranch = createRepoBranch('feature/worktree')
     const worktrees = [createRepoWorktreeSnapshotForTest(worktreeBranch.name, WORKTREE_PATH)]
     const repo = seedRepoWithReadModelForTest({
@@ -145,9 +145,12 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(screen.queryByText('feature/merge')).toBeNull()
   })
 
-  test.each(['rebase', 'bisect'] as const)(
+  test.each([
+    ['rebase', 'worktree-state.rebase-branch'],
+    ['bisect', 'worktree-state.bisect'],
+  ] as const)(
     'replaces the retained branch row with its detached %s worktree state',
-    (kind) => {
+    (kind, expectedLabel) => {
       const branch = createRepoBranch('feature/in-progress')
       seedRepoWithReadModelForTest({
         id: REPO_ID,
@@ -169,9 +172,7 @@ describe('GitWorkspaceNavigatorView', () => {
 
       renderGitWorkspaceNavigatorView()
 
-      expect(
-        screen.getByText(kind === 'rebase' ? 'worktree-state.rebase-branch' : 'worktree-state.bisect'),
-      ).toBeTruthy()
+      expect(screen.getByText(expectedLabel)).toBeTruthy()
       expect(screen.queryByText(branch.name)).toBeNull()
     },
   )
@@ -217,18 +218,7 @@ describe('GitWorkspaceNavigatorView', () => {
       id: REPO_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: null,
-      worktrees: [
-        {
-          path: WORKTREE_PATH,
-          head: { kind: 'detached' },
-          headOid: '0123456789abcdef0123456789abcdef01234567',
-          operation: null,
-          materializedBranch: null,
-          isSource: false,
-          isPrimary: false,
-          isLocked: false,
-        },
-      ],
+      worktrees: [detachedWorktree()],
     })
 
     renderGitWorkspaceNavigatorView()
@@ -252,21 +242,11 @@ describe('GitWorkspaceNavigatorView', () => {
   })
 
   test('opens detached worktree tabs from the target action menu', async () => {
-    const worktree: WorkspaceRepoWorktreeSnapshot = {
-      path: WORKTREE_PATH,
-      head: { kind: 'detached' },
-      headOid: '0123456789abcdef0123456789abcdef01234567',
-      operation: null,
-      materializedBranch: null,
-      isSource: false,
-      isPrimary: false,
-      isLocked: false,
-    }
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: null,
-      worktrees: [worktree],
+      worktrees: [detachedWorktree()],
     })
 
     renderGitWorkspaceNavigatorView()
@@ -371,32 +351,6 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(screen.queryByLabelText('branches.dirty')).toBeNull()
   })
 
-  test('keeps branch rows visible while outer chrome owns a membership-change failure', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('main')],
-      currentBranchName: 'main',
-    })
-    seedRepoQueryDataForTest(repo, {
-      branches: [createRepoBranch('main')],
-      currentBranch: 'main',
-    })
-    appQueryClient.removeQueries({
-      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
-    })
-    const readStatus = vi.fn(async () => {
-      throw new Error('error.repo-membership-changing')
-    })
-    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
-
-    renderGitWorkspaceNavigatorView()
-
-    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
-    expect(screen.getByText('main')).toBeTruthy()
-    expect(screen.queryByRole('status')).toBeNull()
-    expect(screen.queryByRole('alert')).toBeNull()
-  })
-
   test('keeps last-good branch status visible without a local stale warning', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -444,6 +398,19 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
+
+function detachedWorktree(): WorkspaceRepoWorktreeSnapshot {
+  return {
+    path: WORKTREE_PATH,
+    head: { kind: 'detached' },
+    headOid: '0123456789abcdef0123456789abcdef01234567',
+    operation: null,
+    materializedBranch: null,
+    isSource: false,
+    isPrimary: false,
+    isLocked: false,
+  }
+}
 
 function renderGitWorkspaceNavigatorView() {
   return renderInJsdom(

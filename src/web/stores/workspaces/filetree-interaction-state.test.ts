@@ -14,7 +14,7 @@ describe('filetreeInteractionStore', () => {
     resetFiletreeInteractionStore()
   })
 
-  test('stores selected and expanded keys by repo worktree scope', async () => {
+  test('stores selected and expanded keys by repo worktree scope', () => {
     const scopeA = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/a')
     const scopeB = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/b')
 
@@ -34,7 +34,7 @@ describe('filetreeInteractionStore', () => {
     })
   })
 
-  test('prunes keys that no longer exist in the loaded tree', async () => {
+  test('prunes keys that no longer exist in the loaded tree', () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/a')
     filetreeInteractionStore.getState().setSelectedKeys(scopeKey, ['README.md'])
     filetreeInteractionStore.getState().setExpandedKeys(scopeKey, ['src', 'docs'])
@@ -48,7 +48,7 @@ describe('filetreeInteractionStore', () => {
     })
   })
 
-  test('keeps remembered lazy descendants until a loaded ancestor disproves them', async () => {
+  test('keeps remembered lazy descendants until a loaded ancestor disproves them', () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/a')
     filetreeInteractionStore.getState().setSelectedKeys(scopeKey, ['src/web/index.ts'])
     filetreeInteractionStore.getState().setExpandedKeys(scopeKey, ['src', 'src/web'])
@@ -70,7 +70,7 @@ describe('filetreeInteractionStore', () => {
     })
   })
 
-  test('updates one expanded key without replacing sibling expansion state', async () => {
+  test('updates one expanded key without replacing sibling expansion state', () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/a')
     filetreeInteractionStore.getState().setExpandedKeys(scopeKey, ['src'])
 
@@ -84,7 +84,7 @@ describe('filetreeInteractionStore', () => {
     })
   })
 
-  test('stores top visible row index in the same file tree interaction scope', async () => {
+  test('stores top visible row index in the same file tree interaction scope', () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/a')
 
     filetreeInteractionStore.getState().setTopVisibleRowIndex(scopeKey, 240)
@@ -96,7 +96,7 @@ describe('filetreeInteractionStore', () => {
     })
   })
 
-  test('restored view state replaces existing file tree interaction state', async () => {
+  test('restored view state replaces existing file tree interaction state', () => {
     const staleScopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/stale')
     const restoredScopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/restored')
     filetreeInteractionStore.getState().setExpandedKeys(staleScopeKey, ['old'])
@@ -118,7 +118,7 @@ describe('filetreeInteractionStore', () => {
     })
   })
 
-  test('rejects malformed and noncanonical workspace identities while restoring scope keys', async () => {
+  test('rejects malformed and noncanonical workspace identities while restoring scope keys', () => {
     const validScopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/valid')
     const malformedScopeKey = 'not-a-workspace\0/worktree/malformed'
     const noncanonicalScopeKey = 'goblin+file:///workspaces/%65xample\0/worktree/noncanonical'
@@ -142,7 +142,7 @@ describe('filetreeInteractionStore', () => {
     })
   })
 
-  test('reset clears remembered file tree interaction state', async () => {
+  test('reset clears remembered file tree interaction state', () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/worktree/a')
     filetreeInteractionStore.getState().setExpandedKeys(scopeKey, ['src'])
 

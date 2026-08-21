@@ -99,8 +99,6 @@ describe('TerminalSessionState', () => {
       canonicalTitle: null,
       composer: DEFAULT_COMPOSER,
     })
-    // An unbound runtime passes null. Once a runtime id is addressable, its
-    // control identity remains orthogonal to lifecycle.
     expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment).toEqual({ role: 'controller' })
   })
 
@@ -116,9 +114,7 @@ describe('TerminalSessionState', () => {
         canonicalSize: { cols: 120, rows: 40 },
       }),
     ).toBe(true)
-    // The default phase is 'open' for an attach/restart metadata payload.
     expect(state.snapshot(null).phase).toBe('open')
-    // The attachment carries identity fields only — no phase.
     expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'open',
       message: null,
@@ -132,12 +128,6 @@ describe('TerminalSessionState', () => {
   })
 
   test('applyIdentity does not touch lifecycle; applyLifecycle does not touch identity', () => {
-    // The split is the architectural contract: an identity event
-    // updates role/controllerStatus/canonicalSize and returns
-    // `changed` only for those fields. A lifecycle event updates
-    // phase/message and returns `changed` only for
-    // those fields. A future caller cannot accidentally re-introduce
-    // the conflation because the types do not overlap.
     const state = new TerminalSessionState()
     applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
@@ -148,7 +138,6 @@ describe('TerminalSessionState', () => {
       canonicalSize: { cols: 100, rows: 30 },
     })
 
-    // Identity-only update: phase is unchanged.
     const identityOnly: TerminalIdentityViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -161,7 +150,6 @@ describe('TerminalSessionState', () => {
     expect(state.getPhase()).toBe('open')
     expect(state.getClientController().role).toBe('viewer')
 
-    // Lifecycle-only update: role is unchanged.
     const lifecycleOnly: TerminalLifecycleViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -173,12 +161,7 @@ describe('TerminalSessionState', () => {
     expect(state.getClientController().role).toBe('viewer')
   })
 
-  test('isController reflects role only — a transitional phase does not flip it', () => {
-    // The split: `isController` is the role-only controller predicate the
-    // teardown decision uses. A `canSendInput` (which adds the phase
-    // requirement) is the write-path gate. They are intentionally
-    // separate so the conflation in the pre-split `canResize()` is
-    // not possible.
+  test('isController depends only on role during transitional phases', () => {
     const state = new TerminalSessionState()
     applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
@@ -191,18 +174,17 @@ describe('TerminalSessionState', () => {
     expect(state.isController()).toBe(true)
     expect(state.canSendInput()).toBe(true)
 
-    // Move to a transitional phase but keep the controller role.
     state.applyLifecycle({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       phase: 'opening',
       message: null,
     })
-    expect(state.isController()).toBe(true) // Role-only — still controller.
-    expect(state.canSendInput()).toBe(false) // Write-path — phase is transitional.
+    expect(state.isController()).toBe(true)
+    expect(state.canSendInput()).toBe(false)
   })
 
-  test('canSendInput requires both role=controller AND phase=open', () => {
+  test('canSendInput requires the controller role and open phase', () => {
     const state = new TerminalSessionState()
     applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
@@ -212,7 +194,6 @@ describe('TerminalSessionState', () => {
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
     })
-    // Viewer cannot send input regardless of phase.
     expect(state.canSendInput()).toBe(false)
     state.applyLifecycle({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -222,7 +203,6 @@ describe('TerminalSessionState', () => {
     })
     expect(state.canSendInput()).toBe(false)
 
-    // Controller can send input only when phase is 'open'.
     state.applyIdentity({
       identityRevision: 1,
       role: 'controller',
@@ -241,10 +221,6 @@ describe('TerminalSessionState', () => {
   })
 
   test('applyIdentity is order-independent with applyLifecycle', () => {
-    // The split is order-independent: applying lifecycle first and
-    // identity second produces the same state as the reverse order,
-    // as long as the final values are the same. This pins the
-    // contract that the two sub-states do not interact.
     const identity: TerminalIdentityViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -327,8 +303,6 @@ describe('TerminalSessionState', () => {
     state.recordComposerHistory('kept command')
 
     expect(state.resetTransientState()).toBe(true)
-    // Identity and lifecycle survive `resetTransientState` — only
-    // the replay buffer, search result, and progress are wiped.
     expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'open',
       message: null,

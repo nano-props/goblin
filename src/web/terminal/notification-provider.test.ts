@@ -59,7 +59,7 @@ describe('terminal notification provider', () => {
     expect(wsMock.notificationInstances).toHaveLength(0)
   })
 
-  test('does not fall through to browser notifications when native handles the request as false', async () => {
+  test('returns a native rejection without issuing a browser notification', async () => {
     const notifyBell = vi.fn(async () => false)
     Object.defineProperty(window, 'goblinNative', {
       configurable: true,
@@ -78,7 +78,7 @@ describe('terminal notification provider', () => {
     expect(wsMock.notificationInstances).toHaveLength(0)
   })
 
-  test('falls back to browser notifications when no native notification provider exists', async () => {
+  test('uses browser notifications when the native provider is unavailable', async () => {
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
 

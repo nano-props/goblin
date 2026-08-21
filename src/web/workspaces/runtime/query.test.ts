@@ -53,7 +53,7 @@ describe('workspace runtime query cache', () => {
     const connecting: WorkspaceRuntimesSnapshot = { runtimes: [] }
     const settled: WorkspaceRuntimesSnapshot = { runtimes: [] }
     vi.mocked(listWorkspaceRuntimes)
-      .mockImplementationOnce(async () => await first.promise)
+      .mockImplementationOnce(() => first.promise)
       .mockResolvedValueOnce(settled)
 
     const commandRefresh = refreshWorkspaceRuntimes(queryClient)
@@ -74,7 +74,7 @@ describe('workspace runtime query cache', () => {
   test('orders membership cache mutations after an older authoritative read', async () => {
     const queryClient = new QueryClient()
     const read = Promise.withResolvers<WorkspaceRuntimesSnapshot>()
-    vi.mocked(listWorkspaceRuntimes).mockImplementationOnce(async () => await read.promise)
+    vi.mocked(listWorkspaceRuntimes).mockImplementationOnce(() => read.promise)
     const refresh = refreshWorkspaceRuntimes(queryClient)
     await vi.waitFor(() => expect(listWorkspaceRuntimes).toHaveBeenCalledOnce())
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
@@ -96,7 +96,7 @@ describe('workspace runtime query cache', () => {
       runtimes: [{ workspaceId, workspaceRuntimeId: 'runtime-old', workspaceProbe: { status: 'probing' } }],
     })
     const read = Promise.withResolvers<WorkspaceRuntimesSnapshot>()
-    vi.mocked(listWorkspaceRuntimes).mockImplementationOnce(async () => await read.promise)
+    vi.mocked(listWorkspaceRuntimes).mockImplementationOnce(() => read.promise)
     const refresh = refreshWorkspaceRuntimes(queryClient)
     await vi.waitFor(() => expect(listWorkspaceRuntimes).toHaveBeenCalledOnce())
     const removal = removeWorkspaceRuntimeFromCache({ workspaceId, workspaceRuntimeId: 'runtime-old' }, queryClient)
@@ -113,7 +113,7 @@ describe('workspace runtime query cache', () => {
     const first = Promise.withResolvers<WorkspaceRuntimesSnapshot>()
     const settled: WorkspaceRuntimesSnapshot = { runtimes: [] }
     vi.mocked(listWorkspaceRuntimes)
-      .mockImplementationOnce(async () => await first.promise)
+      .mockImplementationOnce(() => first.promise)
       .mockResolvedValueOnce(settled)
     const connectingRead = refreshWorkspaceRuntimes(queryClient)
     await vi.waitFor(() => expect(listWorkspaceRuntimes).toHaveBeenCalledOnce())

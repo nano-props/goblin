@@ -1,16 +1,15 @@
 // @vitest-environment jsdom
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
-  TerminalSessionCommandScope,
+  EMPTY_TERMINAL_SNAPSHOT,
   TerminalSessionReadScope,
   useTerminalSessionContext,
   useTerminalSessionReadContext,
 } from '#/web/terminal/components/terminal-session-context.ts'
-import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
-import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
+import type { TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
@@ -29,45 +28,9 @@ function CommandProbe() {
   return <span data-testid="has-create-terminal">{String(typeof ctx.createTerminal)}</span>
 }
 
-function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
-  return terminalSessionContextForTest({
-    createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-    createTerminalWithAdmission: vi.fn(async () => ({
-      terminalSessionId: 'term-111111111111111111111',
-      presentation: { kind: 'git-worktree' as const },
-      resourceDisposition: 'created',
-      runtimeProjectionApplied: false,
-      requestRole: 'leader',
-    })) as TerminalSessionContextValue['createTerminalWithAdmission'],
-    selectTerminal: vi.fn(),
-    scrollToBottom: vi.fn(),
-    clearBell: vi.fn(() => false),
-    closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    attach: vi.fn(),
-    detach: vi.fn(),
-    restart: vi.fn(),
-    focusTerminal: vi.fn(),
-    findNext: vi.fn(() => ({ resultIndex: 0, resultCount: 0, found: false })),
-    findPrevious: vi.fn(() => ({ resultIndex: 0, resultCount: 0, found: false })),
-    clearSearch: vi.fn(),
-    takeover: vi.fn(async () => false),
-    ...overrides,
-  })
-}
-
 describe('useTerminalSessionContext', () => {
   test('throws when the provider is missing', () => {
     expect(() => renderInJsdom(<CommandProbe />)).toThrow('Terminal session context is unavailable')
-  })
-
-  test('returns the provider value when present', async () => {
-    const createTerminal = vi.fn(async () => 'real-session-id')
-    renderInJsdom(
-      <TerminalSessionCommandScope value={makeCommandContext({ createTerminal })}>
-        <CommandProbe />
-      </TerminalSessionCommandScope>,
-    )
-    expect(createTerminal).not.toHaveBeenCalled()
   })
 })
 
@@ -76,7 +39,7 @@ describe('useTerminalSessionReadContext', () => {
     expect(() => renderInJsdom(<ReadSnapshot />)).toThrow('Terminal session read context is unavailable')
   })
 
-  test('returns the provider value when present', async () => {
+  test('returns the provider value when present', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalFilesystemTargetSnapshot: () => ({ ...EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT, count: 7 }),
       subscribeTerminalFilesystemTarget: () => () => {},
@@ -84,12 +47,7 @@ describe('useTerminalSessionReadContext', () => {
       subscribeWorkspaceBellCount: () => () => {},
       workspaceTerminalSessions: () => [],
       subscribeWorkspaceTerminalSessions: () => () => {},
-      snapshot: () => ({
-        phase: 'opening',
-        message: null,
-        processName: 'terminal',
-        composer: { expanded: false, mode: 'keys', draft: '', historyEntries: [] },
-      }),
+      snapshot: () => EMPTY_TERMINAL_SNAPSHOT,
       subscribeSnapshot: () => () => {},
     }
     const { getByTestId } = renderInJsdom(

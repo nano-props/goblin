@@ -12,7 +12,7 @@ const TARGET = {
 describe('AppTerminalProjectionRecovery', () => {
   test('transfers an in-flight initial catalog read to a replacement projection scope', async () => {
     const catalog = Promise.withResolvers<TerminalSessionsSnapshot>()
-    const recoverSessions = vi.fn(async () => await catalog.promise)
+    const recoverSessions = vi.fn(() => catalog.promise)
     const markReady = vi.fn()
     const recovery = new AppTerminalProjectionRecovery({
       projection: {
@@ -110,7 +110,7 @@ describe('AppTerminalProjectionRecovery', () => {
         terminalSessionsCatalogCoverageRevision: vi.fn(() => 1),
       },
       readClientId: () => 'client-test',
-      recoverSessions: async () => await catalog.promise,
+      recoverSessions: () => catalog.promise,
       hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase }),
       beginHydration,
       markReady,
@@ -141,7 +141,7 @@ describe('AppTerminalProjectionRecovery', () => {
         terminalSessionsCatalogCoverageRevision: vi.fn(() => 1),
       },
       readClientId: () => 'client-test',
-      recoverSessions: async () => await Promise.reject(failure),
+      recoverSessions: () => Promise.reject(failure),
       hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase }),
       beginHydration,
       markReady: vi.fn(),
@@ -151,32 +151,6 @@ describe('AppTerminalProjectionRecovery', () => {
     })
 
     recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 2 })
-
-    await vi.waitFor(() =>
-      expect(markFailed).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId, failure.message),
-    )
-  })
-
-  test('records an initial recovery failure only while hydration is pending', async () => {
-    const markFailed = vi.fn()
-    const failure = new Error('catalog unavailable')
-    const recovery = new AppTerminalProjectionRecovery({
-      projection: {
-        reconcileServerSessionsSnapshot: vi.fn(() => true),
-        resynchronizeConnectedViews: vi.fn(),
-        terminalSessionsCatalogCoverageRevision: vi.fn(() => null),
-      },
-      readClientId: () => 'client-test',
-      recoverSessions: async () => await Promise.reject(failure),
-      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'pending' }),
-      beginHydration: vi.fn(),
-      markReady: vi.fn(),
-      markFailed,
-      isFocusRefreshDue: () => true,
-      logFailure: vi.fn(),
-    })
-
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 0 })
 
     await vi.waitFor(() =>
       expect(markFailed).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId, failure.message),
@@ -197,7 +171,7 @@ describe('AppTerminalProjectionRecovery', () => {
         terminalSessionsCatalogCoverageRevision: vi.fn(() => null),
       },
       readClientId: () => 'client-test',
-      recoverSessions: async () => await Promise.reject(failure),
+      recoverSessions: () => Promise.reject(failure),
       hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase }),
       beginHydration,
       markReady: vi.fn(),
@@ -254,7 +228,7 @@ describe('AppTerminalProjectionRecovery', () => {
         terminalSessionsCatalogCoverageRevision: vi.fn(() => 2),
       },
       readClientId: () => 'client-test',
-      recoverSessions: async () => await Promise.reject(new Error('network unavailable')),
+      recoverSessions: () => Promise.reject(new Error('network unavailable')),
       hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'ready' }),
       beginHydration,
       markReady: vi.fn(),

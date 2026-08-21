@@ -82,7 +82,7 @@ export function dispatchDeleteBranch({
  * Dispatch a `removeWorktree` action against the resolved repo. See
  * `dispatchDeleteBranch` for why this lives outside the hook.
  */
-export async function dispatchRemoveWorktree({
+export function dispatchRemoveWorktree({
   repo,
   target,
   deleteBranch,
@@ -95,8 +95,8 @@ export async function dispatchRemoveWorktree({
   deleteUpstream: boolean
 }): Promise<RepoMutationExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
-  if (!actionRepo) return recordRepoDataUnavailable(repo)
-  return await dispatchRepoBranchAction(
+  if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
+  return dispatchRepoBranchAction(
     actionRepo.id,
     actionRepo.workspaceRuntimeId,
     {

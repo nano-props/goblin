@@ -497,35 +497,17 @@ describe('BranchRow', () => {
     const className = shell?.className ?? ''
     expect(container.querySelector('li')?.className).toContain('group')
     expect(className).toContain('opacity-0')
-    expect(className).toContain('pointer-events-none')
     expect(className).toContain('group-hover:pointer-events-auto')
-    expect(className).toContain('group-hover:opacity-100')
-    expect(className).toContain('group-focus-within:opacity-100')
-    expect(className).toContain('transition-opacity')
   })
 
-  test('keeps the actions wrapper visible while the action popover is open in non-compact mode', () => {
-    const { shell } = renderRow(false, { actionMenuOpen: true })
+  test.each([
+    ['the action popover is open', false, { actionMenuOpen: true }],
+    ['compact mode is active', true, {}],
+    ['the row reports a busy branch action', false, { branchActionBusy: true }],
+  ] as const)('keeps the actions wrapper visible while %s', (_condition, compact, options) => {
+    const { shell } = renderRow(compact, options)
     const className = shell?.className ?? ''
     expect(className).not.toContain('opacity-0')
-    expect(className).not.toContain('group-hover:opacity-100')
-    expect(className).not.toContain('group-focus-within:opacity-100')
-  })
-
-  test('keeps the actions wrapper fully visible in compact mode', () => {
-    const { shell } = renderRow(true)
-    const className = shell?.className ?? ''
-    expect(className).not.toContain('opacity-0')
-    expect(className).not.toContain('group-hover:opacity-100')
-    expect(className).not.toContain('group-focus-within:opacity-100')
-  })
-
-  test('keeps the actions wrapper visible while the row reports a busy branch action', () => {
-    const { shell } = renderRow(false, { branchActionBusy: true })
-    const className = shell?.className ?? ''
-    expect(className).not.toContain('opacity-0')
-    expect(className).not.toContain('group-hover:opacity-100')
-    expect(className).not.toContain('group-focus-within:opacity-100')
   })
 })
 

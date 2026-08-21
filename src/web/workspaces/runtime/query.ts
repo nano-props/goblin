@@ -37,7 +37,7 @@ export function workspaceRuntimesQueryOptions() {
 export async function refreshWorkspaceRuntimes(
   queryClient: QueryClient = appQueryClient,
 ): Promise<WorkspaceRuntimesSnapshot> {
-  return await requestWorkspaceRuntimeRefresh(queryClient, false)
+  return requestWorkspaceRuntimeRefresh(queryClient, false)
 }
 
 async function requestWorkspaceRuntimeRefresh(
@@ -51,7 +51,7 @@ async function requestWorkspaceRuntimeRefresh(
   }
   if (state.running) {
     if (requestTrailingRefresh) state.trailing = true
-    return await state.running
+    return state.running
   }
   const running = (async () => {
     let snapshot: WorkspaceRuntimesSnapshot | undefined
@@ -113,5 +113,5 @@ export async function removeWorkspaceRuntimeFromCache(
 export async function invalidateWorkspaceRuntimes(
   queryClient: QueryClient = appQueryClient,
 ): Promise<WorkspaceRuntimesSnapshot> {
-  return await requestWorkspaceRuntimeRefresh(queryClient, true)
+  return requestWorkspaceRuntimeRefresh(queryClient, true)
 }

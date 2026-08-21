@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import {
+  branchActionBusyItemId,
+  branchActionDisplayPhase,
   branchActionOperationFromServer,
-  isActiveServerBranchAction,
   projectBranchActionOperation,
   projectBranchActionRepo,
-  serverBranchActionReason,
 } from '#/web/hooks/branch-action-state.ts'
 import { idleOperation } from '#/web/stores/workspaces/operations.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
@@ -16,9 +16,8 @@ describe('branch action state projection', () => {
   test('maps active server branch operations onto the branch action operation shape', () => {
     const operation = serverOperation({ kind: 'push', phase: 'running', branch: 'feature/a' })
 
-    expect(isActiveServerBranchAction(operation)).toBe(true)
-    expect(serverBranchActionReason(operation)).toBe('branch:push')
-    expect(branchActionOperationFromServer(idleOperation(), [operation], 'feature/a')).toMatchObject({
+    expect(branchActionOperationFromServer(idleOperation(), [operation], 'feature/a')).toEqual({
+      operationId: 100,
       phase: 'running',
       reason: 'branch:push',
       target: 'feature/a',
@@ -49,7 +48,7 @@ describe('branch action state projection', () => {
     ).toBe(fallback)
   })
 
-  test('projects from a repo-shaped fallback without leaking the fallback read to callers', () => {
+  test('prefers an active server operation and otherwise retains the local fallback', () => {
     const repo = {
       operations: {
         branchAction: {
@@ -115,6 +114,22 @@ describe('branch action state projection', () => {
         serverOperation({ kind: 'create-worktree', phase: 'done', branch: 'feature/a' }),
       ]),
     ).toBe(fallback)
+  })
+
+  test('derives busy item and display phase only for the targeted branch', () => {
+    const repo = {
+      branchAction: {
+        operationId: 100,
+        phase: 'queued' as const,
+        reason: 'branch:push' as const,
+        target: 'feature/a',
+      },
+    }
+
+    expect(branchActionBusyItemId(repo, 'feature/a')).toBe('push')
+    expect(branchActionDisplayPhase(repo, 'feature/a')).toBe('queued')
+    expect(branchActionBusyItemId(repo, 'feature/other')).toBeNull()
+    expect(branchActionDisplayPhase(repo, 'feature/other')).toBeNull()
   })
 })
 

@@ -27,7 +27,7 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
   request(scope: RuntimeProjectionScope, requirement: WorkspacePaneTabsRecoveryRequirement): void {
     scope.runLatest(
       WORKSPACE_TABS_REFRESH_LANE,
-      async () => await this.dependencies.refresh(scope.target, requirement),
+      () => this.dependencies.refresh(scope.target, requirement),
       () => {},
       (error) => this.dependencies.logFailure(scope.target, error),
     )

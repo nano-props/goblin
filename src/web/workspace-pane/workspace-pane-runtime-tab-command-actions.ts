@@ -111,7 +111,7 @@ export async function dispatchTerminalRuntimePrimaryAction(
   const target = resolution.target
   const placeholderTab = terminalPlaceholderForEmptyProjection(target)
   if (placeholderTab) {
-    return await dispatchSelectWorkspacePaneTabByIdentityAction({
+    return dispatchSelectWorkspacePaneTabByIdentityAction({
       workspaceId: currentWorkspaceId,
       workspacePaneRoute: options.target.workspacePaneRoute,
       location: options.target.location,
@@ -120,7 +120,7 @@ export async function dispatchTerminalRuntimePrimaryAction(
     })
   }
   const context = terminalRuntimeTabActionContext(options)
-  return await runWorkspacePaneRuntimePrimaryAction('terminal', context)
+  return runWorkspacePaneRuntimePrimaryAction('terminal', context)
 }
 
 export async function dispatchNewTerminalRuntimeTabAction(
@@ -130,7 +130,7 @@ export async function dispatchNewTerminalRuntimeTabAction(
   if (!currentWorkspaceId || currentWorkspaceId !== options.target.location.workspaceId) return false
   if (!terminalCommandTargetIsCurrent(options.target)) return false
   const context = terminalRuntimeTabActionContext(options)
-  return await runWorkspacePaneRuntimeNewAction('terminal', context)
+  return runWorkspacePaneRuntimeNewAction('terminal', context)
 }
 
 function terminalPlaceholderForEmptyProjection(
@@ -171,18 +171,18 @@ function terminalRuntimeTabActionContext({
   })
 }
 
-export async function runWorkspacePaneRuntimePrimaryAction(
+export function runWorkspacePaneRuntimePrimaryAction(
   type: WorkspacePaneRuntimeTabType,
   context: WorkspacePaneRuntimeTabCommandContext,
 ): Promise<boolean> {
-  return await WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE[type].primary(context)
+  return WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE[type].primary(context)
 }
 
-export async function runWorkspacePaneRuntimeNewAction(
+export function runWorkspacePaneRuntimeNewAction(
   type: WorkspacePaneRuntimeTabType,
   context: WorkspacePaneRuntimeTabCommandContext,
 ): Promise<boolean> {
-  return await WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE[type].createNew(context)
+  return WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE[type].createNew(context)
 }
 
 async function showTerminalRuntimeTab(

@@ -31,13 +31,6 @@ const responsiveMocks = vi.hoisted(() => {
     },
   }
 })
-const gitWorkspaceNavigatorMocks = vi.hoisted(() => ({
-  activate: vi.fn<(repoId: string) => void>(),
-}))
-const createWorktreePageMocks = vi.hoisted(() => ({
-  cancel: vi.fn<() => void>(),
-  created: vi.fn<(branchName: string) => void>(),
-}))
 const restoreWorkspaceTabsMocks = vi.hoisted(() => ({
   useRestoreWorkspaceTabsOnView: vi.fn(),
   useRepoToasts: vi.fn(),
@@ -84,14 +77,8 @@ vi.mock('#/web/hooks/useRestoreWorkspaceTabsOnView.ts', () => ({
 }))
 
 vi.mock('#/web/components/GitWorkspaceNavigator.tsx', () => {
-  const GitWorkspaceNavigator: FunctionalComponent<{ repoId: string }> = (props) => (
-    <button
-      type="button"
-      data-testid="git-workspace-navigator"
-      onClick={() => {
-        gitWorkspaceNavigatorMocks.activate(props.repoId)
-      }}
-    >
+  const GitWorkspaceNavigator: FunctionalComponent<{ repoId: string }> = () => (
+    <button type="button" data-testid="git-workspace-navigator">
       branch
     </button>
   )
@@ -167,18 +154,12 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => {
       <button
         type="button"
         data-testid="create-worktree-cancel"
-        onClick={() => {
-          createWorktreePageMocks.cancel()
-          props.onCancel()
-        }}
+        onClick={props.onCancel}
       />
       <button
         type="button"
         data-testid="create-worktree-created"
-        onClick={() => {
-          createWorktreePageMocks.created('/tmp/new-worktree')
-          props.onCreated('/tmp/new-worktree', 1)
-        }}
+        onClick={() => props.onCreated('/tmp/new-worktree', 1)}
       />
     </div>
   )
@@ -354,7 +335,6 @@ beforeEach(() => {
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
     currentBranchName: null,
   })
-  gitWorkspaceNavigatorMocks.activate.mockImplementation(() => {})
   restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockClear()
   restoreWorkspaceTabsMocks.useRepoToasts.mockClear()
   workspaceRepoReadNotificationHostMocks.render.mockClear()
@@ -365,17 +345,12 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  gitWorkspaceNavigatorMocks.activate.mockReset()
-  createWorktreePageMocks.cancel.mockReset()
-  createWorktreePageMocks.created.mockReset()
   vi.restoreAllMocks()
 })
 
 // RTL has no reusable harness for WorkspaceView routing, responsive layout, and Zen reveal behavior.
 export {
   responsiveMocks,
-  gitWorkspaceNavigatorMocks,
-  createWorktreePageMocks,
   restoreWorkspaceTabsMocks,
   workspacePaneMocks,
   workspaceRepoReadNotificationHostMocks,
@@ -400,7 +375,6 @@ export {
   workspaceNavigationControls,
   zenModeToggleOverlay,
   mockZenRevealLayout,
-  domRect,
   setReadModelLoading,
   setRepoUnavailable,
 }

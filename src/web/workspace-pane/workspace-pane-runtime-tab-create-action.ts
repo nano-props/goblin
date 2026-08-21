@@ -123,7 +123,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 ): Promise<TerminalCreateCommandResult> {
   const base = workspacePaneLocationTerminalBase(options.location)
   if (!terminalCreateTargetIsCurrent(options.location, base)) return staleTerminalCreateResult()
-  return await runWorkspacePaneAction(options.location, async () => {
+  return runWorkspacePaneAction(options.location, async () => {
     const admission = terminalCreateAdmission(options.location, base)
     if (admission === 'stale') return staleTerminalCreateResult()
     if (admission !== 'ready') return blockedTerminalCreateResult(admission, options.t)
@@ -142,8 +142,8 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
         insertAfterIdentity: options.insertAfterIdentity,
         t: options.t,
         logMessage: options.logMessage,
-        commitCreatedTerminalTab: async (admission) =>
-          await commitCreatedTerminalWorkspacePaneRuntimeTab({
+        commitCreatedTerminalTab: (admission) =>
+          commitCreatedTerminalWorkspacePaneRuntimeTab({
             location: options.location,
             base,
             admission,

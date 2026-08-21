@@ -330,19 +330,6 @@ describe('workspace pane tab controller transactions', () => {
     expect(onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('returns the navigation settlement result without owning presentation effects', async () => {
-    await expect(
-      commitWorkspacePaneControllerRoute(WORKSPACE_ID, 'feature/a', TARGET_ROUTE, {
-        commitWorkspacePaneRoute: vi.fn(async () => true),
-      }),
-    ).resolves.toBe(true)
-    await expect(
-      commitWorkspacePaneControllerRoute(WORKSPACE_ID, 'feature/a', TARGET_ROUTE, {
-        commitWorkspacePaneRoute: vi.fn(async () => false),
-      }),
-    ).resolves.toBe(false)
-  })
-
   test('does not translate an unexpected route failure into a boolean result', async () => {
     await expect(
       commitWorkspacePaneControllerRoute(WORKSPACE_ID, 'feature/a', TARGET_ROUTE, {

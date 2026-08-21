@@ -75,16 +75,12 @@ describe('client workspace persistence', () => {
     expect(raw).toEqual(presentation)
   })
 
-  test('replaces parseable corruption in the current browser format', async () => {
-    const corrupt = JSON.stringify({ ...currentState(), zenMode: 'yes' })
-    localStorage.setItem('goblin.workspace', corrupt)
-    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
-    expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
-  })
-
-  test('replaces an obsolete browser version envelope', async () => {
-    const future = JSON.stringify({ version: 2, state: {} })
-    localStorage.setItem('goblin.workspace', future)
+  test.each([
+    ['an invalid current field', { ...currentState(), zenMode: 'yes' }],
+    ['an obsolete version envelope', { version: 2, state: {} }],
+    ['an unknown root field', { ...currentState(), unknownRoot: 'reject' }],
+  ])('replaces browser state containing %s', async (_case, invalidState) => {
+    localStorage.setItem('goblin.workspace', JSON.stringify(invalidState))
 
     await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
     expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
@@ -124,13 +120,6 @@ describe('client workspace persistence', () => {
     await expect(readClientWorkspaceState()).resolves.toEqual(state)
   })
 
-  test('replaces state with unknown root data', async () => {
-    const raw = JSON.stringify({ ...currentState(), unknownRoot: 'preserve' })
-    localStorage.setItem('goblin.workspace', raw)
-
-    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
-    expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
-  })
 })
 
 function currentState(overrides: Partial<ClientWorkspaceState> = {}): ClientWorkspaceState {

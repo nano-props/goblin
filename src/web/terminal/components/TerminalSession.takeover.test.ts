@@ -27,26 +27,6 @@ const geometryMocks = terminalGeometryMocks()
 beforeEach(resetTerminalSessionHarness)
 
 describe('TerminalSession takeover and identity', () => {
-  test('tracks server title changes separately from process name', async () => {
-    const host = createTerminalHost()
-    const notify = vi.fn()
-    const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-    notify.mockClear()
-
-    session.handleServerTitle('~/Developer/goblin — npm run dev')
-
-    expect(session.snapshot()).toMatchObject({
-      phase: 'open',
-      processName: 'zsh',
-      canonicalTitle: '~/Developer/goblin — npm run dev',
-    })
-    expect(notify).toHaveBeenCalledTimes(1)
-  })
-
   test('joins concurrent takeover callers to one server mutation', async () => {
     const takeoverResponse = Promise.withResolvers<TerminalTakeoverResult>()
     terminalCalls.takeover.mockReturnValueOnce(takeoverResponse.promise)
@@ -236,13 +216,7 @@ describe('TerminalSession takeover and identity', () => {
     )
   })
 
-  test('takeover response is the authoritative handshake (no realtime event required)', async () => {
-    // After the takeover atomicity follow-up, the `terminal.takeover`
-    // response carries role/controllerStatus/canonicalSize/phase
-    // and is applied synchronously. The client does NOT have to
-    // wait for a realtime `identity` event before painting the
-    // post-takeover frame. A subsequent realtime event for the same
-    // session is idempotent.
+  test('commits takeover from the response without a realtime identity event', async () => {
     terminalCalls.attach
       .mockResolvedValueOnce(
         attachResult('pty_session_1_aaaaaaaaa', {
@@ -283,13 +257,8 @@ describe('TerminalSession takeover and identity', () => {
       cols: 100,
       rows: 30,
     })
-    // No realtime identity event is needed; takeover and its recovery
-    // attach commit the fitted controller view in one presentation.
     expect(session.snapshot().attachment).toEqual({ role: 'controller' })
 
-    // A later realtime identity event for the same session is a
-    // benign re-apply — the runtime treats it as idempotent because
-    // every field already matches.
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,

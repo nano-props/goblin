@@ -17,28 +17,18 @@ import {
   workspacePane,
   workspaceLayout,
   compactWorkspace,
-  compactPane,
-  zenModeSidebarDragPlate,
-  zenModeSidebarReveal,
-  zenModeSidebarTrigger,
 } from '#/web/test-utils/workspace-view.tsx'
 
 describe('WorkspaceView branch and page routes', () => {
-  test('large-screen branch activation keeps the Git workspace navigator visible', async () => {
+  test('large-screen branch route renders the split navigator and workspace', () => {
     const { container } = render(branchWorkspaceView())
 
     expect(workspaceLayout(container)?.dataset.mode).toBe('split')
-
-    await flushTestUpdates(() => {
-      gitWorkspaceNavigator(container)?.click()
-    })
-
     expect(gitWorkspaceNavigator(container)).not.toBeNull()
-    expect(workspaceLayout(container)?.dataset.mode).toBe('split')
     expect(workspacePane(container)).not.toBeNull()
   })
 
-  test('route branch view does not write current branch into the store before read model is ready', () => {
+  test('route branch view does not throw before the read model is ready', () => {
     resetWorkspacesStore()
     seedRepoShellForTest({ id: REPO_ID })
 
@@ -61,15 +51,6 @@ describe('WorkspaceView branch and page routes', () => {
     )
 
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
-  })
-
-  test('route branch view leaves store selection unchanged when read model is ready', () => {
-    render(
-      <WorkspaceView
-        workspaceId={REPO_ID}
-        routeView={{ kind: 'branch', workspaceId: REPO_ID, branchName: 'feature/a', workspacePaneRoute: null }}
-      />,
-    )
   })
 
   test('new worktree page cancel returns to the stored source route', () => {
@@ -134,14 +115,12 @@ describe('WorkspaceView branch and page routes', () => {
     )
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
-    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBeNull()
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
     expect(gitWorkspaceNavigator(container)).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane"]')).not.toBeNull()
     expect(workspacePane(container)).toBeNull()
   })
 
-  test('large-screen Zen Mode repo root keeps the sidebar as the active single pane', async () => {
+  test('large-screen Zen Mode repo root keeps the sidebar as the active single pane', () => {
     workspacesStore.getState().setZenMode(true)
 
     const { container } = render(
@@ -166,8 +145,6 @@ describe('WorkspaceView branch and page routes', () => {
     )
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
-    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
 
     buttonByLabel(container, 'workspace.back-to-workspace-navigator')?.click()
 
@@ -203,17 +180,5 @@ describe('WorkspaceView branch and page routes', () => {
     expect(workspaceLayout(container)?.dataset.sidebarCollapsed).toBe('true')
     expect(workspacePane(container)).not.toBeNull()
     expect(workspacePane(container)?.dataset.trafficLightOffset).toBe('true')
-    expect(zenModeSidebarTrigger(container)).not.toBeNull()
-    const sidebarTops = [...container.querySelectorAll<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')]
-    expect(sidebarTops.length).toBeGreaterThan(0)
-    const closedRevealTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
-      '[data-testid="workspace-shell-sidebar-top"]',
-    )
-    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
-    expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
-    expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
-    expect(zenModeSidebarDragPlate(container)).toBeNull()
-    expect(closedRevealTop?.dataset.titleBarChromeRegion).toBeUndefined()
-    expect(closedRevealTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 })

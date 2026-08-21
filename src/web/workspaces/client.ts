@@ -24,7 +24,7 @@ export async function refreshWorkspace(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorkspaceRefreshResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/workspace/refresh',
     { workspaceId, workspaceRuntimeId },
     decodeWith(WorkspaceRefreshResponseSchema),
@@ -42,7 +42,7 @@ export async function openWorkspaceRuntime(workspaceId: WorkspaceId): Promise<st
 }
 
 export async function openWorkspaceRuntimeForInput(workspaceInput: string): Promise<WorkspaceRuntimeOpenResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/workspace/runtime-open',
     { workspaceInput, clientId: readClientPageId() },
     decodeWith(WorkspaceRuntimeOpenResponseSchema),
@@ -52,7 +52,7 @@ export async function openWorkspaceRuntimeForInput(workspaceInput: string): Prom
 export async function reconcileWorkspaceRuntimeMemberships(
   workspaceIds: WorkspaceId[],
 ): Promise<WorkspaceRuntimeMembershipReconcileResult> {
-  return await postServerCommandJson(
+  return postServerCommandJson(
     '/api/workspace/runtime-reconcile',
     {
       clientId: readClientPageId(),
@@ -76,7 +76,7 @@ export async function closeWorkspaceRuntime(workspaceId: WorkspaceId, workspaceR
 }
 
 export async function listWorkspaceRuntimes(signal?: AbortSignal): Promise<WorkspaceRuntimesSnapshot> {
-  return await postServerJson('/api/workspace/runtime-list', {}, decodeWith(WorkspaceRuntimesResponseSchema), {
+  return postServerJson('/api/workspace/runtime-list', {}, decodeWith(WorkspaceRuntimesResponseSchema), {
     signal,
   })
 }
@@ -86,7 +86,7 @@ export async function getWorkspaceDirectoryOverview(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorkspaceDirectoryOverview> {
-  return await postServerJson(
+  return postServerJson(
     '/api/workspace/directory-overview',
     { workspaceId, workspaceRuntimeId },
     decodeWith(WorkspaceDirectoryOverviewResponseSchema),
@@ -95,7 +95,7 @@ export async function getWorkspaceDirectoryOverview(
 }
 
 export async function getLocalDirectoryPathSuggestions(prefix: string, signal?: AbortSignal): Promise<string[]> {
-  return await postServerJson('/api/workspace/path-suggestions', { prefix }, decodeWith(StringArrayResponseSchema), {
+  return postServerJson('/api/workspace/path-suggestions', { prefix }, decodeWith(StringArrayResponseSchema), {
     signal,
   })
 }

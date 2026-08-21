@@ -14,6 +14,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { terminalClient } from '#/web/terminal/client-facade.ts'
 import type { VNode } from 'vue'
 
 const toastMocks = vi.hoisted(() => ({
@@ -88,6 +89,7 @@ beforeEach(() => {
   setClientBridgeForTests(null)
   resetWorkspacesStore()
   sendTestNotification.mockClear()
+  vi.spyOn(terminalClient, 'sendTestNotification').mockImplementation(sendTestNotification)
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
   invokeIpc.mockClear()
@@ -126,6 +128,7 @@ afterEach(() => {
   setClientBridgeForTests(null)
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
+  vi.restoreAllMocks()
 })
 
 describe('SettingsSurface', () => {

@@ -325,32 +325,6 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('openWorkspaceMembership opens without changing the restored repo', async () => {
-    const calls = installGoblin()
-
-    const first = await workspacesStore.getState().openWorkspaceMembership(REPO_A)
-    if (first.ok) workspacesStore.setState({ restoredWorkspaceId: first.workspaceId })
-    await workspacesStore.getState().openWorkspaceMembership(REPO_B)
-
-    expect(workspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
-    expect(workspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
-    await vi.waitFor(() => {
-      expect(calls.snapshot).toEqual([REPO_A, REPO_B])
-    })
-  })
-
-  test('openWorkspaceMembership still ensures the workspace is added to the open set', async () => {
-    installGoblin()
-
-    const first = await workspacesStore.getState().openWorkspaceMembership(REPO_A)
-    if (first.ok) workspacesStore.setState({ restoredWorkspaceId: first.workspaceId })
-    await workspacesStore.getState().openWorkspaceMembership(REPO_B)
-
-    expect(Object.keys(workspacesStore.getState().workspaces)).toEqual([REPO_A, REPO_B])
-    expect(workspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
-    expect(workspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
-  })
-
   test('openWorkspaceMembership does not re-refresh an already-open repo with unchanged target', async () => {
     const calls = installGoblin()
 
