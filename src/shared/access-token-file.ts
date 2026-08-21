@@ -87,13 +87,19 @@ export async function rotateAccessTokenFile(dataDir: string = serverDataDir()): 
 }
 
 async function readExistingToken(filePath: string): Promise<string | null> {
-  const raw = await readFile(filePath, 'utf8').catch((err: unknown) => {
-    if (hasErrorCode(err, 'ENOENT')) return null
-    throw err
-  })
+  const raw = await readAccessTokenText(filePath)
   if (raw === null) return null
   const trimmed = raw.trim()
   return TOKEN_PATTERN.test(trimmed) ? trimmed : null
+}
+
+async function readAccessTokenText(filePath: string): Promise<string | null> {
+  try {
+    return await readFile(filePath, 'utf8')
+  } catch (err) {
+    if (hasErrorCode(err, 'ENOENT')) return null
+    throw err
+  }
 }
 
 async function createAccessTokenFile(dataDir: string, filePath: string): Promise<string> {

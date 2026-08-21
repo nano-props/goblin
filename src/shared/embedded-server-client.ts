@@ -24,20 +24,7 @@ async function executeEmbeddedServerJson<T>(
   decode: (value: unknown) => T,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(new URL(path, runtime.url).toString(), {
-    ...init,
-    headers: {
-      [ACCESS_TOKEN_HEADER]: runtime.accessToken,
-      ...(init?.headers ?? {}),
-    },
-  }).catch((error: unknown) => {
-    if (requestKind === 'query') throw error
-    throw new CodedError({
-      code: 'OUTCOME_UNCERTAIN',
-      message: 'Embedded server request outcome is uncertain',
-      cause: error,
-    })
-  })
+  const response = await fetchEmbeddedServerResponse(requestKind, runtime, path, init)
   if (!response.ok) throw new Error(`Embedded server request failed (${response.status})`)
   try {
     return decode(await response.json())
@@ -46,6 +33,30 @@ async function executeEmbeddedServerJson<T>(
     throw new CodedError({
       code: 'OUTCOME_UNCERTAIN',
       message: 'Embedded server returned an invalid successful response',
+      cause: error,
+    })
+  }
+}
+
+async function fetchEmbeddedServerResponse(
+  requestKind: EmbeddedServerRequestKind,
+  runtime: EmbeddedServerRuntime,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(new URL(path, runtime.url).toString(), {
+      ...init,
+      headers: {
+        [ACCESS_TOKEN_HEADER]: runtime.accessToken,
+        ...(init?.headers ?? {}),
+      },
+    })
+  } catch (error) {
+    if (requestKind === 'query') throw error
+    throw new CodedError({
+      code: 'OUTCOME_UNCERTAIN',
+      message: 'Embedded server request outcome is uncertain',
       cause: error,
     })
   }

@@ -25,6 +25,17 @@ describe('embedded server client', () => {
     })
   })
 
+  test('classifies a synchronous transport failure as an uncertain request outcome', async () => {
+    fetchMock.mockImplementationOnce(() => {
+      throw new Error('transport setup failed')
+    })
+
+    await expect(postEmbeddedServerJson(runtime, '/api/settings/prefs', {}, (value) => value)).rejects.toMatchObject({
+      name: 'CodedError',
+      code: 'OUTCOME_UNCERTAIN',
+    })
+  })
+
   test('classifies an invalid successful response as an uncertain request outcome', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
 
