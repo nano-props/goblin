@@ -28,13 +28,8 @@ export async function getLocalPathSuggestionsForHost(input: {
   const plan = planNativeDirectorySuggestions(input.prefix, input.platform, input.homeDir)
   if (!plan) return []
 
-  let directory
-  try {
-    directory = await opendir(plan.searchRoot)
-  } catch (error) {
-    if (isExpectedFilesystemError(error)) return []
-    throw error
-  }
+  const directory = await openSuggestionDirectory(plan.searchRoot)
+  if (!directory) return []
   await using managedDirectory = directory
 
   const suggestions: string[] = []
@@ -55,6 +50,15 @@ export async function getLocalPathSuggestionsForHost(input: {
     return []
   }
   return suggestions.sort((left, right) => left.localeCompare(right, 'en'))
+}
+
+async function openSuggestionDirectory(searchRoot: string) {
+  try {
+    return await opendir(searchRoot)
+  } catch (error) {
+    if (isExpectedFilesystemError(error)) return null
+    throw error
+  }
 }
 
 async function isDirectoryEntry(

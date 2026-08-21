@@ -24,12 +24,12 @@ import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.t
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { ClientWorkspaceStateSchema } from '#/shared/client-workspace-state-schema.ts'
-import { LANG_PREF_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
+import { EDITOR_APP_VALUES, LANG_PREF_VALUES, TERMINAL_APP_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
 import { FetchIntervalSecSchema } from '#/shared/settings-response-schema.ts'
 
 const StringArray = v.array(v.string())
-const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
-const EditorAppSchema = v.picklist(['vscode'])
+const TerminalAppSchema = v.picklist(TERMINAL_APP_VALUES)
+const EditorAppSchema = v.picklist(EDITOR_APP_VALUES)
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
 const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const GlobalShortcutSchema = v.pipe(
@@ -80,7 +80,7 @@ const WorkspaceRuntimeOpenSchema = v.union([
 ])
 const WorkspaceRuntimeCloseSchema = v.object({
   workspaceId: WorkspaceIdSchema,
-  workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   clientId: ClientIdSchema,
 })
 const EmptyBodySchema = v.optional(v.object({}))
@@ -269,7 +269,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
       WorkspaceIdSchema,
       v.check((workspaceId) => isRemoteWorkspaceId(workspaceId), 'remote lifecycle requires an SSH workspace id'),
     ),
-    workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     mode: v.optional(v.picklist(['restart', 'ensure'])),
   }),
   pathSuggestions: RemoteDirectoryPathSuggestionsInputSchema,
@@ -293,7 +293,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   globalShortcutState: v.object({ registered: v.boolean() }),
   recentWorkspacesAdd: v.object({ workspace: WorkspaceSessionEntrySchema }),
   // Body for `POST /api/settings/workspace-external-app-recent`. The
-  // The server re-validates that targetKey is canonical and belongs to
+  // server re-validates that targetKey is canonical and belongs to
   // workspaceId before touching disk.
   workspaceExternalAppRecentSet: v.pipe(
     v.strictObject({
@@ -317,7 +317,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   restoreWorkspaceTabs: v.object({
     clientId: ClientIdSchema,
     workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   }),
 } as const
 

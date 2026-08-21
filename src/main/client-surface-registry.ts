@@ -187,6 +187,6 @@ export function registerClientWindowSurface(win: BrowserWindowType, surface: Cli
   })
 }
 
-export function unregisterClientWindowSurface(_surface: ClientSurfaceSpec, win?: BrowserWindowType): void {
+export function unregisterClientWindowSurface(win?: BrowserWindowType): void {
   unregisterPrimaryWindow(win)
 }

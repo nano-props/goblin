@@ -199,7 +199,7 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
       }
       const workspaceSlug = workspaceSlugForKnownId(routeTarget.workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
-      return await commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, routeTarget, route, options })
+      return commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, routeTarget, route, options })
     },
     openRepoBranch(workspaceId, branchName, options) {
       const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)
@@ -267,11 +267,11 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
       const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)
       if (!target) return abandonAppRoute(options)
       if (target.kind === 'git-worktree') {
-        return await navigation.commitFilesystemWorkspacePaneRoute(target, route, options)
+        return navigation.commitFilesystemWorkspacePaneRoute(target, route, options)
       }
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
-      return await commitBranchWorkspacePaneRoute({
+      return commitBranchWorkspacePaneRoute({
         router,
         workspaceSlug,
         branchName: target.branchName,

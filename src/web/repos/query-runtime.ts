@@ -110,12 +110,8 @@ export async function fetchQueryOwnedRepoSnapshotReadModel(
   workspaceRuntimeId: string,
   client: QueryClient,
 ): Promise<RepoSnapshotResponse> {
-  return await currentRead(
-    metadataVersions,
-    repoRoot,
-    workspaceRuntimeId,
-    client,
-    async () => await getRepoSnapshot(repoRoot, workspaceRuntimeId),
+  return currentRead(metadataVersions, repoRoot, workspaceRuntimeId, client, () =>
+    getRepoSnapshot(repoRoot, workspaceRuntimeId),
   )
 }
 
@@ -125,12 +121,8 @@ export async function fetchQueryOwnedRepoPullRequestsReadModel(
   scope: RepoPullRequestScope,
   client: QueryClient,
 ): Promise<RepoPullRequestsResponse> {
-  return await currentRead(
-    pullRequestVersions,
-    repoRoot,
-    workspaceRuntimeId,
-    client,
-    async () => await getRepoPullRequests(repoRoot, workspaceRuntimeId, scope),
+  return currentRead(pullRequestVersions, repoRoot, workspaceRuntimeId, client, () =>
+    getRepoPullRequests(repoRoot, workspaceRuntimeId, scope),
   )
 }
 
@@ -139,12 +131,8 @@ export async function fetchQueryOwnedRepoWorktreeStatusReadModel(
   workspaceRuntimeId: string,
   client: QueryClient,
 ): Promise<RepoWorktreeStatusSnapshot> {
-  const snapshot = await currentRead(
-    statusVersions,
-    repoRoot,
-    workspaceRuntimeId,
-    client,
-    async () => await getRepoWorktreeStatus(repoRoot, workspaceRuntimeId),
+  const snapshot = await currentRead(statusVersions, repoRoot, workspaceRuntimeId, client, () =>
+    getRepoWorktreeStatus(repoRoot, workspaceRuntimeId),
   )
   if (snapshot.workspaceRuntimeId !== workspaceRuntimeId) throw new MismatchedRepoRuntimeReadError()
   return snapshot
@@ -156,12 +144,8 @@ export async function fetchQueryOwnedRepoOperationsReadModel(
   includeSettled: boolean,
   client: QueryClient,
 ): Promise<RepoOperationsSnapshot> {
-  return await currentRead(
-    operationVersions,
-    repoRoot,
-    workspaceRuntimeId,
-    client,
-    async () => await getRepoOperations(repoRoot, workspaceRuntimeId, { includeSettled }),
+  return currentRead(operationVersions, repoRoot, workspaceRuntimeId, client, () =>
+    getRepoOperations(repoRoot, workspaceRuntimeId, { includeSettled }),
   )
 }
 
@@ -171,7 +155,7 @@ export async function fetchQueryOwnedRepoMetadataQuery<T>(
   client: QueryClient,
   read: () => Promise<T>,
 ): Promise<T> {
-  return await currentRead(metadataVersions, repoRoot, workspaceRuntimeId, client, read)
+  return currentRead(metadataVersions, repoRoot, workspaceRuntimeId, client, read)
 }
 
 export async function refreshRepoSnapshotReadModel(

@@ -55,7 +55,7 @@ async function ensureWritableDirectory(cwd: string): Promise<ProbeAvailability> 
 }
 
 function classifyPathProbeError(err: unknown): string {
-  const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: unknown }).code) : ''
+  const code = typeof err === 'object' && err ? String(Reflect.get(err, 'code') ?? '') : ''
   if (code === 'ENOENT') return 'error.path-not-found'
   if (code === 'ENOTDIR') return 'error.path-not-directory'
   if (code === 'EACCES' || code === 'EPERM') return 'error.path-permission-denied'

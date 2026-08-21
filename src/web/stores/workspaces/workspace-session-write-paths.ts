@@ -73,7 +73,7 @@ export async function openLocalWorkspaceRuntimeForInput(
 ): Promise<RuntimeOpenResolvedWorkspace> {
   const admission = workspaceAdmissionFromInput(input)
   const workspaceInput = admission.kind === 'workspace-entry' ? admission.entry.id : admission.input
-  return await runWorkspaceRuntimeMembershipCommand(workspaceInput, async () => {
+  return runWorkspaceRuntimeMembershipCommand(workspaceInput, async () => {
     const opened = await openLocalWorkspaceRuntimeForCommandInput(workspaceInput)
     await onOpened?.(opened)
     return opened
@@ -113,7 +113,7 @@ export async function openWorkspaceRuntimeWithCache(
   workspaceId: WorkspaceId,
   onOpened?: (workspaceRuntimeId: string) => void | Promise<void>,
 ): Promise<string> {
-  return await runWorkspaceRuntimeMembershipCommand(workspaceId, async () => {
+  return runWorkspaceRuntimeMembershipCommand(workspaceId, async () => {
     const workspaceRuntimeId = await openWorkspaceRuntime(workspaceId)
     await updateWorkspaceRuntimeCache({ workspaceId, workspaceRuntimeId })
     await onOpened?.(workspaceRuntimeId)
@@ -252,14 +252,14 @@ export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: Workspa
     async openWorkspaceMembership(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenWorkspaceResult> {
       const admission = workspaceAdmissionFromInput(pathOrEntry)
       if (admission.kind === 'workspace-entry' && isRemoteWorkspaceId(admission.entry.id)) {
-        return await openRemoteWorkspace(set, get, admission.entry)
+        return openRemoteWorkspace(set, get, admission.entry)
       }
       const workspaceInput = admission.kind === 'workspace-entry' ? admission.entry.id : admission.input
-      return await runWorkspaceCommand(workspaceInput, async () => await openLocalWorkspace(set, get, workspaceInput))
+      return runWorkspaceCommand(workspaceInput, () => openLocalWorkspace(set, get, workspaceInput))
     },
 
     async closeWorkspace(workspaceId: WorkspaceId): Promise<CloseWorkspaceResult> {
-      return await runWorkspaceCommand(workspaceId, async () => await closeWorkspaceMembership(set, get, workspaceId))
+      return runWorkspaceCommand(workspaceId, () => closeWorkspaceMembership(set, get, workspaceId))
     },
 
     async retryRemoteWorkspaceConnection(id: string) {

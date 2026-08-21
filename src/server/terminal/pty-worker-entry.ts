@@ -1,13 +1,5 @@
-// Resolves the on-disk path of the bundled PTY worker entry. The host
-// process (or a test harness) calls this once at startup to find the
-// file to spawn. Resolution order:
-//   1. The bundled dist artifact (`pty-worker.js` next to the main
-//      server bundle) — the production path.
-//   2. The source entry (`pty-worker.ts` next to `pty-worker.js`) —
-//      used during `bun run start:server` and other source-only runs.
-//
-// Throws if neither exists so startup fails loudly rather than
-// silently falling back to a wrong file.
+// Prefer the bundled worker, while allowing the source entry in source-only
+// runs. Missing entries fail startup instead of spawning an unintended file.
 
 import { existsSync } from 'node:fs'
 import path from 'node:path'

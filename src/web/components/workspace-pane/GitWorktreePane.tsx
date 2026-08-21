@@ -185,7 +185,7 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
       const routeMissing = routeReconciliation.value.kind === 'missing'
       const openStaticTab = (type: 'changes' | 'history') => {
         void dispatchOpenWorkspacePaneTargetStaticTabAction({
-          location: currentModel.location!,
+          location: location.value,
           type,
           workspacePaneRoute: props.route,
           navigation,

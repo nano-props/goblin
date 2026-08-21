@@ -1,26 +1,5 @@
-// Wire protocol for the dedicated PTY worker subprocess.
-//
-// The worker is intentionally a thin node-pty supervisor — it does not
-// know about terminal sessions, workspace-pane slots, session services, sockets, or any business state. The
-// native host owns the business runtime and talks to the worker over
-// IPC for the few low-level operations that have to live close to the
-// OS process boundary (spawn / write / resize / kill). Every other
-// concern (terminal session lifecycle, filesystem-target grouping, controllers, sockets, session service) is handled
-// in-process by the main runtime.
-//
-// Protocol surface:
-//
-//   main → worker:
-//     pty-spawn    (request with id)    → pty-spawn-result
-//     pty-write    (request)            → pty-write-result
-//     pty-resize   (request)            → pty-resize-result
-//     pty-kill     (fire-and-forget)
-//     shutdown     (fire-and-forget)
-//
-//   worker → main:
-//     pty-data             (event)
-//     pty-exit             (event)
-//     pty-process-name-changed (event)
+// IPC protocol for the dedicated PTY worker. The worker owns only native PTY
+// operations; terminal sessions and other business state remain in the host.
 
 import * as v from 'valibot'
 import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
@@ -65,11 +44,7 @@ export type PtyWorkerMessage =
 export const PTY_WORKER_REQUEST_ACTIONS = ['pty-spawn', 'pty-write', 'pty-resize', 'pty-kill', 'shutdown'] as const
 export type PtyWorkerRequestAction = (typeof PTY_WORKER_REQUEST_ACTIONS)[number]
 
-// valibot schemas for the worker → main message stream. Trust boundary:
-// the worker is bundled with the host binary, so under the current
-// deployment this validation is mostly defensive. If the worker ever
-// becomes a separately-distributed extension point, this is the
-// place that turns "trust the IPC payload" into a parse step.
+// Validate the worker → host IPC trust boundary before dispatch.
 const PtySessionIdStringSchema = v.pipe(v.string(), v.minLength(1))
 const PtySpawnResultSuccessSchema = v.object({
   type: v.literal('pty-spawn-result'),

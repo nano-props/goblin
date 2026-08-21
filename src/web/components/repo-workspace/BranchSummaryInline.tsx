@@ -1,13 +1,5 @@
-// Read-only branch status strip used by branch navigator rows. It is
-// intentionally non-interactive; clicking the row selects the branch in the
-// list.
-//
-// Layout (left to right):
-//   [icon / leading alert]  [name]  [meta…]  <badges · deltas · last-commit time>
-//
-// The icon and meta are exported as standalone subcomponents so callers that
-// need a different name trigger can reuse the visual primitives without
-// re-deriving the branch-state predicates.
+// Read-only branch status strip. The exported icon and metadata primitives
+// share the same derived branch state with the complete row.
 
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, HTMLAttributes } from 'vue'
@@ -58,10 +50,7 @@ const Delta: FunctionalComponent<{ direction: 'ahead' | 'behind'; count: number;
   )
 }
 
-// Derives the visual-state predicates and last-commit time for a
-// (branch, repo) pair. Single source of truth shared by the icon, the
-// meta strip, and the outer title — recomputing these in three places
-// is what originally kept this file sprawling.
+// Shared by the icon, metadata strip, and accessible title.
 export function computeBranchSummaryState(
   branch: BranchSnapshotInfo,
   worktree: RepoWorktreeSnapshot | undefined,
@@ -76,8 +65,7 @@ export function computeBranchSummaryState(
 
 type BranchSummaryState = ReturnType<typeof computeBranchSummaryState>
 
-// Comma-joined `title` attribute. Mirrors the visible body so the hover
-// tooltip stays consistent across the branch navigator.
+// Mirrors the visible body in the row's title attribute.
 export function buildBranchSummaryTitle(
   state: BranchSummaryState,
   branch: BranchSnapshotInfo,
@@ -101,20 +89,11 @@ export function buildBranchSummaryTitle(
     .join(', ')
 }
 
-// The status icon on the leading edge of a branch row. Carries the
-// worktree-vs-branch distinction (FolderTree vs GitBranch) plus the
-// dirty state (icon color + aria-label). The trailing meta strip no
-// longer renders worktree / dirty badges — this icon is the single
-// visual + accessible signal for both.
-// Kept as a 4-wide column so the name column has a stable left margin
-// even when the icon kind changes.
 interface BranchSummaryIconProps {
   hasWorktree: boolean
   worktreeDirty: boolean | undefined
   selected: boolean
-  // Screen-reader text for the glyph. The icon is otherwise decorative —
-  // passing a label keeps the worktree / dirty state announced when the
-  // corresponding badge is hidden (see BranchSummaryMeta).
+  // Announces worktree and dirty state when the glyph is meaningful.
   ariaLabel?: string
 }
 
@@ -143,12 +122,6 @@ export const BranchSummaryIcon: FunctionalComponent<BranchSummaryIconProps> = (p
   )
 }
 
-// The trailing metadata strip: optional badges (default / gone),
-// ahead/behind deltas, and the last-commit relative time.
-// Worktree-vs-branch and dirty-vs-clean are both carried by the
-// leading BranchSummaryIcon glyph — no worktree / dirty badges here.
-// Read-only by design — none of the inner spans are interactive.
-// BranchRow renders it as part of BranchSummaryInline.
 export const BranchSummaryMeta = defineComponent<
   Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'worktree' | 'selected'>
 >({

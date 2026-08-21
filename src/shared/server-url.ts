@@ -1,7 +1,11 @@
 export function formatServerUrl(host: string, port: number | string): string {
-  let accessHost = host
-  if (accessHost === '0.0.0.0') accessHost = '127.0.0.1'
-  else if (accessHost === '::') accessHost = '[::1]'
-  else if (accessHost.includes(':') && !accessHost.startsWith('[')) accessHost = `[${accessHost}]`
+  const accessHost = serverAccessHost(host)
   return `http://${accessHost}:${port}`
+}
+
+function serverAccessHost(host: string): string {
+  if (host === '0.0.0.0') return '127.0.0.1'
+  if (host === '::') return '[::1]'
+  if (host.includes(':') && !host.startsWith('[')) return `[${host}]`
+  return host
 }

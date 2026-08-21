@@ -15,10 +15,6 @@ export const NotificationSettings = defineComponent({
     const fetchSettings = useFetchSettings()
     const { setTerminalNotificationsEnabled } = useFetchSettingsController()
     const testingTerminalNotification = ref(false)
-    // Pick the OS-specific hint at render time so the settings UI doesn't
-    // hand a Windows user a macOS-flavored "System Settings → Notifications"
-    // path. The client doesn't have `process.platform`; the host-info
-    // store carries the value the server returns from `/api/host`.
     const hintKey = notificationsHintKey()
 
     const testTerminalNotification = () => {
@@ -89,12 +85,6 @@ export const NotificationSettings = defineComponent({
   },
 })
 
-/**
- * Pick the OS-specific i18n key for the notification permission hint.
- * Mirrors the variant keys added in shared/i18n/*.ts. The generic key
- * is used on Linux / other Unix-y platforms and on the dev-server
- * preview ('web'), where the OS notification paths don't apply.
- */
 function notificationsHintKey():
   | 'settings.terminal-notifications-test-failed-hint.mac'
   | 'settings.terminal-notifications-test-failed-hint.win'

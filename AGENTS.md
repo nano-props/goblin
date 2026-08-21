@@ -33,13 +33,18 @@
   This is a readability guideline, not a destructuring ban or a static-check
   requirement.
 - Prefer expression-oriented value construction when branches only compute a
-  result: return or map each branch to a value bound with `const`, then perform
-  the side effect at one explicit commit point. Avoid declaring an outer `let`
-  solely so `if`, `try/catch`, or Promise branches can assign it. For async
-  work, map rejection to a value only when failure genuinely has that domain
-  meaning; otherwise let the error fail fast. Keep `let` when mutation or
-  accumulation is the clearest representation, and do not replace it with a
-  denser conditional or Promise chain that is harder to read.
+  result and the rewrite preserves evaluation order, timing, error coverage,
+  and clarity. Bind the result with `const`, then perform the side effect at one
+  explicit commit point. Avoid an outer `let` used only for branch assignment,
+  but keep it when it makes mutation or an error boundary clearest. Map async
+  rejection to a value only when failure has that domain meaning; otherwise
+  fail fast.
+- Do not mechanically replace `try { await callback() } catch` with
+  `callback().catch(...)`: callback invocation, argument evaluation,
+  dependency or bridge lookup, and platform APIs may throw before returning a
+  Promise. At those boundaries, prefer direct `try/await/catch`, which covers
+  both synchronous throws and Promise rejection. Do not add a generic wrapper
+  or defer invocation to another microtask solely to avoid `let`.
 
 ## Engineering approach
 

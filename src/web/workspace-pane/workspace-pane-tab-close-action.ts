@@ -278,11 +278,15 @@ function beginCloseWorkspacePaneTabAction(
     workspacePaneRoute,
     selectedIdentity: options.selectedIdentity,
   })
-  let close
-  try {
-    close = beginWorkspacePaneTabEntryClose(target, tabEntry)
-  } catch (err) {
-    terminalLog.warn('workspace pane tab close could not start', { err })
+  const close = (() => {
+    try {
+      return beginWorkspacePaneTabEntryClose(target, tabEntry)
+    } catch (err) {
+      terminalLog.warn('workspace pane tab close could not start', { err })
+      return null
+    }
+  })()
+  if (!close) {
     abandonWorkspacePaneClosePresentation(transition)
     return { kind: 'done', result: false }
   }

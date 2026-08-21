@@ -7,6 +7,7 @@ import {
   isWorkspaceFilesystemInvalidationEvent,
   type WorkspaceFilesystemInvalidationEvent,
 } from '#/shared/workspace-filesystem-invalidation.ts'
+import { isStringIn } from '#/shared/string-literals.ts'
 
 export const SETTINGS_INVALIDATION_SCOPES = ['settings-snapshot', 'external-apps', 'i18n', 'theme'] as const
 
@@ -24,16 +25,17 @@ export type ServerInvalidationEvent =
   | SettingsInvalidationEvent
 
 export function isSettingsInvalidationScope(value: unknown): value is SettingsInvalidationScope {
-  return value === 'settings-snapshot' || value === 'external-apps' || value === 'i18n' || value === 'theme'
+  return isStringIn(SETTINGS_INVALIDATION_SCOPES, value)
 }
 
 export function isSettingsInvalidationEvent(value: unknown): value is SettingsInvalidationEvent {
   if (!value || typeof value !== 'object') return false
-  const event = value as Partial<SettingsInvalidationEvent>
+  const type = Reflect.get(value, 'type')
+  const scopes = Reflect.get(value, 'scopes')
   return (
-    event.type === 'settings-invalidated' &&
-    Array.isArray(event.scopes) &&
-    event.scopes.every((scope) => isSettingsInvalidationScope(scope))
+    type === 'settings-invalidated' &&
+    Array.isArray(scopes) &&
+    scopes.every((scope) => isSettingsInvalidationScope(scope))
   )
 }
 

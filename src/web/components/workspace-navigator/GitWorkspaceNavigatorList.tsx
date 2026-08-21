@@ -1,5 +1,3 @@
-// Presentational list owning row action-menu lifetime and highlighted-row scrolling.
-
 import { defineComponent, ref, watch } from 'vue'
 import type { PropType, VNodeChild } from 'vue'
 import { GitWorkspaceNavigatorBranchRow } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorBranchRow.tsx'
@@ -12,11 +10,8 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 type NavigatorActionMenuTarget = { kind: 'branch' | 'worktree'; identity: string }
 
 interface Props {
-  /** May be null while repo data is not loaded yet; the list falls
-   *  through to the empty-state slot in that case. */
   repo: GitWorkspaceNavigatorRepo | null
   rows: GitWorkspaceNavigatorRow[]
-  /** Name of the branch to mark as selected/highlighted in the list. */
   highlightedBranch: string | null
   highlightedWorktreePath?: string | null
   onSelectBranch: (branch: string) => void
@@ -24,7 +19,6 @@ interface Props {
   onSelectWorktree?: (worktreePath: string) => void
   onOpenWorktreeStatus?: (worktreePath: string) => void
   onOpenWorktreeTab?: (worktreePath: string, type: WorkspacePaneStaticTabType) => void
-  /** Rendered when `rows` is empty. */
   emptyState: VNodeChild
 }
 
@@ -67,7 +61,8 @@ export const GitWorkspaceNavigatorList = defineComponent<Props>({
     )
 
     return () => {
-      if (props.rows.length === 0 || !props.repo) {
+      const repo = props.repo
+      if (props.rows.length === 0 || !repo) {
         return <>{props.emptyState}</>
       }
 
@@ -78,7 +73,7 @@ export const GitWorkspaceNavigatorList = defineComponent<Props>({
               return (
                 <WorktreeStateRow
                   key={row.worktree.path}
-                  workspaceId={props.repo!.id}
+                  workspaceId={repo.id}
                   worktree={row.worktree}
                   selected={props.highlightedWorktreePath === row.worktree.path}
                   selectedRef={selectedRef}
@@ -106,7 +101,7 @@ export const GitWorkspaceNavigatorList = defineComponent<Props>({
             return (
               <GitWorkspaceNavigatorBranchRow
                 key={row.kind === 'worktree' ? row.worktree.path : branch.name}
-                repo={props.repo!}
+                repo={repo}
                 branch={branch}
                 selected={selected}
                 onSelectBranch={worktreePath ? () => props.onSelectWorktree?.(worktreePath) : props.onSelectBranch}

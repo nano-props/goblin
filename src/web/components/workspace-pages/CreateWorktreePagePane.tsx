@@ -371,20 +371,32 @@ async function loadBootstrap(
     staleTime: 0,
   })
   const previewResult = await waitForPromiseWithSignal(previewRead, signal)
-  let settingsSnapshot: SettingsSnapshot | undefined
-  let settingsError = false
+  const settingsResult =
+    previewResult.ok && previewResult.preview.hasOperations && previewResult.preview.configHash
+      ? await loadBootstrapSettings(signal)
+      : { settingsSnapshot: undefined, settingsError: false }
 
-  if (previewResult.ok && previewResult.preview.hasOperations && previewResult.preview.configHash) {
-    try {
-      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-      settingsSnapshot = await waitForPromiseWithSignal(
-        appQueryClient.fetchQuery(settingsSnapshotQueryOptions()),
-        signal,
-      )
-    } catch {
-      settingsError = true
-    }
+  return {
+    repoId,
+    workspaceRuntimeId,
+    previewResult,
+    settingsSnapshot: settingsResult.settingsSnapshot,
+    settingsError: settingsResult.settingsError,
   }
+}
 
-  return { repoId, workspaceRuntimeId, previewResult, settingsSnapshot, settingsError }
+async function loadBootstrapSettings(signal: AbortSignal): Promise<{
+  settingsSnapshot: SettingsSnapshot | undefined
+  settingsError: boolean
+}> {
+  try {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+    const settingsSnapshot = await waitForPromiseWithSignal(
+      appQueryClient.fetchQuery(settingsSnapshotQueryOptions()),
+      signal,
+    )
+    return { settingsSnapshot, settingsError: false }
+  } catch {
+    return { settingsSnapshot: undefined, settingsError: true }
+  }
 }

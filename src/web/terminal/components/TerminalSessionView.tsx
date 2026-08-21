@@ -470,17 +470,20 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
         : false
       const progress = currentSnapshot.progress ?? (fileResolutionPending ? { state: 3 as const, value: 0 } : null)
       const progressLabelKey = currentSnapshot.progress ? 'terminal.progress' : 'terminal.file-resolution-progress'
-      let progressVariant = ''
-      if (progress?.state === 2) progressVariant = 'error'
-      else if (progress?.state === 4) progressVariant = 'warning'
-      else if (progress?.state === 3) progressVariant = 'indeterminate'
-
-      let resultLabel = ''
-      if (currentSnapshot.search && searchTerm.value) {
-        if (currentSnapshot.search.resultCount === 0) resultLabel = t('terminal.search-no-results')
-        else if (currentSnapshot.search.resultIndex < 0) resultLabel = String(currentSnapshot.search.resultCount)
-        else resultLabel = `${currentSnapshot.search.resultIndex + 1}/${currentSnapshot.search.resultCount}`
-      }
+      const progressVariant =
+        progress?.state === 2
+          ? 'error'
+          : progress?.state === 4
+            ? 'warning'
+            : progress?.state === 3
+              ? 'indeterminate'
+              : ''
+      const resultLabel = (() => {
+        if (!currentSnapshot.search || !searchTerm.value) return ''
+        if (currentSnapshot.search.resultCount === 0) return t('terminal.search-no-results')
+        if (currentSnapshot.search.resultIndex < 0) return String(currentSnapshot.search.resultCount)
+        return `${currentSnapshot.search.resultIndex + 1}/${currentSnapshot.search.resultCount}`
+      })()
 
       const presentationRecovery = currentSnapshot.presentationRecovery
       const hideTerminalHost = readonly || (hasSessions && attaching)
@@ -505,14 +508,13 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       const presentationPendingOperationLabelKey = currentSnapshot.presentationPendingOperation
         ? TERMINAL_PRESENTATION_PENDING_OPERATION_LABEL_KEYS[currentSnapshot.presentationPendingOperation]
         : null
-      let statusOverlayLabel = t('terminal.opening')
-      if (presentationPendingOperationLabelKey) statusOverlayLabel = t(presentationPendingOperationLabelKey)
-      else if (currentSessionPhase === 'restarting') statusOverlayLabel = t('terminal.restarting')
-      else if (currentSessionPhase === 'opening' && !descriptor.value && projectionPending) {
-        statusOverlayLabel = t('terminal.loading')
-      } else if (presentationRecovery === 'pending') {
-        statusOverlayLabel = t('terminal.restoring')
-      }
+      const statusOverlayLabel = (() => {
+        if (presentationPendingOperationLabelKey) return t(presentationPendingOperationLabelKey)
+        if (currentSessionPhase === 'restarting') return t('terminal.restarting')
+        if (currentSessionPhase === 'opening' && !descriptor.value && projectionPending) return t('terminal.loading')
+        if (presentationRecovery === 'pending') return t('terminal.restoring')
+        return t('terminal.opening')
+      })()
       const projectionFailureLabel = props.projectionErrorMessage
         ? `${t('terminal.load-failed')} (${props.projectionErrorMessage})`
         : t('terminal.load-failed')

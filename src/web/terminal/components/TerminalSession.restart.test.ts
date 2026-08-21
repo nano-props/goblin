@@ -355,5 +355,4 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(notify).toHaveBeenCalledWith('snapshot')
     expect(terminalCalls.attach).toHaveBeenCalledOnce()
   })
-
 })

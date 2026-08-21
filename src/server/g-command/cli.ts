@@ -1,15 +1,5 @@
-// Entry point for the `g` shell command. Reduced to lookup-and-run
-// after the registry refactor — `g <subcommand>` resolution is now
-// data-driven via `#/server/g-command/registry.ts`. The CLI itself
-// owns the I/O envelope (stdout/stderr shape, exit codes) but does
-// not know about any specific subcommand's semantics. Server-backed
-// subcommands forward their raw payload to `/api/terminal-command`.
-//
-// The transport layer (`#/server/g-command/transport.ts` in this
-// directory, used by `#/server/entrypoints/g-command.ts`) provides
-// HTTP access to the parent server. Tests inject a mock transport
-// via the `GoblinCommandContext` parameter, so this file has no
-// server-internal imports beyond the registry.
+// The `g` CLI owns command dispatch, I/O formatting, and exit codes. Each
+// registered command owns its argument and domain semantics.
 
 import type { GoblinCommandContext, GoblinCommandIo, GoblinCommandTransport } from '#/server/g-command/context.ts'
 import { findCommand, formatUsage, COMMANDS } from '#/server/g-command/registry.ts'

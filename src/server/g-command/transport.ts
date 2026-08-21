@@ -74,10 +74,7 @@ export function createHttpTransport(
 }
 
 export class TransportError extends Error {
-  // No CLI-level prefix here — every `g` output site prefixes with
-  // `g:` itself, and putting it in two places produced the visible
-  // double-prefix `g: g: <reason>` bug. Keep this error message as
-  // the raw transport reason.
+  // CLI output sites own the `g:` prefix; transport messages remain raw.
   constructor(message: string) {
     super(message)
     this.name = 'TransportError'

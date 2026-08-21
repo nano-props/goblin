@@ -1,12 +1,5 @@
-// Shared types for the `g` command CLI. The CLI runs inside PTYs that
-// the Goblin server itself spawned, so it can assume:
-//   - a server is reachable (env-provided URL + access token)
-//   - `args` come from `process.argv.slice(2)`
-//   - `env` is the inherited PTY environment
-// Commands declare what they need (a transport, a server URL) via the
-// `GoblinCommand.run(ctx)` contract. The entry point
-// (`#/server/entrypoints/g-command.ts`) constructs the ctx; tests
-// construct their own.
+// Commands receive their process inputs and parent-server transport through
+// one explicit invocation context.
 
 export interface GoblinCommandIo {
   stdout(message: string): void
@@ -25,10 +18,6 @@ export interface GoblinCommandContext {
   transport: GoblinCommandTransport
 }
 
-// A `GoblinCommand` is the unit of dispatch. Each command owns its
-// argv parsing, its side effects, and its error mapping. The CLI
-// (`cli.ts`) is reduced to lookup-and-run; adding a command = adding
-// one entry to the registry (`registry.ts`).
 export interface GoblinCommand {
   /** Primary name (e.g. `delta`, `info`, `log`, `help`). */
   name: string

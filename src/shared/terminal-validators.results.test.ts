@@ -243,7 +243,6 @@ describe('shared terminal validators results', () => {
       error: 'delivery uncertain',
       outcome: 'indeterminate',
     })
-
   })
 
   test('normalizes runtime-open command responses', () => {
@@ -893,5 +892,4 @@ describe('shared terminal validators results', () => {
       }
     }
   })
-
 })

@@ -44,24 +44,25 @@ export async function openRemoteWorkspaceFileDownload(
     readyTimedOut = true
     abort()
   }, REMOTE_READY_TIMEOUT_MS)
-  let start: NodeReadableStart
-  try {
-    await childSpawned(child)
-    signal?.throwIfAborted()
-    start = await authenticateRemoteStream(child.stdout, marker)
-  } catch (error) {
-    abort()
-    removeAbortListener()
-    if (signal?.aborted) throw signal.reason
-    const message = readyTimedOut ? 'error.request-timeout' : error instanceof Error ? error.message : String(error)
-    throwRemoteDownloadFailure(target, resolved, {
-      stderr: await stderr,
-      message,
-      timedOut: readyTimedOut,
-    })
-  } finally {
-    clearTimeout(readyTimeout)
-  }
+  const start: NodeReadableStart = await (async () => {
+    try {
+      await childSpawned(child)
+      signal?.throwIfAborted()
+      return await authenticateRemoteStream(child.stdout, marker)
+    } catch (error) {
+      abort()
+      removeAbortListener()
+      if (signal?.aborted) throw signal.reason
+      const message = readyTimedOut ? 'error.request-timeout' : error instanceof Error ? error.message : String(error)
+      throwRemoteDownloadFailure(target, resolved, {
+        stderr: await stderr,
+        message,
+        timedOut: readyTimedOut,
+      })
+    } finally {
+      clearTimeout(readyTimeout)
+    }
+  })()
   return {
     filename: path.posix.basename(filePath),
     stream: nodeReadableStream(child.stdout, {

@@ -32,25 +32,24 @@ export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
   socket: RealtimeSocket,
   message: WorkspacePaneRuntimeRealtimeRequestMessage,
 ): Promise<null> {
-  let response: AppRealtimeResponseMessage
-  try {
-    const payload = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input)
-    response = {
-      type: 'response',
-      requestId: message.requestId,
-      ok: true,
-      action: message.action,
-      payload,
-    } as AppRealtimeResponseMessage
-  } catch (error) {
-    response = {
-      type: 'response',
-      requestId: message.requestId,
-      ok: false,
-      action: message.action,
-      error: error instanceof Error ? error.message : String(error),
-    } as AppRealtimeResponseMessage
-  }
+  const response = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input).then(
+    (payload) =>
+      ({
+        type: 'response',
+        requestId: message.requestId,
+        ok: true,
+        action: message.action,
+        payload,
+      }) as AppRealtimeResponseMessage,
+    (error: unknown) =>
+      ({
+        type: 'response',
+        requestId: message.requestId,
+        ok: false,
+        action: message.action,
+        error: error instanceof Error ? error.message : String(error),
+      }) as AppRealtimeResponseMessage,
+  )
   socket.send(JSON.stringify(response))
   return null
 }

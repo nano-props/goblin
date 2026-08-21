@@ -52,8 +52,7 @@ export async function restoreWorkspaceAtBoot(
   clientId: string,
   options?: { activeWorkspaceId?: WorkspaceId | null; signal?: AbortSignal },
 ): Promise<WorkspaceRestoreResult> {
-  const restored = await restoreServerWorkspace(clientId, options)
-  return restored
+  return restoreServerWorkspace(clientId, options)
 }
 
 export async function addWorkspaceToSession(entry: WorkspaceSessionEntry): Promise<void> {
@@ -75,7 +74,7 @@ export async function restoreWorkspaceTabsOnView(
   workspaceRuntimeId: string,
   options?: { signal?: AbortSignal },
 ) {
-  return await restoreWorkspaceTabs(clientId, workspaceId, workspaceRuntimeId, options)
+  return restoreWorkspaceTabs(clientId, workspaceId, workspaceRuntimeId, options)
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {

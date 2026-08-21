@@ -104,17 +104,7 @@ async function projectWorkspace(
     runtimeCapability.assertCurrent()
     if (lifecycle.kind !== 'settled') return null
     const workspaceProbe = lifecycle.workspaceProbe
-    if (lifecycle.lifecycle.kind === 'failed') {
-      return {
-        entry,
-        workspaceId: entry.id,
-        workspaceRuntimeId: input.workspaceRuntimeId,
-        transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
-        workspaceProbe,
-        repoSnapshot: null,
-      }
-    }
-    if (!workspaceGitAvailable(workspaceProbe)) {
+    if (lifecycle.lifecycle.kind === 'failed' || !workspaceGitAvailable(workspaceProbe)) {
       return {
         entry,
         workspaceId: entry.id,
@@ -138,26 +128,26 @@ async function projectWorkspace(
       repoSnapshot: snapshot,
     }
   }
-  let probe = workspaceProbeStateForRuntime(input.userId, entry.id, input.workspaceRuntimeId)
-  if (!probe) return null
-  if (probe.status === 'probing') {
-    const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
-      userId: input.userId,
-      workspaceId: entry.id,
-      workspaceRuntimeId: input.workspaceRuntimeId,
-      probe: async () =>
-        await probeWorkspace(entry.id, process.platform === 'win32' ? 'win32' : 'posix', {
-          signal: input.signal,
-        }),
-      beforeCommit: async ({ before, after }) => {
-        if (!workspaceGitCleanupRequired(before, after)) return
-        await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
-          runtimeCapability,
+  const currentProbe = workspaceProbeStateForRuntime(input.userId, entry.id, input.workspaceRuntimeId)
+  if (!currentProbe) return null
+  const probe =
+    currentProbe.status === 'probing'
+      ? await runSerializedInitialWorkspaceProbe({
+          userId: input.userId,
+          workspaceId: entry.id,
+          workspaceRuntimeId: input.workspaceRuntimeId,
+          probe: async () =>
+            await probeWorkspace(entry.id, process.platform === 'win32' ? 'win32' : 'posix', {
+              signal: input.signal,
+            }),
+          beforeCommit: async ({ before, after }) => {
+            if (!workspaceGitCleanupRequired(before, after)) return
+            await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
+              runtimeCapability,
+            })
+          },
         })
-      },
-    })
-    probe = authoritativeProbe
-  }
+      : currentProbe
   runtimeCapability.assertCurrent()
   if (probe.status !== 'ready') return null
   if (!workspaceGitAvailable(probe)) {

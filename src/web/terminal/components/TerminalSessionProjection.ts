@@ -837,7 +837,7 @@ export class TerminalSessionProjection {
     }
     const createOptions = await this.resolveCurrentCreateOptions(terminalFilesystemTargetKey, pending)
     this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
-    return await this.performCreateTerminal(pending.base, terminalFilesystemTargetKey, pending, createOptions)
+    return this.performCreateTerminal(pending.base, terminalFilesystemTargetKey, pending, createOptions)
   }
 
   private async resolveCurrentCreateOptions(
@@ -974,7 +974,7 @@ export class TerminalSessionProjection {
     terminalSessionId: string,
     base: TerminalSessionBase,
   ): Promise<WorkspacePaneTabCloseOutcome> => {
-    return await this.closeTerminalRuntimeTab(terminalSessionId, base)
+    return this.closeTerminalRuntimeTab(terminalSessionId, base)
   }
 
   attach = (descriptor: TerminalDescriptor, host: HTMLElement): void => {

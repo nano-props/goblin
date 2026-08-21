@@ -340,7 +340,6 @@ describe('workspace pane route reconciliation', () => {
       kind: 'unverified',
     })
   })
-
 })
 
 function terminalModel(input: {

@@ -22,17 +22,8 @@ interface EmptyTerminalCtaProps {
   newTerminalLabel: string
 }
 
-// Empty-state CTA. Rendered when the filesystem target has no terminal
-// sessions yet. The button is the only way for the user to
-// materialize a session on a fresh target without reaching for
-// the per-target "+" affordance in the tab strip — the session's
-// bare host <div> would otherwise be a featureless black box, which
-// is the "blank screen" symptom the user reported on first click.
-//
-// `creating` is local to the button so double-clicks don't enqueue
-// a second create while the first one is in flight. The registry's
-// pending-create queue would dedupe the second call by filesystem-target
-// key, but a visible loading state is still the right user signal.
+// The empty target needs an in-place creation path. Local pending state gives
+// immediate feedback and prevents duplicate clicks before projection dedupe.
 export const EmptyTerminalCta = defineComponent<EmptyTerminalCtaProps>({
   name: 'EmptyTerminalCta',
   props: ['onCreate', 'emptyLabel', 'newTerminalLabel'],

@@ -56,54 +56,30 @@ export async function resolveServerRemoteTarget(
   signal?: AbortSignal,
 ): Promise<ResolveTargetResult> {
   const needsHomeExpansion = input.remotePath.startsWith('~/')
-  let resolved: ResolvedRemoteWorkspaceTarget
-  try {
-    resolved = await resolveSshRemoteTarget(needsHomeExpansion ? { ...input, remotePath: '/' } : input, signal)
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
-  }
+  const resolved: ResolvedRemoteWorkspaceTarget | { error: string } = await resolveSshRemoteTarget(
+    needsHomeExpansion ? { ...input, remotePath: '/' } : input,
+    signal,
+  ).catch((error: unknown) => ({
+    error: error instanceof Error ? error.message : 'error.failed-read-repo',
+  }))
+  if ('error' in resolved) return resolved
   if (!needsHomeExpansion) return resolved
-  let normalized: RemoteWorkspaceTarget | null
-  try {
-    normalized = normalizeRemoteTarget({
-      ...resolved.target,
-      remotePath: await expandRemotePathInput(resolved.target, input.remotePath, signal),
-    })
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
-  }
+  const normalizedResult = await expandRemotePathInput(resolved.target, input.remotePath, signal)
+    .then(
+      (remotePath) =>
+        ({ kind: 'resolved', target: normalizeRemoteTarget({ ...resolved.target, remotePath }) }) as const,
+    )
+    .catch((error: unknown) => ({
+      kind: 'failed' as const,
+      error: error instanceof Error ? error.message : 'error.failed-read-repo',
+    }))
+  if (normalizedResult.kind === 'failed') return { error: normalizedResult.error }
+  const normalized = normalizedResult.target
   if (!normalized) return { error: 'workspace-picker.open-remote-home-unavailable' }
   return { target: normalized }
 }
 
-/**
- * Server-side unified boundary for the remote-workspace lifecycle.
- *
- * Composes, in order:
- *   1. parse the `workspaceId` into a `RemoteWorkspaceRef` (alias +
- *      remotePath)
- *   2. resolve the SSH target via the existing
- *      `resolveServerRemoteTarget` (parses the SSH config, runs
- *      `ssh -G` to compute the effective config, expands `~/`)
- *   3. probe the remote workspace via `testRemoteWorkspace` (SSH
- *      handshake + `checkShell`/`checkGit`/`revParseTopLevel`)
- *   4. classify the failure into a `RemoteWorkspaceFailureReason`
- *   5. return a converged {@link RemoteWorkspaceConnectionResult}
- *
- * This resolver returns only a terminal result. The owning WorkspaceRuntime wraps
- * it with the authoritative connecting state, attempt id, cancellation, and
- * stale-generation checks.
- *
- * The signal is plumbed through the entire pipeline:
- *   - `resolveServerRemoteTarget` propagates to the `ssh -G`
- *     execa call (`system/ssh/config.ts:resolveEffectiveConfig`)
- *   - `testRemoteWorkspace` propagates to each per-stage
- *     `runRemoteCommand` (the SSH handshake / checkShell / etc.
- *     execas in `system/ssh/commands.ts:runRemoteCommand`)
- *
- * WorkspaceRuntime aborts this signal when a newer attempt supersedes it or the
- * runtime closes, so slow SSH work releases server resources promptly.
- */
+/** Resolves and probes one remote workspace, returning only a terminal result. */
 export interface RemoteWorkspaceConnectionDeps {
   resolveTarget: (
     input: { alias: string; remotePath: string },
@@ -138,11 +114,9 @@ export async function resolveServerRemoteWorkspaceConnection(
     throw new TypeError('remote workspace connection requires an SSH workspace id')
   }
 
-  // Step 1: parse the id into a ref.
   const parsed = parseRemoteWorkspaceId(workspaceId)
   const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
   if (!ref) throw new TypeError('canonical SSH workspace ID did not produce a remote workspace reference')
-  // Step 2: resolve the SSH target.
   const targetResult = await deps.resolveTarget({ alias: ref.alias, remotePath: ref.remotePath }, signal)
   if ('error' in targetResult) {
     return {
@@ -155,7 +129,6 @@ export async function resolveServerRemoteWorkspaceConnection(
   }
   const target = targetResult.target
 
-  // Step 3: probe the remote workspace and derive its optional Git capability.
   const probe = await deps.probeRemote(target, {
     signal,
     timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS,
@@ -203,7 +176,6 @@ export async function resolveServerRemoteWorkspaceConnection(
     }
   }
 
-  // Step 4: success.
   return {
     kind: 'ready',
     gitAvailable: true,
@@ -217,18 +189,13 @@ export async function getServerRemotePathSuggestions(
 ): Promise<string[]> {
   const prefix = input.prefix.trim()
   if (!isResolvableRemotePathInput(prefix)) return []
-  let target: RemoteWorkspaceTarget
-  try {
-    target = (await resolveSshRemoteTarget({ alias: input.alias, remotePath: '/' }, signal)).target
-  } catch {
-    return []
-  }
-  let expandedPrefix: string
-  try {
-    expandedPrefix = await expandRemotePathInput(target, prefix, signal)
-  } catch {
-    return []
-  }
+  const target = await resolveSshRemoteTarget({ alias: input.alias, remotePath: '/' }, signal).then(
+    (resolved) => resolved.target,
+    () => null,
+  )
+  if (!target) return []
+  const expandedPrefix = await expandRemotePathInput(target, prefix, signal).catch(() => null)
+  if (!expandedPrefix) return []
   const normalizedPrefix = expandedPrefix.replace(/\/+/g, '/')
   const endsWithSlash = normalizedPrefix.endsWith('/')
   const searchRoot = endsWithSlash
@@ -244,15 +211,13 @@ export async function getServerRemotePathSuggestions(
       (line) =>
         line.startsWith('/') && (typedLeaf.length === 0 || line.slice(line.lastIndexOf('/') + 1).startsWith(typedLeaf)),
     )
-  let output = suggestions
-  if (isHomeRelativeRemotePath(prefix)) {
-    try {
-      const homePath = await resolveRemoteHomeDirectory(target, signal)
-      if (homePath !== '/' && normalizedPrefix.startsWith(homePath)) {
-        output = suggestions.map((item) => (item === homePath ? '~' : `~${item.slice(homePath.length)}`))
-      }
-    } catch {}
-  }
+  const homePath = isHomeRelativeRemotePath(prefix)
+    ? await resolveRemoteHomeDirectory(target, signal).catch(() => null)
+    : null
+  const output =
+    homePath && homePath !== '/' && normalizedPrefix.startsWith(homePath)
+      ? suggestions.map((item) => (item === homePath ? '~' : `~${item.slice(homePath.length)}`))
+      : suggestions
   return output.slice(0, 20)
 }
 
@@ -277,11 +242,11 @@ export async function testServerRemoteWorkspace(
 }
 
 function classifyResolutionFailure(message: string): RemoteDiagnosticCategory {
-  if (isRemoteDiagnosticCategory(message)) return message as RemoteDiagnosticCategory
+  if (isRemoteDiagnosticCategory(message)) return message
   if (message === 'error.ssh-config-changed') return 'config-changed'
   return 'unknown'
 }
 
-function isRemoteDiagnosticCategory(value: string): boolean {
+function isRemoteDiagnosticCategory(value: string): value is RemoteDiagnosticCategory {
   return (REMOTE_DIAGNOSTIC_CATEGORIES as readonly string[]).includes(value)
 }

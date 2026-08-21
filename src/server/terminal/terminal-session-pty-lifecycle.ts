@@ -261,7 +261,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private async drainPendingSpawns(
     pendingSpawns: readonly PendingSpawnOwnership[] = Array.from(this.pendingSpawns),
   ): Promise<void> {
-    await Promise.all(pendingSpawns.map(async (pending) => await pending.completion))
+    await Promise.all(pendingSpawns.map((pending) => pending.completion))
     for (const pending of pendingSpawns) this.pendingSpawns.delete(pending)
     const failed = pendingSpawns.find((pending) => pending.failed)
     if (failed) throw failed.failure
@@ -840,7 +840,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     } catch (error) {
       ptyLifecycleLogger.warn(
         { terminalRuntimeSessionId, err: error },
-        'waiting for eventual exit after detached PTY retirement did not complete in time',
+        'detached PTY retirement failed; waiting for eventual exit',
       )
       await this.waitForRetiringHandlesToExit()
     }

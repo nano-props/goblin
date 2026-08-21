@@ -1,17 +1,7 @@
 import type { MiddlewareHandler } from 'hono'
 import { serverNodeLog } from '#/node/logger.ts'
 
-/**
- * Per-request access log. The server was previously silent about
- * runtime traffic — only a "listening" line on boot — so a
- * misbehaving client or a slow handler was invisible. Emitted at
- * `debug` so the default `info` level stays quiet during normal
- * use; reach it by setting `GOBLIN_NODE_LOG_LEVEL=debug` when
- * debugging a slow handler or a misbehaving client.
- *
- * Static asset traffic through `serveStatic` is also logged; if
- * that becomes noisy, gate it on path prefix later.
- */
+/** Per-request timing at debug level, including static asset traffic. */
 export function accessLog(): MiddlewareHandler {
   return async (c, next) => {
     const startedAt = performance.now()

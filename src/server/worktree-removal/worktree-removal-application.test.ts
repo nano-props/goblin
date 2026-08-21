@@ -266,6 +266,20 @@ describe('WorktreeRemovalApplication', () => {
     ).rejects.toBe(failure)
   })
 
+  test('maps a synchronous physical identity capture failure to a removal failure', async () => {
+    const application = createApplication({
+      physicalWorktrees: {
+        capture: () => {
+          throw new Error('identity unavailable')
+        },
+      },
+    })
+
+    await expect(
+      application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }),
+    ).resolves.toEqual({ ok: false, message: 'identity unavailable' })
+  })
+
   test('propagates a preclassified runtime carrier without becoming a settlement owner', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: target.repoRoot,

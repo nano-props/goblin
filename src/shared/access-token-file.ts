@@ -64,9 +64,7 @@ export function generateAccessToken(): string {
  * a half-written file. Two processes starting simultaneously can
  * still each generate a different token; whichever renames last
  * wins. The losing process keeps the in-memory token it generated
- * and will 401 against the live file until it restarts. This is
- * acceptable for a single-user desktop app and documented in the
- * plan's "open follow-ups".
+ * and will be rejected by the live server until it restarts.
  *
  * Pass `dataDir` explicitly when calling from a context that has a
  * different canonical data path (e.g. the Electron main, which
@@ -89,15 +87,19 @@ export async function rotateAccessTokenFile(dataDir: string = serverDataDir()): 
 }
 
 async function readExistingToken(filePath: string): Promise<string | null> {
-  let raw: string
+  const raw = await readAccessTokenText(filePath)
+  if (raw === null) return null
+  const trimmed = raw.trim()
+  return TOKEN_PATTERN.test(trimmed) ? trimmed : null
+}
+
+async function readAccessTokenText(filePath: string): Promise<string | null> {
   try {
-    raw = await readFile(filePath, 'utf8')
+    return await readFile(filePath, 'utf8')
   } catch (err) {
     if (hasErrorCode(err, 'ENOENT')) return null
     throw err
   }
-  const trimmed = raw.trim()
-  return TOKEN_PATTERN.test(trimmed) ? trimmed : null
 }
 
 async function createAccessTokenFile(dataDir: string, filePath: string): Promise<string> {

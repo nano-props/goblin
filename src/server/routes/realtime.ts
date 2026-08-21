@@ -27,10 +27,6 @@ type RealtimeSubscriberChannel = 'invalidation' | 'client-intent' | 'app'
 
 const realtimeRoutesLogger = serverNodeLog.child({ module: 'realtime-routes' })
 
-// Cap each app realtime WS message. Terminal paste is currently the largest
-// legitimate payload, but the limit belongs to the shared transport now that
-// runtime capabilities are siblings.
-
 // Server-authoritative realtime for data, plus a dedicated envelope-forwarding
 // channel for client effect intents sourced from `g`-style CLI clients.
 //

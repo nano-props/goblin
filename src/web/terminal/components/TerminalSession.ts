@@ -433,15 +433,8 @@ export class TerminalSession {
   }
 
   private async commitResize(proposal: PendingResize): Promise<void> {
-    const { terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows } = proposal
-    let result: TerminalResizeResult
-    try {
-      result = await terminalClient.resize({ terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows })
-    } catch (error) {
-      this.finishResizeCommit(proposal, { ok: false, message: 'error.unavailable' }, error)
-      return
-    }
-    this.finishResizeCommit(proposal, result, null)
+    const outcome = await requestTerminalResizeOutcome(proposal)
+    this.finishResizeCommit(proposal, outcome.result, outcome.error)
   }
 
   private finishResizeCommit(proposal: PendingResize, result: TerminalResizeResult, error: unknown): void {
@@ -649,7 +642,7 @@ export class TerminalSession {
   async takeover(): Promise<boolean> {
     if (this.disposed) return false
     if (this.runtime.isController()) return true
-    if (this.takeoverOperation) return await this.takeoverOperation
+    if (this.takeoverOperation) return this.takeoverOperation
     const binding = this.runtime.currentRuntimeBinding()
     if (!binding || this.view.currentTerminal() || !this.view.isConnected() || !this.view.canOpenTerminal()) {
       return false
@@ -1367,6 +1360,18 @@ export class TerminalSession {
     void openExternalUrl(uri).catch((err: unknown) => {
       toast.error(err instanceof Error ? err.message : String(err))
     })
+  }
+}
+
+async function requestTerminalResizeOutcome(
+  proposal: PendingResize,
+): Promise<{ result: TerminalResizeResult; error: unknown }> {
+  const { terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows } = proposal
+  try {
+    const result = await terminalClient.resize({ terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows })
+    return { result, error: null }
+  } catch (error) {
+    return { result: { ok: false, message: 'error.unavailable' }, error }
   }
 }
 

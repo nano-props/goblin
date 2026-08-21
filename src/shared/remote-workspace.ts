@@ -399,7 +399,7 @@ function normalizeRemotePath(value: string): string | null {
 }
 
 function safeText(value: string): boolean {
-  return value.length > 0 && !value.includes('\0') && !/[\x00-\x1f\x7f]/.test(value)
+  return value.length > 0 && !/[\x00-\x1f\x7f]/.test(value)
 }
 
 function basename(remotePath: string): string {

@@ -5,11 +5,6 @@ import { cn } from '#/web/lib/cn.ts'
 import { focusRingVisibleInset } from '#/web/components/ui/focus.ts'
 import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
 
-// Calibrated for the desktop tool's chip density: small caps on
-// inline list rows, not pill-shaped contact-list avatars. Square
-// corners (rounded-sm) and a tighter type scale (text-[10px]) match
-// the rest of the inline UI furniture (status codes, two-letter
-// X/Y codes from `git status`, commit shortHash).
 const badgeVariants = cva(
   cn(
     'inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent font-medium leading-tight whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 [&>svg]:pointer-events-none',
@@ -20,18 +15,10 @@ const badgeVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground [a&]:hover:bg-primary/90',
         secondary: 'bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
-        // We override upstream shadcn's `destructive` (solid red fill)
-        // with a translucent tint that matches success/warning/brand
-        // below. Status chips ("conflict", "deleted") read in dense
-        // lists, where a saturated fill reads as a screaming pill —
-        // the tint conveys the same semantic at the right intensity.
         destructive: STATUS_TONE_CHIP_CLASS.danger,
         outline: 'border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         ghost: '[a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 [a&]:hover:underline',
-        // Project extensions — shadcn has no warning/success/brand
-        // slot. Same translucent-tint treatment as destructive above
-        // so the semantic chips read as one family.
         success: STATUS_TONE_CHIP_CLASS.success,
         attention: STATUS_TONE_CHIP_CLASS.attention,
         warning: STATUS_TONE_CHIP_CLASS.warning,

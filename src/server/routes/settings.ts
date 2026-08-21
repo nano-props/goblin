@@ -63,7 +63,6 @@ export function createSettingsRoutes(options: {
         { prefs },
         {
           acceptLanguage: c.req.header('accept-language'),
-          signal: c.req.raw.signal,
         },
       ),
     )

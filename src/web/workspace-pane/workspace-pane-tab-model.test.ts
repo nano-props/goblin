@@ -845,5 +845,4 @@ describe('repo workspace pane tab model', () => {
     expect(model.renderedTab).toBeNull()
     expect(model.activeTab).toBeNull()
   })
-
 })

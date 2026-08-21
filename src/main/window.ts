@@ -403,7 +403,7 @@ async function createPrimaryWindow(): Promise<BrowserWindow> {
 
   win.on('closed', () => {
     failPrimaryWindowDocument(win, new Error('Primary window closed before the renderer was ready'))
-    detachClientSurfaceWindow(win, PRIMARY_WINDOW_SURFACE)
+    detachClientSurfaceWindow(win)
   })
 
   try {

@@ -46,8 +46,9 @@ export async function launchStandaloneServer(
   process.env.GOBLIN_SERVER_ACCESS_TOKEN = accessToken
 
   if (!process.env.npm_package_version?.trim()) {
-    const pkg = JSON.parse(readFileSync(path.join(layout.repoRoot, 'package.json'), 'utf8')) as { version?: string }
-    process.env.npm_package_version = pkg.version?.trim() || '0.1.0'
+    const pkg: unknown = JSON.parse(readFileSync(path.join(layout.repoRoot, 'package.json'), 'utf8'))
+    const version = pkg && typeof pkg === 'object' ? Reflect.get(pkg, 'version') : undefined
+    process.env.npm_package_version = (typeof version === 'string' ? version.trim() : '') || '0.1.0'
   }
 
   const webIndex = path.join(layout.repoRoot, 'dist/web/index.html')

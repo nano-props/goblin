@@ -48,25 +48,24 @@ export async function handleTerminalRealtimeRequestMessage(
   socket: RealtimeSocket,
   message: TerminalSocketRequestMessage,
 ): Promise<TerminalOutputCheckpoint | null> {
-  let response: TerminalSocketResponseMessage
-  try {
-    const payload = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input)
-    response = {
-      type: 'response',
-      requestId: message.requestId,
-      ok: true,
-      action: message.action,
-      payload,
-    } as TerminalSocketResponseMessage
-  } catch (error) {
-    response = {
-      type: 'response',
-      requestId: message.requestId,
-      ok: false,
-      action: message.action,
-      error: error instanceof Error ? error.message : String(error),
-    } as TerminalSocketResponseMessage
-  }
+  const response = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input).then(
+    (payload) =>
+      ({
+        type: 'response',
+        requestId: message.requestId,
+        ok: true,
+        action: message.action,
+        payload,
+      }) as TerminalSocketResponseMessage,
+    (error: unknown) =>
+      ({
+        type: 'response',
+        requestId: message.requestId,
+        ok: false,
+        action: message.action,
+        error: error instanceof Error ? error.message : String(error),
+      }) as TerminalSocketResponseMessage,
+  )
   socket.send(JSON.stringify(response))
   return snapshotFlushBoundaryFromResponse(response)
 }

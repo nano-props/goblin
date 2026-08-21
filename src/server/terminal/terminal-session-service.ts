@@ -252,7 +252,7 @@ class TerminalSessionService {
   async withTerminalRetirementTabsSnapshot(
     userId: string,
     session: TerminalSessionSummary,
-    commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => undefined,
+    commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => void,
   ): Promise<void> {
     const coordinates = terminalSessionCoordinates(session)
     await this.workspaceTabsCoordinator.withExclusiveSnapshot(
@@ -286,7 +286,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
     return await this.workspaceTabsCoordinator.listWorkspaceTabs({
       userId,
-      workspaceId: workspaceId,
+      workspaceId,
       scope,
       epochCapability: runtimeCapability,
     })

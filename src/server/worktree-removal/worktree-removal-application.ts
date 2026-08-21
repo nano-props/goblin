@@ -6,7 +6,10 @@ import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/works
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type {
+  PhysicalWorktreeCapture,
+  ResolvePhysicalWorktreeIdentityInput,
+} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/workspaces/runtime/remote-failure.ts'
 import { WorkspaceRuntimeStaleError } from '#/server/workspaces/runtime/authority.ts'
@@ -22,6 +25,17 @@ interface WorktreeRemovalWorkspaceTabs {
   physicalWorktreeTargets: WorkspacePaneTabsCoordinator['physicalWorktreeTargets']
   clearPhysicalWorktreeIndex: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
 }
+
+interface AffectedWorktreeScope {
+  userId: string
+  repoRoot: WorkspaceId
+  workspaceRuntimeId: string
+  scope: string
+  worktreePath: string
+}
+
+type WorktreeRemovalCaptureOutcome =
+  { kind: 'captured'; capability: PhysicalWorktreeExecutionCapability } | { kind: 'failed'; message: string }
 
 interface WorktreeRemovalApplicationDependencies {
   worktreeOperations: PhysicalWorktreeOperationCoordinator
@@ -58,31 +72,21 @@ export class WorktreeRemovalApplication {
   ): Promise<RepoMutationResult> {
     if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.workspace-runtime-stale' }
     const worktreePath = terminalSessionExecutionPath(input.repoRoot, input.worktreePath)
-    let physicalCapability: PhysicalWorktreeExecutionCapability
-    try {
-      physicalCapability = await this.deps.physicalWorktrees.capture({
-        userId,
-        workspaceId: input.repoRoot,
-        workspaceRuntimeId: input.workspaceRuntimeId,
-        worktreePath,
-      })
-    } catch (error) {
-      if (isRemoteWorkspaceRuntimeFailure(error)) throw error
-      return { ok: false, message: error instanceof Error ? error.message : String(error) }
-    }
+    const capture = await this.captureWorktreeForRemoval({
+      userId,
+      workspaceId: input.repoRoot,
+      workspaceRuntimeId: input.workspaceRuntimeId,
+      worktreePath,
+    })
+    if (capture.kind === 'failed') return { ok: false, message: capture.message }
+    const physicalCapability = capture.capability
     try {
       const result = await this.deps.worktreeOperations.runRemoval(
         physicalCapability,
         async ({ signal }, permit) => {
           if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.workspace-runtime-stale' }
           signal.throwIfAborted()
-          let affectedScopes: Array<{
-            userId: string
-            repoRoot: WorkspaceId
-            workspaceRuntimeId: string
-            scope: string
-            worktreePath: string
-          }> = []
+          let affectedScopes: AffectedWorktreeScope[] = []
           return await input.remove(
             physicalCapability,
             {
@@ -136,6 +140,17 @@ export class WorktreeRemovalApplication {
     return this.deps.isCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
   }
 
+  private async captureWorktreeForRemoval(
+    input: ResolvePhysicalWorktreeIdentityInput,
+  ): Promise<WorktreeRemovalCaptureOutcome> {
+    try {
+      return { kind: 'captured', capability: await this.deps.physicalWorktrees.capture(input) }
+    } catch (error) {
+      if (isRemoteWorkspaceRuntimeFailure(error)) throw error
+      return { kind: 'failed', message: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
   private async quiesce(
     repoRoot: WorkspaceId,
     worktreePath: string,
@@ -143,23 +158,11 @@ export class WorktreeRemovalApplication {
   ): Promise<
     | {
         ok: true
-        scopes: Array<{
-          userId: string
-          repoRoot: WorkspaceId
-          workspaceRuntimeId: string
-          scope: string
-          worktreePath: string
-        }>
+        scopes: AffectedWorktreeScope[]
       }
     | {
         ok: false
-        scopes: Array<{
-          userId: string
-          repoRoot: WorkspaceId
-          workspaceRuntimeId: string
-          scope: string
-          worktreePath: string
-        }>
+        scopes: AffectedWorktreeScope[]
         message: string
       }
   > {
@@ -229,15 +232,7 @@ export function createWorktreeRemovalApplication(
   return new WorktreeRemovalApplication(deps)
 }
 
-function uniqueScopes(
-  scopes: readonly {
-    userId: string
-    repoRoot: WorkspaceId
-    workspaceRuntimeId: string
-    scope: string
-    worktreePath: string
-  }[],
-): Array<{ userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; scope: string; worktreePath: string }> {
+function uniqueScopes(scopes: readonly AffectedWorktreeScope[]): AffectedWorktreeScope[] {
   return Array.from(
     new Map(
       scopes.map((item) => [`${item.userId}\0${item.scope}\0${item.repoRoot}\0${item.worktreePath}`, item]),

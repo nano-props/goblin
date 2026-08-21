@@ -48,31 +48,30 @@ export interface CreateWorktreeIpcInput extends CreateWorktreeInput {
 
 export function normalizeCreateWorktreeInput(input: unknown): CreateWorktreeInput | null {
   if (!input || typeof input !== 'object') return null
-  const raw = input as { worktreePath?: unknown; mode?: unknown }
-  const worktreePath = typeof raw.worktreePath === 'string' ? raw.worktreePath.trim() : ''
+  const rawWorktreePath = Reflect.get(input, 'worktreePath')
+  const worktreePath = typeof rawWorktreePath === 'string' ? rawWorktreePath.trim() : ''
   if (!worktreePath) return null
-  const mode = normalizeCreateWorktreeMode(raw.mode)
+  const mode = normalizeCreateWorktreeMode(Reflect.get(input, 'mode'))
   return mode ? { worktreePath, mode } : null
 }
 
 function normalizeCreateWorktreeMode(input: unknown): CreateWorktreeMode | null {
   if (!input || typeof input !== 'object') return null
-  const mode = input as Record<string, unknown>
-  switch (mode.kind) {
+  switch (Reflect.get(input, 'kind')) {
     case 'newBranch': {
-      const newBranch = stringField(mode.newBranch)
-      const baseRef = stringField(mode.baseRef)
-      return newBranch && baseRef && isSafeBranchName(newBranch) && isSafeRefInput(baseRef)
+      const newBranch = stringField(Reflect.get(input, 'newBranch'))
+      const baseRef = stringField(Reflect.get(input, 'baseRef'))
+      return newBranch && baseRef && isSafeBranchName(newBranch) && isSafeBranchName(baseRef)
         ? { kind: 'newBranch', newBranch, baseRef }
         : null
     }
     case 'existingBranch': {
-      const branch = stringField(mode.branch)
+      const branch = stringField(Reflect.get(input, 'branch'))
       return branch && isSafeBranchName(branch) ? { kind: 'existingBranch', branch } : null
     }
     case 'trackRemoteBranch': {
-      const remote = v.safeParse(RemoteTrackingBranchIdentitySchema, mode.remote)
-      const localBranch = stringField(mode.localBranch)
+      const remote = v.safeParse(RemoteTrackingBranchIdentitySchema, Reflect.get(input, 'remote'))
+      const localBranch = stringField(Reflect.get(input, 'localBranch'))
       return remote.success && localBranch && isSafeBranchName(localBranch)
         ? { kind: 'trackRemoteBranch', remote: remote.output, localBranch }
         : null
@@ -84,10 +83,6 @@ function normalizeCreateWorktreeMode(input: unknown): CreateWorktreeMode | null 
 
 function stringField(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
-}
-
-function isSafeRefInput(ref: string): boolean {
-  return isSafeBranchName(ref)
 }
 
 /** Resolve full remote-tracking refs against the authoritative remote names. */

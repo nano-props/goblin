@@ -79,25 +79,14 @@ export class TerminalSessionState {
     return this.transientViewState.searchResult
   }
 
-  // **Role-only** predicate: is this client the active `controller`
-  // of the PTY? Use this for any decision that should track the
-  // controller role alone — teardown on role change, render-time
-  // role banner, focus, etc. A transitional phase update must
-  // never make this return false for a session whose role is still
-  // `'controller'`. Named after the role enum value (not the
-  // older "user" terminology) to match the userId/clientId/
-  // terminalRuntimeSessionId identity split: the role is `controller`, not
-  // `user`.
+  // Role-only predicate. Transitional lifecycle updates must not revoke an
+  // unchanged controller's view ownership.
   isController(): boolean {
     return this.runtimeState.clientController.role === 'controller'
   }
 
-  // Write-path predicate. Use this only at the actual input gate
-  // — never as a stand-in for "is the controller". A session that is
-  // 'controller' but still in `'opening'` cannot accept writes
-  // (the PTY is still starting up) but is still the controller;
-  // the teardown decision uses `isController()` and the write
-  // decision uses this method. The two are intentionally separate.
+  // Write-path predicate. Controller ownership and input readiness are
+  // intentionally separate while the PTY is still opening.
   canSendInput(): boolean {
     return this.runtimeState.clientController.role === 'controller' && this.runtimeState.phase === 'open'
   }

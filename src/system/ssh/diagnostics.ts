@@ -49,10 +49,8 @@ export async function testRemoteWorkspace(
   // Stages 2/3/4 are independent of each other (each is its own ssh
   // invocation, multiplexed over the ControlMaster socket). Run them
   // in parallel and merge per-stage status. The first failure in
-  // execution order wins as the primary diagnostic, but we still
-  // record the actual outcome of every stage we ran — earlier code
-  // marked downstream stages as 'skipped' even though they had
-  // already returned, which lost useful diagnostic detail.
+  // execution order wins as the primary diagnostic while every completed
+  // stage retains its actual outcome.
   const [gitResult, pathResult, repoResult] = await Promise.all([
     run({ type: 'checkGit' }, target, runOptions),
     run({ type: 'testDirectory', path: target.remotePath }, target, runOptions),

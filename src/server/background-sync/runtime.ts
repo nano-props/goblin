@@ -271,7 +271,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
     const result = await fetchRepo(target.workspaceId, target.runtimeCapability, 'background', ctrl.signal)
     publishRepoMutationInvalidations(target.workspaceId, result, ['metadata'])
     const fetchDuration = Date.now() - fetchStart
-    // Log slow fetchs for performance monitoring
+    // Log slow fetches for performance monitoring.
     if (fetchDuration > 5000) {
       backgroundSyncLogger.warn(
         { workspaceId: target.workspaceId, fetchDuration, intervalMs: state.intervalMs },

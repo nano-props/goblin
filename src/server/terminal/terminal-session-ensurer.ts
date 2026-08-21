@@ -106,7 +106,6 @@ class TerminalSessionEnsurer {
     const invocation = buildRemoteTerminalInvocation(execution.target, execution.canonicalWorktreePath, {
       startupShellCommand: input.startupShellCommand,
     })
-    const coordinates = terminalExecutionCoordinates(input.target)
     const result = await this.options.manager.prepareSession({
       userId,
       terminalSessionId: context.terminalSessionId,

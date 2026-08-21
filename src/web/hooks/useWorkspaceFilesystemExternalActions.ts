@@ -38,15 +38,15 @@ export function workspaceFilesystemExternalActions(
 ): WorkspaceFilesystemExternalActions {
   const executionTarget = workspacePaneFilesystemRuntimeTarget(target)
 
-  async function run(action: () => Promise<ExecResult>): Promise<ExecResult | null> {
-    return await runWorkspaceFilesystemExternalAction(target, action)
+  function run(action: () => Promise<ExecResult>): Promise<ExecResult | null> {
+    return runWorkspaceFilesystemExternalAction(target, action)
   }
 
   return {
     capabilities: workspaceFilesystemExternalCapabilities(target),
-    openTerminal: async (app: TerminalApp) => await run(async () => await openWorkspaceTerminal(executionTarget, app)),
-    openEditor: async (app: EditorApp) => await run(async () => await openWorkspaceEditor(executionTarget, app)),
-    openFinder: async () => await run(async () => await openWorkspaceInFinder(executionTarget)),
+    openTerminal: (app) => run(() => openWorkspaceTerminal(executionTarget, app)),
+    openEditor: (app) => run(() => openWorkspaceEditor(executionTarget, app)),
+    openFinder: () => run(() => openWorkspaceInFinder(executionTarget)),
   }
 }
 

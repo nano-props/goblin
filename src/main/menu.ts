@@ -32,14 +32,7 @@ import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
 import { readMenuRuntimeState } from '#/main/menu-state.ts'
-import {
-  clientMenuCommandById,
-  CLOSE_WINDOW_SHORTCUT,
-  resolveClientMenuCommandAccelerator,
-  resolveClientMenuCommandEnabled,
-  resolveClientMenuCommandIntent,
-  type ClientMenuCommandContext,
-} from '#/shared/shortcut-definitions.ts'
+import { clientMenuCommandById, CLOSE_WINDOW_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 import { openDataFolder, openWebVersionFromMenu } from '#/main/native-menu-actions.ts'
 import { platform } from '#/main/platform.ts'
 
@@ -329,16 +322,12 @@ function createClientCommandMenuItem(
   options?: { beforeIntent?: () => void; missingWindow?: MissingWindowPolicy },
 ): MenuItemConstructorOptions {
   const command = clientMenuCommandById(id)
-  const context: ClientMenuCommandContext = {}
-  const resolvedAccelerator = resolveClientMenuCommandAccelerator(command, context)
-  const resolvedEnabled = resolveClientMenuCommandEnabled(command, context)
   return {
     label: t(command.menuLabelKey),
-    ...(resolvedAccelerator ? { accelerator: accelerator(state, resolvedAccelerator) } : {}),
-    ...(resolvedEnabled !== undefined ? { enabled: resolvedEnabled } : {}),
+    ...(command.accelerator ? { accelerator: accelerator(state, command.accelerator) } : {}),
     click: () => {
       options?.beforeIntent?.()
-      send(resolveClientMenuCommandIntent(command, context), options?.missingWindow)
+      send(command.intent, options?.missingWindow)
     },
   }
 }

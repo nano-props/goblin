@@ -1,8 +1,4 @@
-// Server-side session-scope normalization for the terminal subsystem.
-// Lives in `server/terminal/` (not `shared/`) because it depends on
-// `node:path`; importing it from a module that the client bundles
-// triggers a Vite "node:path externalized" warning and would throw at
-// runtime if the client ever invoked it.
+// Server-only session-scope normalization; execution paths depend on node:path.
 
 import path from 'node:path'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -13,10 +9,8 @@ import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
  * Runtime scopes are keyed by canonical workspace identity. Native paths are
  * execution metadata and must never be allowed to rewrite this identity.
  *
- * This is the **single source of truth** for session scope. Any
- * caller that needs to ask the manager about a workspace (create,
- * list or reorder) must normalize through here first, otherwise
- * string-equality lookups will silently miss.
+ * All manager lookups normalize through this boundary so string equality uses
+ * one canonical identity.
  */
 export function terminalSessionScope(workspaceId: WorkspaceId): string {
   if (!parseCanonicalWorkspaceLocator(workspaceId)) throw new Error('error.workspace-locator-malformed')

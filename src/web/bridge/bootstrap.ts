@@ -2,14 +2,7 @@ import type { ClientBootstrapSnapshot, ClientRuntimeSnapshot } from '#/shared/bo
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 
-/**
- * Bootstrap for a web-hosted client with no host OS. The bootstrap
- * is now a tiny 3-field payload: `runtime` (kind, bridge version,
- * capabilities), `initialServer` (only populated for QR-code
- * logins), and nothing else. Host info (homeDir / platform) moved
- * to the public `/api/host` endpoint and lives in
- * `#/web/stores/host-info.ts`; i18n lives in `#/web/stores/i18n.ts`.
- */
+/** Bootstrap for a web client with no native host capabilities or initial server. */
 const EMPTY_BOOTSTRAP: ClientBootstrapSnapshot = {
   runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
   initialServer: null,

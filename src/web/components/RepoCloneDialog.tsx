@@ -45,16 +45,15 @@ export const RepoCloneDialog = defineComponent<RepoCloneDialogProps>({
       const result = await runCloneRepository(input, { signal })
       if (!result.ok || !result.path || signal.aborted) return result
       const path = result.path
-      let openResult: OpenWorkspaceResult
-      try {
-        openResult = await openClonedWorkspace(path, signal)
-      } catch (error) {
-        if (signal.aborted) return result
-        const message = error instanceof Error ? error.message : t('error.unknown')
-        sessionLog.warn('failed to open cloned workspace automatically', { path, err: error })
-        reportAutomaticOpenFailure(path, message)
-        return result
-      }
+      const openResult = await openClonedWorkspace(path, signal).catch((error: unknown) => {
+        if (!signal.aborted) {
+          const message = error instanceof Error ? error.message : t('error.unknown')
+          sessionLog.warn('failed to open cloned workspace automatically', { path, err: error })
+          reportAutomaticOpenFailure(path, message)
+        }
+        return null
+      })
+      if (!openResult) return result
       if (!openResult.ok && !signal.aborted) {
         if (!reportOpenWorkspaceUncertainty(openResult, t, { descriptionPrefix: path })) {
           reportAutomaticOpenFailure(path, t(openResult.message))

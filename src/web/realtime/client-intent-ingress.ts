@@ -15,17 +15,20 @@ interface ClientIntentEnvelope {
 
 function parseServerClientIntentMessage(data: unknown): RepoViewClientIntent | null {
   if (typeof data !== 'string') return null
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(data) as unknown
-  } catch {
-    return null
-  }
+  const parsed = parseJson(data)
   if (!parsed || typeof parsed !== 'object') return null
   const envelope = parsed as Partial<ClientIntentEnvelope>
   if (envelope.type !== 'client-effect-intent') return null
   if (!isRepoViewClientIntent(envelope.intent)) return null
   return envelope.intent
+}
+
+function parseJson(data: string): unknown {
+  try {
+    return JSON.parse(data) as unknown
+  } catch {
+    return null
+  }
 }
 
 const ingress = createServerWebSocketIngress<RepoViewClientIntent>({

@@ -1,10 +1,3 @@
-// Derived state, validation, and input construction for Create Worktree surfaces.
-//
-// Keeping this separate from the component lets the UI surface focus on UX state
-// (mode, field values, remote branch loading) while this file owns the
-// decision-heavy rules: path defaults, branch validation, and whether the
-// current fields constitute a submittable CreateWorktreeInput.
-
 import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/web/lib/paths.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
 import { isResolvableRemotePathInput, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'

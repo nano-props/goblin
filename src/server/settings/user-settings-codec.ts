@@ -123,11 +123,10 @@ function safeRestorableWorkspacePaneTarget(
 
 export function normalizeWorkspace(value: unknown): ServerWorkspaceState {
   if (!value || typeof value !== 'object') return defaultWorkspace()
-  const partial = value as Partial<ServerWorkspaceState>
   return {
-    openWorkspaceEntries: normalizeWorkspaceEntries(partial.openWorkspaceEntries),
+    openWorkspaceEntries: normalizeWorkspaceEntries(Reflect.get(value, 'openWorkspaceEntries')),
     workspacePaneTabsByTargetByWorkspace: normalizeWorkspacePaneTabsByTargetByWorkspace(
-      partial.workspacePaneTabsByTargetByWorkspace,
+      Reflect.get(value, 'workspacePaneTabsByTargetByWorkspace'),
     ),
   }
 }
@@ -145,13 +144,11 @@ function normalizeWorkspaceEntries(value: unknown): WorkspaceSessionEntry[] {
 
 function normalizeWorktreeBootstrapTrust(value: unknown): WorktreeBootstrapTrust | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const raw = value as Partial<WorktreeBootstrapTrust>
-  if (!isWorktreeBootstrapConfigHash(raw.configHash)) return undefined
-  if (typeof raw.trustedAt !== 'string' || Number.isNaN(Date.parse(raw.trustedAt))) return undefined
-  return {
-    configHash: raw.configHash,
-    trustedAt: raw.trustedAt,
-  }
+  const configHash = Reflect.get(value, 'configHash')
+  const trustedAt = Reflect.get(value, 'trustedAt')
+  if (!isWorktreeBootstrapConfigHash(configHash)) return undefined
+  if (typeof trustedAt !== 'string' || Number.isNaN(Date.parse(trustedAt))) return undefined
+  return { configHash, trustedAt }
 }
 
 function normalizeWorkspaceExternalAppRecent(
@@ -159,10 +156,10 @@ function normalizeWorkspaceExternalAppRecent(
   value: unknown,
 ): WorkspaceExternalAppRecent | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const raw = value as Partial<WorkspaceExternalAppRecent>
-  if (!raw.byTarget || typeof raw.byTarget !== 'object' || Array.isArray(raw.byTarget)) return undefined
+  const rawByTarget = Reflect.get(value, 'byTarget')
+  if (!rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) return undefined
   const byTarget: Record<string, string> = {}
-  for (const [targetKey, itemId] of Object.entries(raw.byTarget)) {
+  for (const [targetKey, itemId] of Object.entries(rawByTarget)) {
     const target = parseWorkspaceExternalAppRecentKey(workspaceId, targetKey)
     if (!target) continue
     if (!isKnownWorkspaceExternalAppItemId(itemId)) continue
@@ -172,26 +169,22 @@ function normalizeWorkspaceExternalAppRecent(
   return { byTarget }
 }
 
-interface RawWorkspaceSettingsEntry {
-  workspaceId?: unknown
-  worktreeBootstrapTrust?: unknown
-  workspaceExternalAppRecent?: unknown
-}
-
 function normalizeWorkspaceSettings(value: unknown): WorkspaceSettingsEntry[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
   const normalized: WorkspaceSettingsEntry[] = []
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue
-    const raw = item as RawWorkspaceSettingsEntry
-    const workspaceId = toSafeCanonicalWorkspaceId(raw.workspaceId)
+    const workspaceId = toSafeCanonicalWorkspaceId(Reflect.get(item, 'workspaceId'))
     if (!workspaceId || seen.has(workspaceId)) continue
     seen.add(workspaceId)
     const entry: WorkspaceSettingsEntry = { workspaceId }
-    const worktreeBootstrapTrust = normalizeWorktreeBootstrapTrust(raw.worktreeBootstrapTrust)
+    const worktreeBootstrapTrust = normalizeWorktreeBootstrapTrust(Reflect.get(item, 'worktreeBootstrapTrust'))
     if (worktreeBootstrapTrust) entry.worktreeBootstrapTrust = worktreeBootstrapTrust
-    const workspaceExternalAppRecent = normalizeWorkspaceExternalAppRecent(workspaceId, raw.workspaceExternalAppRecent)
+    const workspaceExternalAppRecent = normalizeWorkspaceExternalAppRecent(
+      workspaceId,
+      Reflect.get(item, 'workspaceExternalAppRecent'),
+    )
     if (workspaceExternalAppRecent) entry.workspaceExternalAppRecent = workspaceExternalAppRecent
     normalized.push(entry)
   }

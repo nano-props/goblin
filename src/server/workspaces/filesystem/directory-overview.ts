@@ -27,7 +27,7 @@ export async function readWorkspaceDirectoryOverview(
     { signal: options.signal, timeoutMs: DIRECTORY_OVERVIEW_TIMEOUT_MS },
   )
   const runtimeFailure = remoteWorkspaceRuntimeFailureFromCommandResult({
-    workspaceId: workspaceId,
+    workspaceId,
     workspaceRuntimeId: options.workspaceRuntimeId,
     target,
     result,
@@ -72,13 +72,8 @@ export async function readLocalDirectoryOverview(
     for await (const entry of handle) {
       signal?.throwIfAborted()
       const entryPath = path.join(root, entry.name)
-      let entryStat
-      try {
-        entryStat = await lstat(entryPath)
-      } catch {
-        signal?.throwIfAborted()
-        continue
-      }
+      const entryStat = await readDirectoryEntryStat(entryPath, signal)
+      if (!entryStat) continue
       if (entryStat.isDirectory()) topLevelDirectoryCount += 1
       else if (entryStat.isFile()) topLevelFileCount += 1
     }
@@ -86,6 +81,15 @@ export async function readLocalDirectoryOverview(
     await handle.close().catch(() => undefined)
   }
   return { topLevelFileCount, topLevelDirectoryCount, lastModifiedAt }
+}
+
+async function readDirectoryEntryStat(entryPath: string, signal?: AbortSignal) {
+  try {
+    return await lstat(entryPath)
+  } catch {
+    signal?.throwIfAborted()
+    return null
+  }
 }
 
 export function parseRemoteDirectoryOverview(output: string): WorkspaceDirectoryOverview {

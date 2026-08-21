@@ -106,8 +106,8 @@ export function useBranchActions(
   const { setLastResult, runBranchAction } = workspacesStore.getState()
   const copyPatchMutation = useMutation({
     mutationKey: ['repo-data', 'patch'],
-    mutationFn: async (input: { repoId: BranchActionRepo['id']; workspaceRuntimeId: string; worktreePath: string }) =>
-      await getRepoPatch(input.repoId, input.workspaceRuntimeId, input.worktreePath),
+    mutationFn: (input: { repoId: BranchActionRepo['id']; workspaceRuntimeId: string; worktreePath: string }) =>
+      getRepoPatch(input.repoId, input.workspaceRuntimeId, input.worktreePath),
   })
   const localActionScopeKey = computed(() => {
     const currentRepo = toValue(repo)
@@ -140,8 +140,8 @@ export function useBranchActions(
   function runUiAction(op: BranchUiActionOpId, fn: () => Promise<ExecResult>): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
     const currentRepo = toValue(repo)
-    const request = run(op, async () => {
-      return await dispatchWorkspaceUiAction(currentRepo.id, currentRepo.workspaceRuntimeId, op, fn, {
+    const request = run(op, () => {
+      return dispatchWorkspaceUiAction(currentRepo.id, currentRepo.workspaceRuntimeId, op, fn, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         reportResult: setLastResult,
       })

@@ -198,7 +198,6 @@ describe('TerminalSessionView composer', () => {
       await user.keyboard('{Escape}')
       expect(trigger.getAttribute('aria-expanded')).toBe('false')
       expect(document.activeElement).toBe(trigger)
-
     } finally {
       await rendered.cleanup()
     }

@@ -62,8 +62,7 @@ export function getRepoActivityControlView(input: {
   completion: RepoCompletion | null
   primaryRefreshBusy: boolean
 }): RepoActivityControlView {
-  if (input.visibleActivity?.kind === 'branch-action') return { kind: 'activity', activity: input.visibleActivity }
-  if (input.completion) return { kind: 'completion', completion: input.completion }
   if (input.visibleActivity) return { kind: 'activity', activity: input.visibleActivity }
+  if (input.completion) return { kind: 'completion', completion: input.completion }
   return { kind: 'refresh-button', primaryRefreshBusy: input.primaryRefreshBusy }
 }

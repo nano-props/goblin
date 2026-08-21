@@ -21,6 +21,6 @@ export function attachRecoverableStdioErrorHandler(stream: Writable): void {
 
 export function isRecoverableStdioWriteError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false
-  const code = (err as { code?: unknown }).code
+  const code = Reflect.get(err, 'code')
   return code === 'EIO' || code === 'EBADF' || code === 'EPIPE'
 }

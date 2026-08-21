@@ -253,7 +253,6 @@ describe('branch action capabilities', () => {
       canOpenEditor: true,
     })
   })
-
 })
 
 describe('runBranchAction', () => {

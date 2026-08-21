@@ -123,7 +123,7 @@ export interface TerminalEventSink<TUser extends string | number> {
   withRetirementTabsSnapshot(
     userId: TUser,
     session: TerminalSessionSummary,
-    commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => undefined,
+    commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => void,
   ): Promise<void>
   onSessionClosed?(
     userId: TUser,
@@ -1191,7 +1191,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   // id) *and* `terminalSessionId` (the durable tab identity) — see the
   // naming-boundary note on the realtime event types in
   // `#/shared/terminal-types.ts`. Every emit path funnels through one of
-  // these two helpers so a future event type cannot be added without the
+  // these two helpers so another event type cannot be added without the
   // `terminalSessionId` a client needs to route it reliably.
   private terminalSessionIdentity(session: TerminalSessionView<TUser>): { terminalSessionId: string } {
     return { terminalSessionId: session.terminalSessionId }
@@ -1432,18 +1432,14 @@ function sameTerminalScope<TUser extends string | number>(
   session: TerminalSessionView<TUser>,
   input: TerminalEnsureSessionInput<TUser>,
 ): boolean {
+  const current = terminalExecutionCoordinates(session.target)
+  const requested = terminalExecutionCoordinates(input.target)
   if (
-    session.scope !==
-      terminalSessionRuntimeScope(
-        terminalExecutionCoordinates(input.target).workspaceId,
-        terminalExecutionCoordinates(input.target).workspaceRuntimeId,
-      ) ||
+    session.scope !== terminalSessionRuntimeScope(requested.workspaceId, requested.workspaceRuntimeId) ||
     session.target.kind !== input.target.kind
   ) {
     return false
   }
-  const current = terminalExecutionCoordinates(session.target)
-  const requested = terminalExecutionCoordinates(input.target)
   return (
     current.workspaceId === requested.workspaceId &&
     current.workspaceRuntimeId === requested.workspaceRuntimeId &&

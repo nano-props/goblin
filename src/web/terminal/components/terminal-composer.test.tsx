@@ -820,15 +820,18 @@ describe('TerminalComposer', () => {
   test.each([
     ['available', true, [LABELS.sendOnly, LABELS.uploadFiles, LABELS.copyContent, LABELS.close]],
     ['unavailable', false, [LABELS.sendOnly, LABELS.copyContent, LABELS.close]],
-  ] as const)('groups input-mode menu actions when file upload is %s', async (_availability, canUploadFiles, labels) => {
-    const { container } = render({ canUploadFiles })
-    await expand(container)
-    await openMoreMenu(container)
+  ] as const)(
+    'groups input-mode menu actions when file upload is %s',
+    async (_availability, canUploadFiles, labels) => {
+      const { container } = render({ canUploadFiles })
+      await expand(container)
+      await openMoreMenu(container)
 
-    const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
-    if (!menu) throw new Error('expected Composer menu')
-    expectComposerMenuLayout(menu, labels)
-  })
+      const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+      if (!menu) throw new Error('expected Composer menu')
+      expectComposerMenuLayout(menu, labels)
+    },
+  )
 
   test('sends without submitting and preserves input focus across rejected and accepted delivery', async () => {
     const user = userEvent.setup()

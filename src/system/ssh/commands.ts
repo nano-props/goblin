@@ -164,13 +164,11 @@ export async function runRemoteCommand(
     }
     return { ok: true, stdout: parsed.stdout, stderr: parsed.stderr, remoteStarted: parsed.remoteStarted }
   } catch (err) {
-    const e = err as { stdout?: unknown; stderr?: unknown; timedOut?: boolean; isCanceled?: boolean; message?: string }
-    const parsed = parseRemoteCommandOutput(
-      typeof e.stdout === 'string' ? e.stdout : '',
-      typeof e.stderr === 'string' ? e.stderr : '',
-    )
+    const stdout = objectStringProperty(err, 'stdout')
+    const stderr = objectStringProperty(err, 'stderr')
+    const parsed = parseRemoteCommandOutput(stdout, stderr)
     const transport = parsed.remoteStarted ? { transportStderr: parsed.transportStderr } : {}
-    if (options?.signal?.aborted || e.isCanceled === true) {
+    if (options?.signal?.aborted || objectProperty(err, 'isCanceled') === true) {
       return {
         ok: false,
         stdout: parsed.stdout,
@@ -180,7 +178,7 @@ export async function runRemoteCommand(
         ...transport,
       }
     }
-    if (err instanceof ExecaError && e.timedOut) {
+    if (err instanceof ExecaError && objectProperty(err, 'timedOut') === true) {
       return {
         ok: false,
         stdout: parsed.stdout,
@@ -196,7 +194,7 @@ export async function runRemoteCommand(
         ok: false,
         stdout: parsed.stdout,
         stderr: parsed.stderr,
-        message: parsed.stderr || parsed.transportStderr || e.message || 'unknown',
+        message: parsed.stderr || parsed.transportStderr || objectStringProperty(err, 'message') || 'unknown',
         commandNotStarted: true,
       }
     }
@@ -204,11 +202,20 @@ export async function runRemoteCommand(
       ok: false,
       stdout: parsed.stdout,
       stderr: parsed.stderr,
-      message: parsed.stderr || parsed.transportStderr || e.message || 'unknown',
+      message: parsed.stderr || parsed.transportStderr || objectStringProperty(err, 'message') || 'unknown',
       remoteStarted: parsed.remoteStarted,
       ...transport,
     }
   }
+}
+
+function objectProperty(value: unknown, key: string): unknown {
+  return value && typeof value === 'object' ? Reflect.get(value, key) : undefined
+}
+
+function objectStringProperty(value: unknown, key: string): string {
+  const property = objectProperty(value, key)
+  return typeof property === 'string' ? property : ''
 }
 
 function isProcessStartFailure(error: ExecaError): boolean {

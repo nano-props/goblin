@@ -10,11 +10,7 @@ import {
   WORKSPACE_PANE_STATIC_TAB_TYPES,
 } from '#/shared/workspace-pane.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import {
-  formatWorkspaceLocator,
-  parseCanonicalWorkspaceLocator,
-  workspaceLocatorsShareTransport,
-} from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, workspaceLocatorsShareTransport } from '#/shared/workspace-locator.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 
@@ -151,20 +147,12 @@ type RuntimeWorkspacePaneTargetInput =
 export function canonicalRuntimeWorkspacePaneTarget(
   target: RuntimeWorkspacePaneTargetInput,
 ): RuntimeWorkspacePaneTarget | null {
-  const workspaceId = canonicalLocator(target.workspaceId)
+  const workspaceId = canonicalWorkspaceLocator(target.workspaceId)
   if (!workspaceId) return null
   if (target.kind === 'workspace-root') return { ...target, workspaceId }
   if (target.kind === 'git-branch') return { ...target, workspaceId }
-  const root = canonicalLocator(target.root)
+  const root = canonicalWorkspaceLocator(target.root)
   if (!root) return null
   if (!workspaceLocatorsShareTransport(workspaceId, root)) return null
   return { ...target, workspaceId, root }
-}
-
-function canonicalLocator(value: string) {
-  const parsed = parseCanonicalWorkspaceLocator(value)
-  const canonical = parsed
-    ? formatWorkspaceLocator(parsed, parsed.transport === 'file' ? parsed.platform : 'posix')
-    : null
-  return canonical === value ? canonical : null
 }

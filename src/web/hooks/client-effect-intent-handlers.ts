@@ -201,7 +201,7 @@ export async function handleWorkspaceClientIntent(
       // server orders both operations by physical worktree: an earlier terminal
       // create may finish and is then closed by removal quiescence, while an
       // already-admitted removal rejects a later create.
-      return await runNewTerminalTabCommand({
+      return runNewTerminalTabCommand({
         workspaceId: plan.workspaceId,
         target: plan.target,
         navigation: deps.navigation,
@@ -233,21 +233,21 @@ export async function handleWorkspaceClientIntent(
       return presentWorkspaceRefreshOutcome(refreshOutcome, deps.t)
     case 'show-workspace-pane-tab':
       if (plan.tab === 'terminal') {
-        return await runTerminalPrimaryActionCommand({
+        return runTerminalPrimaryActionCommand({
           workspaceId: plan.workspaceId,
           target: plan.target,
           navigation: deps.navigation,
           t: deps.t,
         })
       }
-      return await runShowWorkspacePaneTabCommand({
+      return runShowWorkspacePaneTabCommand({
         workspaceId: plan.workspaceId,
         target: plan.target,
         tab: plan.tab,
         navigation: deps.navigation,
       })
     case 'terminal-primary-action':
-      return await runTerminalPrimaryActionCommand({
+      return runTerminalPrimaryActionCommand({
         workspaceId: plan.workspaceId,
         target: plan.target,
         navigation: deps.navigation,

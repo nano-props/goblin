@@ -1,22 +1,4 @@
-// Node-side logger (Electron main, preload, system utilities).
-//
-// Mirrors `src/web/logger.ts` for symmetry: one pino instance with tagged
-// children shared directly by Electron, the Hono server, and system utilities.
-//
-// Level policy:
-//   - Test runs: Silent. `bun run test` runs under NODE_ENV=test, and
-//     pino's `silent` level drops every record at the source so the
-//     test output stays free of stack frames that aren't failures.
-//   - Production: Info. Captures lifecycle events (server boot, IPC
-//     failures, persistence errors) without debug noise.
-//   - Dev: Info. Captures lifecycle events; debug records are reachable
-//     by setting GOBLIN_NODE_LOG_LEVEL=debug explicitly.
-//
-// Tagged children are pre-bound to the same tag prefixes the codebase
-// already uses (`[server]`, `[window]`, `[menu]`, etc.), so call sites
-// stay one symbol:
-//   `nodeLog.child({ tag: 'window' }).warn({ err }, 'failed to load')`
-//   renders as `{"level":"warn","tag":"window","msg":"failed to load", ...}`.
+// Shared structured logger for Electron, server, and system code.
 
 import { pino, type Logger } from 'pino'
 import { installStdioErrorGuard } from '#/node/stdio-error-guard.ts'
@@ -50,10 +32,7 @@ export const nodeLogger: Logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
 })
 
-// Pre-tagged child loggers. Each subsystem imports the variant it needs;
-// call sites stay one symbol:
-//   `serverNodeLog.warn({ err }, 'failed to start')`
-//   renders as `{"tag":"server","msg":"failed to start", ...}`.
+// Subsystems import a pre-tagged child so ownership is present on every record.
 export const serverNodeLog = nodeLogger.child({ tag: 'server' })
 export const windowNodeLog = nodeLogger.child({ tag: 'window' })
 export const windowStateNodeLog = nodeLogger.child({ tag: 'window-state' })

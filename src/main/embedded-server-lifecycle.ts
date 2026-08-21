@@ -151,8 +151,7 @@ function matchesServerProcess(value: unknown, expectedPid: number | undefined): 
     expectedPid !== undefined &&
     typeof value === 'object' &&
     value !== null &&
-    'pid' in value &&
-    value.pid === expectedPid
+    Reflect.get(value, 'pid') === expectedPid
   )
 }
 
@@ -189,8 +188,8 @@ function readLanEnabledFromSettings(): boolean {
   try {
     const file = path.join(app.getPath('userData'), 'user-settings.json')
     const raw = readFileSync(file, 'utf-8')
-    const parsed = JSON.parse(raw)
-    return parsed.lanEnabled === true
+    const parsed: unknown = JSON.parse(raw)
+    return !!parsed && typeof parsed === 'object' && Reflect.get(parsed, 'lanEnabled') === true
   } catch {
     return false
   }

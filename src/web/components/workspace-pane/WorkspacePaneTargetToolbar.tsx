@@ -190,7 +190,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       if (isPendingWorkspacePaneTabItem(item)) return
       void dispatchSelectWorkspacePaneTabByIdentityAction({
         workspaceId: props.target.workspaceId,
-        location: props.model.location!,
+        location: requiredWorkspacePaneTabModelLocation(props.model),
         workspacePaneRoute: props.workspacePaneRoute,
         identity: item.identity,
         navigation,

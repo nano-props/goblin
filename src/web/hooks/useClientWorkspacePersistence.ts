@@ -99,13 +99,14 @@ export function useClientWorkspacePersistence({
     () => {
       const currentRoutedWorkspaceId = toValue(routedWorkspaceId)
       if (currentRoutedWorkspaceId) lastRoutedWorkspaceId = currentRoutedWorkspaceId
-      let workspace: ClientWorkspaceState | null
-      try {
-        workspace = latestClientWorkspace()
-      } catch (err) {
-        sessionLog.warn('local workspace save blocked', { err })
-        return
-      }
+      const workspace = (() => {
+        try {
+          return latestClientWorkspace()
+        } catch (err) {
+          sessionLog.warn('local workspace save blocked', { err })
+          return null
+        }
+      })()
       if (!workspace) return
       const immediateKey = JSON.stringify({
         restoredWorkspaceId: workspace.restoredWorkspaceId,

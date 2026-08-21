@@ -257,6 +257,25 @@ describe('workspace runtime remote lifecycle', () => {
     })
   })
 
+  test('settles a synchronous resolver failure instead of orphaning connecting', async () => {
+    const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+
+    await expect(
+      runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, () => {
+        throw new Error('resolver setup failed')
+      }),
+    ).resolves.toEqual({
+      kind: 'settled',
+      lifecycle: { kind: 'failed', attemptId: 1, reason: 'unknown' },
+      workspaceProbe: { status: 'probing' },
+    })
+    expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({
+      kind: 'failed',
+      attemptId: 1,
+      reason: 'unknown',
+    })
+  })
+
   test('terminalizes cleanup failure monotonically before a queued restart', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     const availableProbe = {

@@ -1,11 +1,4 @@
-// Preload bridge. Exposes low-level IPC under `window.goblinNative` to the
-// client. The client no longer needs a bootstrap roundtrip here — the
-// server renders the full bootstrap JSON into the HTML response
-// (`<script id="goblin-bootstrap">`), which is read by `web/bridge/bootstrap.ts`
-// after page load. The preload is now strictly an IPC bridge: every
-// function it exposes corresponds to a capability that the client
-// could not get from the server (open settings window, send IPC
-// requests to main, etc.).
+// Exposes native-only capabilities under `window.goblinNative`.
 //
 // IMPORTANT: This preload runs with sandbox: true (see window.ts). Only
 // the `electron` module is available here — do NOT require Node built-ins
@@ -152,26 +145,3 @@ ipcRenderer.on(IPC.ipc.effectIntentChallenge, (_event, generation) => {
   if (!Number.isSafeInteger(generation) || generation <= 0) return
   ipcRenderer.send(IPC.ipc.effectIntentReady, generation)
 })
-
-// Auth model: the client is identical in every runtime. The
-// embedded Electron main plants the auth cookie on the client's
-// `webContents.session` BEFORE the URL loads, so the client's
-// first request (the `useAccessTokenStatus` whoami probe) already
-// carries the cookie and clears the gate without user input. The
-// web path skips the gate entirely — the user pastes the token
-// once and `useAccessTokenStatus` exchanges it for the same
-// cookie. After that, both paths look identical: the client
-// calls `fetchServerJson('/api/whoami')`, the browser attaches
-// the cookie, the server returns 200.
-//
-// The preload does NOT seed `window.__GOBLIN_BOOTSTRAP__` with
-// anything — the bootstrap is empty on first paint in every
-// runtime, and the client fetches i18n before mounting the normal
-// app tree, then fetches host info and settings from the dedicated
-// `/api/*` endpoints during the app bootstrap hooks. The embedded
-// path used to also seed
-// homeDir + platform via `goblin:get-home-dir` /
-// `goblin:get-platform` IPC; those channels were removed when
-// host info moved to the public `/api/host` endpoint, so the
-// preload is now strictly an IPC bridge for browser-missing
-// capabilities (open settings window, send IPC requests, etc.).

@@ -25,6 +25,11 @@ export type RemoteWorkspaceConnectionOutcome =
   | { kind: 'outcome-uncertain'; workspaceId: WorkspaceId }
   | { kind: 'transport-failed'; workspaceId: WorkspaceId; reason: 'unknown' }
 
+type RemoteWorkspaceConnectionTransportOutcome = Extract<
+  RemoteWorkspaceConnectionOutcome,
+  { kind: 'outcome-uncertain' | 'cancelled' | 'transport-failed' }
+>
+
 function commandOutcome(
   result: RemoteWorkspaceLifecycleCommandResult,
   workspaceId: WorkspaceId,
@@ -63,16 +68,16 @@ export async function runRemoteWorkspaceConnection(
   const workspaceRuntimeId = options.workspaceRuntimeId ?? get().workspaces[workspaceId]?.workspaceRuntimeId
   if (!workspaceRuntimeId) return null
 
-  let result: RemoteWorkspaceLifecycleCommandResult
-  try {
-    result = await resolveRemoteWorkspaceConnection(
-      { workspaceId, workspaceRuntimeId, mode: options.mode },
-      options.signal,
-    )
-  } catch (error) {
+  const result = await resolveRemoteWorkspaceConnection(
+    { workspaceId, workspaceRuntimeId, mode: options.mode },
+    options.signal,
+  ).catch((error: unknown): RemoteWorkspaceLifecycleCommandResult | RemoteWorkspaceConnectionTransportOutcome => {
     if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return { kind: 'outcome-uncertain', workspaceId }
     if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', workspaceId }
     return { kind: 'transport-failed', workspaceId, reason: 'unknown' }
+  })
+  if (result.kind === 'outcome-uncertain' || result.kind === 'cancelled' || result.kind === 'transport-failed') {
+    return result
   }
   if (result.workspaceId !== workspaceId) return { kind: 'stale-runtime', workspaceId }
   if (result.kind === 'settled') {

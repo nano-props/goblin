@@ -24,9 +24,27 @@ describe('terminal session selection helper', () => {
 
   test.each([
     { name: 'uses a valid preferred selection', preferred: THIRD, current: SECOND, controller: FIRST, expected: THIRD },
-    { name: 'uses the current selection when the preference is invalid', preferred: 'missing', current: SECOND, controller: FIRST, expected: SECOND },
-    { name: 'uses the controller when no client selection exists', preferred: null, current: null, controller: FIRST, expected: FIRST },
-    { name: 'uses the first terminal when no selection exists', preferred: null, current: null, controller: null, expected: FIRST },
+    {
+      name: 'uses the current selection when the preference is invalid',
+      preferred: 'missing',
+      current: SECOND,
+      controller: FIRST,
+      expected: SECOND,
+    },
+    {
+      name: 'uses the controller when no client selection exists',
+      preferred: null,
+      current: null,
+      controller: FIRST,
+      expected: FIRST,
+    },
+    {
+      name: 'uses the first terminal when no selection exists',
+      preferred: null,
+      current: null,
+      controller: null,
+      expected: FIRST,
+    },
   ])('$name', ({ preferred, current, controller, expected }) => {
     expect(
       resolveSelectedTerminalSessionId({

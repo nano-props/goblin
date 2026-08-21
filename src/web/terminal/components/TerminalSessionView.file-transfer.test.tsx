@@ -80,51 +80,51 @@ describe('TerminalSessionView file transfer', () => {
   test.each(['paste', 'drop'] as const)(
     'remote %s rejects files before local resolution or terminal input',
     async (kind) => {
-    const shellClient = await import('#/web/app/shell-client.ts')
-    const { toast } = await import('vue-sonner')
-    vi.mocked(shellClient.pathForDroppedFile).mockClear()
-    vi.mocked(shellClient.saveClipboardFiles).mockClear()
-    vi.mocked(toast.error).mockClear()
-    const rendered = await renderTerminalSession(
-      {},
-      {
-        repoRoot: 'goblin+ssh://example/srv/repo',
-        worktreePath: 'goblin+ssh://example/srv/repo-feature',
-      },
-    )
-    const file = new File([new Uint8Array([1])], 'archive.bin')
+      const shellClient = await import('#/web/app/shell-client.ts')
+      const { toast } = await import('vue-sonner')
+      vi.mocked(shellClient.pathForDroppedFile).mockClear()
+      vi.mocked(shellClient.saveClipboardFiles).mockClear()
+      vi.mocked(toast.error).mockClear()
+      const rendered = await renderTerminalSession(
+        {},
+        {
+          repoRoot: 'goblin+ssh://example/srv/repo',
+          worktreePath: 'goblin+ssh://example/srv/repo-feature',
+        },
+      )
+      const file = new File([new Uint8Array([1])], 'archive.bin')
 
-    try {
-      const transfer = kind === 'drop' ? dropDataWithFiles([file]) : null
-      if (transfer) {
-        const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
-        Object.defineProperty(dragEnter, 'dataTransfer', { value: transfer })
-        rendered.sessionRoot.dispatchEvent(dragEnter)
-        const dragOver = new Event('dragover', { bubbles: true, cancelable: true })
-        Object.defineProperty(dragOver, 'dataTransfer', { value: transfer })
-        rendered.sessionRoot.dispatchEvent(dragOver)
-        expect(dragEnter.defaultPrevented).toBe(true)
-        expect(dragOver.defaultPrevented).toBe(true)
-        expect(transfer.dropEffect).toBe('none')
-        expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
+      try {
+        const transfer = kind === 'drop' ? dropDataWithFiles([file]) : null
+        if (transfer) {
+          const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
+          Object.defineProperty(dragEnter, 'dataTransfer', { value: transfer })
+          rendered.sessionRoot.dispatchEvent(dragEnter)
+          const dragOver = new Event('dragover', { bubbles: true, cancelable: true })
+          Object.defineProperty(dragOver, 'dataTransfer', { value: transfer })
+          rendered.sessionRoot.dispatchEvent(dragOver)
+          expect(dragEnter.defaultPrevented).toBe(true)
+          expect(dragOver.defaultPrevented).toBe(true)
+          expect(transfer.dropEffect).toBe('none')
+          expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
+        }
+        const event = new Event(kind, { bubbles: true, cancelable: true })
+        Object.defineProperty(event, kind === 'paste' ? 'clipboardData' : 'dataTransfer', {
+          value: kind === 'paste' ? clipboardDataWithFiles([file]) : transfer,
+        })
+        await flushTestUpdates(async () => {
+          rendered.sessionRoot.dispatchEvent(event)
+          await waitForNextMacrotask()
+        })
+
+        expect(event.defaultPrevented).toBe(true)
+        expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
+        expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+        expect(rendered.writeInput).not.toHaveBeenCalled()
+        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-remote-unsupported')
+      } finally {
+        await rendered.cleanup()
       }
-      const event = new Event(kind, { bubbles: true, cancelable: true })
-      Object.defineProperty(event, kind === 'paste' ? 'clipboardData' : 'dataTransfer', {
-        value: kind === 'paste' ? clipboardDataWithFiles([file]) : transfer,
-      })
-      await flushTestUpdates(async () => {
-        rendered.sessionRoot.dispatchEvent(event)
-        await waitForNextMacrotask()
-      })
-
-      expect(event.defaultPrevented).toBe(true)
-      expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
-      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
-      expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-remote-unsupported')
-    } finally {
-      await rendered.cleanup()
-    }
     },
   )
 

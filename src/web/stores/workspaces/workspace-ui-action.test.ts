@@ -28,6 +28,27 @@ describe('workspace UI action result boundary', () => {
     )
   })
 
+  test('normalizes synchronous action errors and reports them with runtime authority', async () => {
+    const reportResult = vi.fn()
+
+    await expect(
+      dispatchWorkspaceUiAction(
+        WORKSPACE_ID,
+        WORKSPACE_RUNTIME_ID,
+        'editor',
+        () => {
+          throw new Error('launch failed')
+        },
+        { reportResult },
+      ),
+    ).resolves.toEqual({ ok: false, message: 'launch failed' })
+    expect(reportResult).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      { ok: false, message: 'launch failed' },
+      WORKSPACE_RUNTIME_ID,
+    )
+  })
+
   test('ignores cancellation without reporting a failure', async () => {
     const reportResult = vi.fn()
 

@@ -20,6 +20,6 @@ export function attachClientSurfaceWindow(win: BrowserWindow, { surface }: Attac
   registerClientWindowSurface(win, surface)
 }
 
-export function detachClientSurfaceWindow(win: BrowserWindow, surface: ClientSurfaceSpec): void {
-  unregisterClientWindowSurface(surface, win)
+export function detachClientSurfaceWindow(win: BrowserWindow): void {
+  unregisterClientWindowSurface(win)
 }

@@ -60,13 +60,6 @@ export function wireAccessTokenIpc(): void {
   // Token rotation atomically stages the next-start token. Trust gating
   // prevents an auxiliary or compromised surface from replacing the
   // credential that will become authoritative after restart.
-  //
-  // Host info (home dir, platform) used to live here too under
-  // `goblin:get-home-dir` / `goblin:get-platform`. They were
-  // removed when host info moved to the public `/api/host`
-  // endpoint (see `#/server/host-info.ts` and
-  // `#/web/stores/host-info.ts`); the embedded client now
-  // fetches it the same way the standalone web path does.
   ipcMain.handle(GET_ACCESS_TOKEN_PROJECTION_CHANNEL, async (event): Promise<AccessTokenProjection> => {
     if (!isTrustedIpcEvent(event)) throw new Error('Untrusted IPC sender for get-access-token-projection')
     return await serializeTokenFileOperation(readAccessTokenProjection)

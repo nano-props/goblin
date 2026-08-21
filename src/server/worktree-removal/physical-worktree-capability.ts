@@ -28,7 +28,7 @@ export interface PhysicalWorktreeExecutionCapability {
   readonly [physicalWorktreeExecutionCapabilityBrand]: true
 }
 
-export interface PhysicalWorktreeExecutionScope extends PhysicalWorktreeExecutionInput {}
+export type PhysicalWorktreeExecutionScope = PhysicalWorktreeExecutionInput
 
 type ResolvedRemoteWorkspaceTarget = Awaited<ReturnType<typeof resolveRemoteTargetWithConfigFingerprint>>['target']
 export type PhysicalWorktreeExecutionBinding =

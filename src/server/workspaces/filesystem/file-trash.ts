@@ -28,7 +28,7 @@ export async function trashWorkspaceFile(
     const stat = await lstat(absolutePath)
     if (stat.isDirectory()) return { ok: false, message: 'error.filetree-delete-directory-unsupported' }
   } catch (err) {
-    const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: unknown }).code) : ''
+    const code = err && typeof err === 'object' ? String(Reflect.get(err, 'code') ?? '') : ''
     return { ok: false, message: code === 'ENOENT' ? 'error.file-not-found' : 'error.failed-trash-file' }
   }
 

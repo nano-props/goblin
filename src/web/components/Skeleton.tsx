@@ -1,10 +1,5 @@
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
-// Skeleton placeholders used while a list loads.  We keep the shapes
-// coarse — a few large blocks per row — rather than mirroring every
-// badge, icon, and label.  This matches the shadcn/ui Skeleton style
-// (animate-pulse + bg-muted) and avoids the "fine-grained flicker"
-// that comes from dozens of tiny bars pulsing in unison.
 
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { WorkspaceLayoutPane, WorkspaceSplitLayout } from '#/web/components/workspace-layout/WorkspaceLayout.tsx'
@@ -49,9 +44,6 @@ export function GitWorkspaceNavigatorSkeleton({ rows = 6 }: GitWorkspaceNavigato
   )
 }
 
-// WorkspaceLayoutSkeleton renders the sidebar + workspace pane while
-// a workspace is being hydrated. The current workspace shell owns the sidebar
-// chrome, so the workspace skeleton just shows the panes.
 export function WorkspaceLayoutSkeleton({
   singlePane = false,
   singlePaneView = 'navigator',

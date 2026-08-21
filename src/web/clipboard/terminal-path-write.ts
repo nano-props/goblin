@@ -1,5 +1,6 @@
 import { isAbsolutePathLike, isTerminalPastePathSafe } from '#/shared/clipboard-paste.ts'
-import { TERMINAL_WS_MESSAGE_LIMIT_BYTES, terminalUtf8ByteLength } from '#/shared/terminal-protocol-constraints.ts'
+import { TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal-protocol-constraints.ts'
+import { utf8ByteLength } from '#/shared/utf8-byte-length.ts'
 
 const PASTE_PATH_WRITE_MARGIN_BYTES = 4096
 const PASTE_PATH_MAX_WRITE_BYTES = TERMINAL_WS_MESSAGE_LIMIT_BYTES - PASTE_PATH_WRITE_MARGIN_BYTES
@@ -18,7 +19,7 @@ export function planTerminalPathWrite(paths: string[]): TerminalPathWritePlan {
   // Measure the JSON-escaped payload so paths full of backslashes or
   // double quotes cannot pass this check and then close the socket.
   // Use UTF-8 bytes to match the WebSocket transport cap.
-  if (terminalUtf8ByteLength(JSON.stringify(data)) > PASTE_PATH_MAX_WRITE_BYTES) return { kind: 'too-long' }
+  if (utf8ByteLength(JSON.stringify(data)) > PASTE_PATH_MAX_WRITE_BYTES) return { kind: 'too-long' }
   return { kind: 'write', data }
 }
 

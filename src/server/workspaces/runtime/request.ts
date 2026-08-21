@@ -103,15 +103,12 @@ async function runGitWorkspaceMutationRuntimeRequestWith<Result extends RepoMuta
     if (!isRepoMutationRuntimeFailureError(error)) {
       return await throwRuntimeRequestError(input, error, 'error.failed-read-repo')
     }
-    let mutation = error.mutation
     const lifecycleSettled = await settleRuntimeFailureAndStopAutomation(
       input.userId,
       input.label,
       error.runtimeFailure,
     )
-    if (!lifecycleSettled) {
-      mutation = mutationWithRuntimeSettlementRecovery(mutation)
-    }
+    const mutation = lifecycleSettled ? error.mutation : mutationWithRuntimeSettlementRecovery(error.mutation)
     workspaceRuntimeRequestLogger.warn({ err: error.runtimeFailure, label: input.label }, 'mutation runtime failed')
     return runtimeFailureResult(mutation)
   }
@@ -178,15 +175,14 @@ async function settleRuntimeFailureAndStopAutomation(
   label: string,
   error: RemoteWorkspaceRuntimeFailureError,
 ): Promise<boolean> {
-  let lifecycleSettled = true
   try {
     await settleRemoteWorkspaceRuntimeFailure(userId, error)
+    return true
   } catch (settlementError) {
-    lifecycleSettled = false
     workspaceRuntimeRequestLogger.warn({ err: settlementError, label }, 'failed to settle workspace runtime')
     // No lifecycle transition was committed, so the lifecycle event cannot
     // stop automation. Ask the background owner directly for this uncertain case.
     stopBackgroundSyncRuntime(userId, error.workspaceId, error.workspaceRuntimeId)
+    return false
   }
-  return lifecycleSettled
 }

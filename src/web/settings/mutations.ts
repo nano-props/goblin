@@ -16,8 +16,8 @@ export function useSettingsMutation<TVariables, TResult>(
   let inFlight: Promise<TResult> | null = null
   return useMutation({
     mutationFn: async (variables: TVariables) => {
-      if (!options?.singleFlight) return await task(variables)
-      if (inFlight) return await inFlight
+      if (!options?.singleFlight) return task(variables)
+      if (inFlight) return inFlight
       const promise = task(variables)
       inFlight = promise
       try {

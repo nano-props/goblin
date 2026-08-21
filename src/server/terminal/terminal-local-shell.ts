@@ -5,28 +5,7 @@ export interface ResolvedLocalShell {
   args: string[]
 }
 
-/**
- * Pick the right login shell for a local (non-SSH) terminal.
- *
- * Resolution order on Unix:
- *  1. Caller-supplied `input.command` wins (explicit override).
- *  2. `env.SHELL` — the user-facing Electron desktop launches inherit
- *     this from launchd / the user's login session, so it's correct on macOS
- *     and Linux desktops.
- *  3. `os.userInfo().shell` — Node reads `getpwuid_r(getuid())->pw_shell` for
- *     us. This catches CI, devcontainer, and other containerised contexts
- *     where the inherited `SHELL` points at the container base shell (often
- *     `/bin/sh`) rather than the user's actual login shell.
- *  4. `/bin/sh` — last-resort POSIX guarantee; `-l` keeps the shell in login
- *     mode so it sources the user's profile.
- *
- * On Windows there is no login-shell concept; fall back to `COMSPEC` (which
- * the Windows kernel always sets) or `cmd.exe`. No login-mode flag — cmd.exe
- * does not have an equivalent.
- *
- * Pure platform policy — no node-pty dependency — so this lives in its own
- * file rather than inside terminal-pty-runtime.
- */
+/** Resolves an explicit command, the user login shell, or the platform fallback. */
 export function resolveLocalShell(
   input: { command?: string; args?: string[] },
   env: NodeJS.ProcessEnv = process.env,

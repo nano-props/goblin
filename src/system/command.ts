@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, statSync } from 'node:fs'
+import { accessSync, constants, statSync } from 'node:fs'
 import path from 'node:path'
 
 function candidateDirectories(extraDirectories: string[]): string[] {
@@ -15,7 +15,6 @@ function candidateDirectories(extraDirectories: string[]): string[] {
 }
 
 function isExecutableFile(filePath: string): boolean {
-  if (!existsSync(filePath)) return false
   try {
     if (!statSync(filePath).isFile()) return false
     accessSync(filePath, constants.X_OK)

@@ -16,7 +16,7 @@ export async function runWorkspaceRuntimeMembershipCommand<T>(
   }
   const work = (async () => {
     await precedingExclusive
-    return await queue.add(command)
+    return queue.add(command)
   })()
   activeWorkspaceRuntimeMembershipCommands.add(work)
   try {
@@ -37,11 +37,11 @@ export async function runExclusiveWorkspaceRuntimeMembershipCommand<T>(command: 
   const work = (async () => {
     await precedingExclusive
     await Promise.allSettled(precedingShared)
-    return await command()
+    return command()
   })()
   workspaceRuntimeMembershipExclusiveTail = work.then(
     () => undefined,
     () => undefined,
   )
-  return await work
+  return work
 }

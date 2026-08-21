@@ -34,7 +34,7 @@ export class PhysicalWorktreeOperationCoordinator {
   private readonly batchAdmissions = new Map<string, number>()
   private readonly permitContexts = new WeakMap<
     PhysicalWorktreeOperationPermit,
-    { capability: PhysicalWorktreeExecutionCapability; key: string; context: PhysicalWorktreeOperationContext }
+    { capability: PhysicalWorktreeExecutionCapability; context: PhysicalWorktreeOperationContext }
   >()
   private readonly activePermits = new WeakSet<PhysicalWorktreeOperationPermit>()
   private nextOperationId = 1
@@ -65,7 +65,7 @@ export class PhysicalWorktreeOperationCoordinator {
     const key = physicalWorktreeOperationKey(capability)
     if (this.removalAdmissions.has(key)) return { admitted: false }
     const context = Object.freeze({ signal })
-    const permit = this.createPermit(capability, key, context)
+    const permit = this.createPermit(capability, context)
     try {
       return {
         admitted: true,
@@ -138,7 +138,7 @@ export class PhysicalWorktreeOperationCoordinator {
     if (this.removalAdmissions.has(key) || this.batchAdmissions.has(key)) return { admitted: false }
     this.removalAdmissions.add(key)
     const context = Object.freeze({ signal })
-    const permit = this.createPermit(capability, key, context)
+    const permit = this.createPermit(capability, context)
     try {
       return {
         admitted: true,
@@ -195,11 +195,10 @@ export class PhysicalWorktreeOperationCoordinator {
 
   private createPermit(
     capability: PhysicalWorktreeExecutionCapability,
-    key: string,
     context: PhysicalWorktreeOperationContext,
   ): PhysicalWorktreeOperationPermit {
     const permit = { operationId: this.nextOperationId++ }
-    this.permitContexts.set(permit, { capability, key, context })
+    this.permitContexts.set(permit, { capability, context })
     this.activePermits.add(permit)
     return permit
   }

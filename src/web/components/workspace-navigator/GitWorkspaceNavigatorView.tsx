@@ -1,5 +1,3 @@
-// Single source of truth for the persistent and zen-mode Git workspace navigator.
-
 import { computed, defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'

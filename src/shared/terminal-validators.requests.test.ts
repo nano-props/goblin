@@ -6,7 +6,6 @@ import {
   isValidTerminalWriteData,
   MAX_TERMINAL_WRITE_CHARS,
   normalizeTerminalSize,
-  terminalUtf8ByteLength,
   TERMINAL_WS_MESSAGE_LIMIT_BYTES,
 } from '#/shared/terminal-protocol-constraints.ts'
 import {
@@ -136,11 +135,7 @@ describe('shared terminal validators requests', () => {
     expect(isValidTerminalTestNotificationInput({ title: '', body: 'Notifications are working' })).toBe(false)
   })
 
-  test('measures terminal websocket messages in UTF-8 bytes', () => {
-    expect('你'.length).toBe(1)
-    expect(terminalUtf8ByteLength('你')).toBe(3)
-    expect('😀'.length).toBe(2)
-    expect(terminalUtf8ByteLength('😀')).toBe(4)
+  test('limits terminal websocket messages by UTF-8 bytes', () => {
     expect(isTerminalWsMessageWithinLimit('a'.repeat(TERMINAL_WS_MESSAGE_LIMIT_BYTES))).toBe(true)
     expect(isTerminalWsMessageWithinLimit('你'.repeat(Math.floor(TERMINAL_WS_MESSAGE_LIMIT_BYTES / 2)))).toBe(false)
   })

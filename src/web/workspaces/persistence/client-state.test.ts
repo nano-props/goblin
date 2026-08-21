@@ -119,7 +119,6 @@ describe('client workspace persistence', () => {
 
     await expect(readClientWorkspaceState()).resolves.toEqual(state)
   })
-
 })
 
 function currentState(overrides: Partial<ClientWorkspaceState> = {}): ClientWorkspaceState {

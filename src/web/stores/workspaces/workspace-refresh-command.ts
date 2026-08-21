@@ -37,7 +37,7 @@ export async function runWorkspaceRefresh(
   if (workspace.workspaceRuntimeId !== workspaceRuntimeId) return { ok: false, cancelled: true }
   const key = `${workspaceId}\0${workspaceRuntimeId}`
   const existing = commands.get(key)
-  if (existing) return await existing
+  if (existing) return existing
   const command = runWorkspaceRefreshOnce(store, workspaceId, workspaceRuntimeId)
   commands.set(key, command)
   try {
@@ -92,7 +92,7 @@ async function runWorkspaceRefreshOnce(
     lane: 'read',
     priority: 100,
     targets: [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }],
-    task: async (signal) => await runRefreshSyncPipeline(workspaceId, workspaceRuntimeId, signal),
+    task: (signal) => runRefreshSyncPipeline(workspaceId, workspaceRuntimeId, signal),
     onError: (message) => {
       updateIfFresh(store.set, workspaceId, workspaceRuntimeId, (workspace) => {
         if (!isGitWorkspace(workspace)) return

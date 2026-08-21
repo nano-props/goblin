@@ -108,16 +108,17 @@ export function isWorkspacePaneTabEntry(value: unknown): value is WorkspacePaneT
 
 export function workspacePaneTabEntryFromUnknown(value: unknown): WorkspacePaneTabEntry | null {
   if (!value || typeof value !== 'object') return null
-  const entry = value as { type?: unknown; tabId?: unknown; runtimeSessionId?: unknown }
-  const type = typeof entry.type === 'string' ? entry.type : null
+  const rawType = Reflect.get(value, 'type')
+  const type = typeof rawType === 'string' ? rawType : null
   if (isWorkspacePaneRuntimeTabType(type)) {
-    return typeof entry.runtimeSessionId === 'string' && entry.runtimeSessionId.length > 0
-      ? workspacePaneRuntimeTabEntry(type, entry.runtimeSessionId)
+    const runtimeSessionId = Reflect.get(value, 'runtimeSessionId')
+    return typeof runtimeSessionId === 'string' && runtimeSessionId.length > 0
+      ? workspacePaneRuntimeTabEntry(type, runtimeSessionId)
       : null
   }
   if (isWorkspacePaneStaticTabType(type)) {
     const tabId = workspacePaneStaticTabId(type)
-    return entry.tabId === tabId ? workspacePaneStaticTabEntry(type) : null
+    return Reflect.get(value, 'tabId') === tabId ? workspacePaneStaticTabEntry(type) : null
   }
   return null
 }

@@ -44,32 +44,10 @@ const ALL_TERMINAL_APPS: ExternalToolItem[] = [
   },
 ]
 
-/**
- * Per-platform visibility for terminal entries.
- *
- * - `terminal` is the macOS Terminal.app backend (`openInAppleTerminal`).
- *   On Windows/Linux/other the backend is unreachable, so we hide it from
- *   the picker rather than offer a row that can only fail.
- * - `windowsTerminal` is win32-only — `windows-terminal.ts` hard-checks
- *   `process.platform === 'win32'`, so cygwin (which reports `'cygwin'`)
- *   and other Windows-like environments don't get it either.
- * - `ghostty` is cross-platform. Detection is currently best-effort on
- *   macOS only; on Linux/Windows the row simply shows "not detected" if
- *   Ghostty isn't installed.
- *
- * The data lives in the shared array above so the i18n bundle stays
- * single-source; this map just filters which entries are visible per
- * host platform. Mirrors the union in `shared/bootstrap.ts`; add new
- * platforms here when they get a Windows-Terminal-shaped backend.
- */
 type BootstrapPlatform = ClientPlatform
 const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   win32: new Set(['windowsTerminal']),
   darwin: new Set(['ghostty', 'terminal']),
-  // Non-darwin, non-win32 Unix-y platforms: only Ghostty, which is the
-  // only cross-platform terminal backend we ship. cygwin reports
-  // `'cygwin'` not `'win32'`, so Windows Terminal's platform guard would
-  // reject it anyway.
   linux: new Set(['ghostty']),
   aix: new Set(['ghostty']),
   android: new Set(['ghostty']),
@@ -79,8 +57,6 @@ const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   netbsd: new Set(['ghostty']),
   openbsd: new Set(['ghostty']),
   sunos: new Set(['ghostty']),
-  // Web-hosted clients (the dev preview) have no real terminal; hide
-  // every OS-specific entry.
   web: new Set<string>(),
 }
 
@@ -160,12 +136,7 @@ export const ExternalAppSettings = defineComponent({
     const t = useT()
     const { data } = useExternalAppsQuery()
     const { refreshExternalApps, refreshing } = useExternalAppSettingsController()
-    // Read the platform from the host-info store, not `process.platform`:
-    // the client is sandboxed and does not have `process` at runtime, so
-    // the only reliable source is the public `/api/host` endpoint fetched
-    // during public bootstrap. The store falls back to `'web'`
-    // (which hides every OS-specific terminal entry) until the hydrate
-    // resolves — the settings page is gated behind login anyway.
+    // The sandboxed client receives its platform from the host projection.
     const platform = useStoreSelector(hostInfoStore, selectHostPlatform)
     return () => {
       const snapshot = data.value

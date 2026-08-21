@@ -45,15 +45,11 @@ export interface ClientRuntimeSnapshot {
  * inlines these into HTML — the bootstrap is now a tiny payload
  * carrying only the runtime kind, the bridge protocol version, the
  * native capability set, and the optional QR-code server handoff.
- * Everything else (i18n, settings, host info) lives on dedicated
- * `/api/*` endpoints. The client hydrates i18n before mounting
+ * Everything else (i18n, settings, host info) lives behind dedicated
+ * server procedures. The client hydrates i18n before mounting
  * the normal Vue tree, then the app bootstrap composables hydrate the
  * remaining runtime state. The server's HTML is an immutable static
  * file.
- *
- *   - i18n:    `GET /api/i18n`   (public, see `#/web/main.tsx`)
- *   - settings:`GET /api/settings` (auth)
- *   - host:    `GET /api/host`   (public, see `#/web/stores/host-info.ts`)
  */
 export interface ClientBootstrapSnapshot {
   runtime: ClientRuntimeSnapshot

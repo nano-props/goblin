@@ -36,7 +36,7 @@ export async function openLocalWorkspaceFileDownload(resolved: LocalFilesystemEx
 
 function localDownloadError(error: unknown): unknown {
   if (error instanceof CodedError) return error
-  const code = (error as NodeJS.ErrnoException).code
+  const code = error && typeof error === 'object' ? Reflect.get(error, 'code') : undefined
   if (code === 'ENOENT') return new CodedError({ code: 'BAD_REQUEST', message: 'error.file-not-found' })
   if (code === 'EACCES' || code === 'EPERM') {
     return new CodedError({ code: 'BAD_REQUEST', message: 'error.workspace-permission-denied' })

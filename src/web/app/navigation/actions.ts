@@ -274,7 +274,7 @@ async function commitWorkspacePaneRoute(
     onAbandon: options?.onAbandon,
     routePrecondition: options?.routePrecondition,
   }
-  return await routeNavigation.commitWorkspacePaneRoute(workspaceId, branchName, route, routeOptions)
+  return routeNavigation.commitWorkspacePaneRoute(workspaceId, branchName, route, routeOptions)
 }
 
 function restoreWorkspacePresentationOrOpenDashboard(

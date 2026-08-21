@@ -46,11 +46,12 @@ export async function createBrowserWindowWebPreferences(): Promise<BrowserWindow
 
 function resolvePreloadPath(): string {
   if (!app.isPackaged) return PRELOAD_SOURCE_PATH
-  const manifest = JSON.parse(readFileSync(PRELOAD_MANIFEST_PATH, 'utf8')) as { file?: unknown }
-  if (typeof manifest.file !== 'string' || manifest.file.length === 0) {
+  const manifest: unknown = JSON.parse(readFileSync(PRELOAD_MANIFEST_PATH, 'utf8'))
+  const file = manifest && typeof manifest === 'object' ? Reflect.get(manifest, 'file') : undefined
+  if (typeof file !== 'string' || file.length === 0) {
     throw new Error('Packaged preload manifest is invalid')
   }
-  return path.join(PRELOAD_DIST_DIR, manifest.file)
+  return path.join(PRELOAD_DIST_DIR, file)
 }
 
 function resolveClientBuildCacheKey(): string | null {

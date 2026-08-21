@@ -30,20 +30,19 @@ export const WorkspaceLayoutShell: FunctionalComponent<WorkspaceLayoutShellProps
   const zenRevealEnabled = !props.compact && behavior.sidebarCollapsed
   const activePane = props.singlePaneActivePane ?? 'navigator'
 
-  let workspaceBody: VNodeChild
-  if (props.compact) {
-    workspaceBody = (
-      <CompactWorkspaceLayout
-        activePane={activePane}
-        sidebarPane={props.sidebarPane}
-        workspacePane={props.workspacePane}
-        transitionScopeKey={props.workspaceId}
-      />
-    )
-  } else if (behavior.singlePane) {
-    workspaceBody = activePane === 'workspace' ? props.workspacePane : props.sidebarPane
-  } else {
-    workspaceBody = (
+  const workspaceBody = (() => {
+    if (props.compact) {
+      return (
+        <CompactWorkspaceLayout
+          activePane={activePane}
+          sidebarPane={props.sidebarPane}
+          workspacePane={props.workspacePane}
+          transitionScopeKey={props.workspaceId}
+        />
+      )
+    }
+    if (behavior.singlePane) return activePane === 'workspace' ? props.workspacePane : props.sidebarPane
+    return (
       <WorkspaceSplitLayout
         mode="split"
         workspacePaneSize={props.workspacePaneSize}
@@ -53,7 +52,7 @@ export const WorkspaceLayoutShell: FunctionalComponent<WorkspaceLayoutShellProps
         workspacePane={props.workspacePane}
       />
     )
-  }
+  })()
 
   return (
     <section class="relative flex min-w-0 flex-1 flex-col">

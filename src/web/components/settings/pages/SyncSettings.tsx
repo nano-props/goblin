@@ -1,3 +1,4 @@
+import { defineComponent } from 'vue'
 import {
   SettingsGroup,
   SettingsList,
@@ -44,4 +45,3 @@ export const SyncSettings = defineComponent({
     )
   },
 })
-import { defineComponent } from 'vue'

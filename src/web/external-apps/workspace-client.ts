@@ -9,24 +9,16 @@ export async function openWorkspaceTerminal(
   target: WorkspacePaneFilesystemExecutionTarget,
   app: TerminalApp,
 ): Promise<ExecResult> {
-  return await postServerCommandJson(
-    '/api/workspace/open-terminal',
-    { target, app },
-    decodeWith(ExecResultResponseSchema),
-  )
+  return postServerCommandJson('/api/workspace/open-terminal', { target, app }, decodeWith(ExecResultResponseSchema))
 }
 
 export async function openWorkspaceEditor(
   target: WorkspacePaneFilesystemExecutionTarget,
   app: EditorApp,
 ): Promise<ExecResult> {
-  return await postServerCommandJson(
-    '/api/workspace/open-editor',
-    { target, app },
-    decodeWith(ExecResultResponseSchema),
-  )
+  return postServerCommandJson('/api/workspace/open-editor', { target, app }, decodeWith(ExecResultResponseSchema))
 }
 
 export async function openWorkspaceInFinder(target: WorkspacePaneFilesystemExecutionTarget): Promise<ExecResult> {
-  return await postServerCommandJson('/api/workspace/open-in-finder', { target }, decodeWith(ExecResultResponseSchema))
+  return postServerCommandJson('/api/workspace/open-in-finder', { target }, decodeWith(ExecResultResponseSchema))
 }

@@ -241,7 +241,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
     }
 
     if (network) {
-      return await runLatestOperation({
+      return runLatestOperation({
         set,
         get,
         id,
@@ -261,7 +261,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       })
     }
 
-    return await runExclusiveOperation({
+    return runExclusiveOperation({
       set,
       get,
       id,
@@ -284,7 +284,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       action: CreateWorktreeAction,
       options?: RunBranchActionOptions,
     ): Promise<CreateWorktreeExecResult | null> {
-      return await runScheduledBranchAction(
+      return runScheduledBranchAction(
         id,
         action,
         options,
@@ -298,7 +298,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       action: NonCreateRepoBranchAction,
       options?: RunBranchActionOptions,
     ): Promise<RepoMutationExecResult | null> {
-      return await runScheduledBranchAction(
+      return runScheduledBranchAction(
         id,
         action,
         options,

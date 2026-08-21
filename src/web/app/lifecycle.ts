@@ -32,7 +32,7 @@ export function subscribeAppQuitting(listener: Listener): () => void {
 export async function markAppQuitting(): Promise<void> {
   if (quitting) return
   quitting = true
-  const pending = Array.from(listeners).map(async (listener) => await listener())
+  const pending = Array.from(listeners).map(async (listener) => listener())
   listeners.clear()
   const results = await Promise.allSettled(pending)
   const failure = results.find((result) => result.status === 'rejected')

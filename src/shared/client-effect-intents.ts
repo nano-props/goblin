@@ -1,6 +1,7 @@
 import { isSettingsPage, type SettingsPage } from '#/shared/settings-pages.ts'
 import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { LangPref, ThemePref } from '#/shared/settings.ts'
+import { LANG_PREF_VALUES, THEME_PREF_VALUES, type LangPref, type ThemePref } from '#/shared/settings.ts'
+import { isStringIn } from '#/shared/string-literals.ts'
 import { isWorkspacePaneTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { isValidTerminalSessionBase } from '#/shared/terminal-validators.ts'
@@ -86,11 +87,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isThemePref(value: unknown): value is ThemePref {
-  return value === 'auto' || value === 'light' || value === 'dark'
+  return isStringIn(THEME_PREF_VALUES, value)
 }
 
 function isLangPref(value: unknown): value is LangPref {
-  return value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja'
+  return isStringIn(LANG_PREF_VALUES, value)
 }
 
 function isWorkspaceSessionEntry(value: unknown): value is WorkspaceSessionEntry {

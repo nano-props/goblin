@@ -151,11 +151,7 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => {
     onCreated: (worktreePath: string, navigationGeneration: AppNavigationGeneration) => void
   }> = (props) => (
     <div data-testid="create-worktree-page" data-compact={props.compact ? 'true' : 'false'}>
-      <button
-        type="button"
-        data-testid="create-worktree-cancel"
-        onClick={props.onCancel}
-      />
+      <button type="button" data-testid="create-worktree-cancel" onClick={props.onCancel} />
       <button
         type="button"
         data-testid="create-worktree-created"

@@ -165,9 +165,9 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       const result = await scheduleRepoOperation<T>(
         options.id,
         options.lane,
-        async (signal) => {
+        (signal) => {
           operationSignal = signal
-          return await options.task(signal, ctx)
+          return options.task(signal, ctx)
         },
         options.queuedTimeoutMs === undefined
           ? scheduleOptions

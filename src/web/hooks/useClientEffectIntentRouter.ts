@@ -61,7 +61,7 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
     openCloneRepo: options.openCloneRepo,
     openRemoteWorkspace: options.openRemoteWorkspace,
     overlayBlocked: options.isOverlayOpen() || isShortcutBlockingLayerOpen(),
-    openWorkspaceMembership: async (input: string | WorkspaceSessionEntry) => await openWorkspaceMembership(input),
+    openWorkspaceMembership: (input: string | WorkspaceSessionEntry) => openWorkspaceMembership(input),
     resetLayout,
     t: (key: string) => t(key),
   })
@@ -81,7 +81,7 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
   }
 
   const externalOpenDrainer = createExternalOpenIntentDrainer({
-    openWorkspaceMembership: async (path) => await openWorkspaceMembership(path),
+    openWorkspaceMembership: (path) => openWorkspaceMembership(path),
     activateWorkspace: (workspaceId) => toValue(options.navigation).activateWorkspace(workspaceId),
     t: (key) => t(key),
   })

@@ -246,7 +246,6 @@ describe('terminal session projection helpers', () => {
         canonicalSize: { cols: 120, rows: 40 },
       }),
     )
-
   })
 
   test('projects restored create metadata for the durable terminal session id', () => {

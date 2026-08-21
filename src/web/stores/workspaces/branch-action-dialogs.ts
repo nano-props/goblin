@@ -1,16 +1,5 @@
-// Branch action confirmation dialog state. Lifted out of component
-// local state so that a confirmation requested from a temporary
-// surface (e.g. the zen-mode HoverCard popover) survives the
-// surface unmounting. Previously `useRetainedDialogState` was used
-// inside `useBranchActions` and the dialog state was destroyed as
-// soon as the row that hosted it was unmounted — see the zen-mode
-// "Delete worktree does nothing" bug.
-//
-// Follows docs/arch.md "Keep overlays centralized" — branch action
-// dialogs are now owned by a single store instead of one state slot
-// per BranchActionsMenu instance.
-//
-// Invariants enforced by the store:
+// Centralized state lets confirmation dialogs survive temporary trigger
+// surfaces unmounting. Invariants enforced by the store:
 //   * At most one dialog is open at a time across the whole app.
 //     `openXxx` actions null the other four slots atomically.
 //   * Dialog state is keyed by (repoId, branchName) so two rows in
@@ -86,8 +75,7 @@ interface BranchActionDialogsActions {
    * Open the "Remove worktree" confirm. On the first open for a given
    * (repoId, branchName) the checkbox state is initialized from branch
    * context (`isProtectedBranch`); subsequent opens preserve the user's
-   * previous choice — matching the prior per-component
-   * `useRetainedDialogState` + `useState` semantics.
+   * previous choice.
    *
    * Closes any other dialog slot, enforcing the "one dialog open at a
    * time" invariant.
@@ -100,9 +88,7 @@ interface BranchActionDialogsActions {
    * Promote the in-flight "Remove worktree" attempt to a force-delete
    * confirm. Closes the regular confirm so the force confirm is the
    * single visible dialog. Preserves the user's existing checkbox
-   * choices (including `deleteAlsoUpstream` set in the regular
-   * confirm) — only the previous code reset `deleteAlsoUpstream: false`
-   * here, which was a regression from pre-PR behaviour.
+   * choices, including `deleteAlsoUpstream` set in the regular confirm.
    */
   openForceRemoveWorktreeConfirm: (entry: BranchActionDialogEntry<RemoveWorktreeDialogPayload>) => void
   closeDialog: (key: BranchActionDialogKey) => void
@@ -175,11 +161,7 @@ export const branchActionDialogsStore = createStore<BranchActionDialogsStore>()(
     set((state) => ({
       ...closeOtherSlots('deleteConfirm'),
       deleteConfirm: entry,
-      // Reset the upstream-delete checkbox on each new entry-point
-      // open. Pre-PR behaviour: `setDeleteAlsoUpstream(false)` at the
-      // request layer in useBranchActions. Force-promote paths
-      // deliberately do NOT reset this — see the comment on
-      // openForceDeleteConfirm below.
+      // A new delete request resets this choice; force promotion preserves it.
       checkboxStateByBranch: updateCheckbox(state, entry.repoId, entry.branchName, {
         deleteAlsoUpstream: false,
       }).checkboxStateByBranch,
@@ -189,12 +171,7 @@ export const branchActionDialogsStore = createStore<BranchActionDialogsStore>()(
     set({
       ...closeOtherSlots('forceDeleteConfirm'),
       forceDeleteConfirm: entry,
-      // Preserve all of the user's existing checkbox choices from
-      // the regular `deleteConfirm` — including `deleteAlsoUpstream`.
-      // The pre-PR code (useRetainedDialogState + useState) had the
-      // same semantics: checkbox state was shared across the regular
-      // and force confirm dialogs, with only `requestDeleteBranch`
-      // resetting it on entry.
+      // Force promotion preserves choices from the regular confirmation.
     }),
 
   openRemoveWorktreeConfirm: (entry, options) =>
@@ -202,10 +179,8 @@ export const branchActionDialogsStore = createStore<BranchActionDialogsStore>()(
       const key = branchCheckboxKey(entry.repoId, entry.branchName)
       const existing = state.checkboxStateByBranch[key]
       const isProtectedBranch = options?.isProtectedBranch ?? false
-      // First-open for this branch: seed removeAlsoDeletes from
-      // branch protection so protected branches always start with
-      // the checkbox locked off, matching the previous useState-init
-      // logic. Subsequent opens keep the user's last choice.
+      // Seed protected branches with deletion disabled; later opens keep the
+      // user's last choice.
       const nextCheckboxes: BranchCheckboxState = existing ?? {
         removeAlsoDeletes: !isProtectedBranch,
         removeAlsoUpstream: false,
@@ -225,10 +200,7 @@ export const branchActionDialogsStore = createStore<BranchActionDialogsStore>()(
     set({
       ...closeOtherSlots('forceRemoveConfirm'),
       forceRemoveConfirm: entry,
-      // No checkbox state reset: removeAlsoDeletes / removeAlsoUpstream
-      // are shared with the regular `removeConfirm` (single useState in
-      // pre-PR code), and `deleteAlsoUpstream` was deliberately not
-      // reset by pre-PR's `forceRemoveConfirm.openWith(target)` either.
+      // Force promotion shares all choices with the regular confirmation.
     }),
 
   closeDialog: (key) =>
@@ -271,10 +243,6 @@ export const branchActionDialogsStore = createStore<BranchActionDialogsStore>()(
 }))
 
 export function resetBranchActionDialogsStore(): void {
-  // Replace the state with INITIAL_STATE while preserving the action
-  // function references (which are set once at store creation).
-  // The previous implementation spread `...INITIAL_STATE` first and
-  // `...current` last, which meant every key in INITIAL_STATE was
-  // shadowed by `current`'s value — a no-op.
+  // setState merges the initial fields while preserving action functions.
   branchActionDialogsStore.setState(() => ({ ...INITIAL_STATE }))
 }

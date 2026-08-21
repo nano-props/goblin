@@ -5,15 +5,7 @@ export interface TerminalLifecycleState {
   message: string | null
 }
 
-/**
- * All `markTerminalSession*` helpers return `true` when the state
- * actually changed (so the caller can broadcast a lifecycle realtime
- * event) and `false` when the new value is identical to the current
- * one (so the caller can skip the broadcast). Centralising the
- * "did it change" check here keeps the session manager's emitLifecycle
- * call sites honest: identity events are never piggybacked on a
- * lifecycle setter that didn't actually change.
- */
+/** Returns whether the lifecycle value changed and needs publication. */
 function setTerminalSessionPhase(
   state: TerminalLifecycleState,
   phase: TerminalSessionPhase,
