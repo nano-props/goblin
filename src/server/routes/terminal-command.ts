@@ -12,13 +12,12 @@ const VIEW_TAB_BY_COMMAND = {
   log: 'history',
 } as const satisfies Record<string, WorkspacePaneStaticTabType>
 
-export function createTerminalCommandRoutes(host: ServerTerminalCommandHost | undefined) {
+export function createTerminalCommandRoutes(host: ServerTerminalCommandHost) {
   const app = createRouteApp()
 
   app.post('/', async (c) => {
     const request = await parseHttpBody(GOBLIN_SERVER_COMMAND_REQUEST_SCHEMA, c)
     if (request.command === 'term') {
-      if (!host) return errorJson(c, 'TERMINAL_UNAVAILABLE', 'terminal service is unavailable', 503)
       const { terminalSessionId, args } = request.payload
       const result = await host.execute(requiredUserId(c), terminalSessionId, args, c.req.raw.signal)
       return result.ok ? c.json(result.value) : errorJson(c, 'TERMINAL_UNAVAILABLE', result.message, 409)

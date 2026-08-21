@@ -70,7 +70,6 @@ export interface WorkspacePaneTargetProjectionProvider {
     userId: string,
     workspaceId: WorkspaceId,
     scope: string,
-    signal?: AbortSignal,
   ): Promise<readonly WorkspacePaneTargetProjection[]>
 }
 
@@ -374,22 +373,14 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     workspaceId: WorkspaceId
     scope: string
     epochCapability: WorkspaceRuntimeEpochCapability
-    signal?: AbortSignal
   }): Promise<WorkspacePaneTabsSnapshot> {
-    input.signal?.throwIfAborted()
     assertWorkspaceRuntimeEpochCapability(
       input.epochCapability,
       aggregateScope(input.userId, input.workspaceId, input.scope),
     )
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-      const validTargets = await this.targetProjection.captureTargets(
-        input.userId,
-        input.workspaceId,
-        input.scope,
-        input.signal,
-      )
-      input.signal?.throwIfAborted()
+      const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
       return await layout.snapshot({
         scope: aggregateScope(input.userId, input.workspaceId, input.scope),
         validTargets,

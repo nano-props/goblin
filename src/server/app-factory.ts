@@ -44,7 +44,7 @@ export interface ServerAppOptions {
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
-  terminalCommandHost?: ServerTerminalCommandHost
+  terminalCommandHost: ServerTerminalCommandHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to

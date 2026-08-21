@@ -9,7 +9,7 @@ interface WorkspacePaneTargetCatalogDependencies {
   hasGitCapability(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
   readMembership(
     workspaceId: WorkspaceId,
-    options: { workspaceRuntimeId: string; signal?: AbortSignal },
+    options: { workspaceRuntimeId: string },
   ): Promise<WorkspacePaneTargetMembership>
 }
 
@@ -29,7 +29,6 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
     userId: string,
     workspaceId: WorkspaceId,
     scope: string,
-    signal?: AbortSignal,
   ): Promise<readonly WorkspacePaneTargetProjection[]> {
     const workspaceRuntimeId = runtimeIdFromScope(scope)
     const workspace = parseCanonicalWorkspaceLocator(workspaceId)
@@ -39,7 +38,7 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
       nativeWorktreePath: workspace.path,
     }
     if (!this.dependencies.hasGitCapability(userId, workspaceId, workspaceRuntimeId)) return [workspaceTarget]
-    const membership = await this.dependencies.readMembership(workspaceId, { workspaceRuntimeId, signal })
+    const membership = await this.dependencies.readMembership(workspaceId, { workspaceRuntimeId })
     return [
       workspaceTarget,
       ...membership.linkedWorktrees.map((identity): WorkspacePaneTargetProjection => ({

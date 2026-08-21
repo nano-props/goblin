@@ -6,7 +6,6 @@ import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 import { GOBLIN_SERVER_COMMAND_RESULT_SCHEMA } from '#/shared/g-command.ts'
-import { CodedError } from '#/shared/coded-error.ts'
 import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/realtime/client-intent-broker.ts'
 
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
@@ -38,7 +37,7 @@ const workspacePaneTabsHost = {
   updateTabs: vi.fn(),
 } satisfies ServerWorkspacePaneTabsHost
 
-function createTestApp(host?: ServerTerminalCommandHost) {
+function createTestApp(host: ServerTerminalCommandHost = terminalCommandHost()) {
   return createApp({
     version: '0.1.0',
     startedAt: 0,
@@ -124,40 +123,6 @@ describe('terminal command routes', () => {
 
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ ok: false, message: "'info' does not take arguments" })
-  })
-
-  test('rejects invalid terminal arguments as a bad request', async () => {
-    const host: ServerTerminalCommandHost = {
-      async execute() {
-        throw new CodedError({
-          code: 'BAD_REQUEST',
-          message: "expected 'g term', 'g term list', or 'g term prune'",
-        })
-      },
-    }
-    const response = await createTestApp(host).request('/api/terminal-command', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goblin-access-token': 'secret' },
-      body: JSON.stringify({
-        command: 'term',
-        payload: { terminalSessionId: TERMINAL_SESSION_ID, args: ['unknown'] },
-      }),
-    })
-
-    expect(response.status).toBe(400)
-  })
-
-  test('reports an unavailable terminal host', async () => {
-    const response = await createTestApp().request('/api/terminal-command', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goblin-access-token': 'secret' },
-      body: JSON.stringify({
-        command: 'term',
-        payload: { terminalSessionId: TERMINAL_SESSION_ID, args: ['list'] },
-      }),
-    })
-
-    expect(response.status).toBe(503)
   })
 
   test('reports terminal application failures', async () => {

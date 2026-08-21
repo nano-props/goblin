@@ -9,11 +9,9 @@ import {
 } from '#/shared/terminal-types.ts'
 import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorktreeInfo } from '#/shared/git-types.ts'
+import type { WorkspacePaneTargetMembership, WorkspacePaneWorktreeTargetIdentity } from '#/shared/git-types.ts'
 import { CodedError } from '#/shared/coded-error.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import { orderWorkspaceTerminals } from '#/shared/workspace-terminal-order.ts'
-import { getRepoWorktreeMembership } from '#/server/repos/read-paths.ts'
+import { getWorkspacePaneTargetMembership } from '#/server/repos/read-paths.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { workspaceProbeStateForRuntime } from '#/server/workspaces/runtime/authority.ts'
 import type { ServerTerminalCommandHost, TerminalCommandHostResult } from '#/server/terminal/terminal-command-host.ts'
@@ -30,17 +28,12 @@ interface TerminalCommandManager {
 interface TerminalCommandApplicationDependencies {
   manager: TerminalCommandManager
   workspaceProbe?: typeof workspaceProbeStateForRuntime
-  readWorktrees?: typeof getRepoWorktreeMembership
-  readPaneTabs?: (
-    userId: string,
-    workspaceId: WorkspaceId,
-    workspaceRuntimeId: string,
-    signal?: AbortSignal,
-  ) => Promise<WorkspacePaneTabsSnapshot>
+  readMembership?: typeof getWorkspacePaneTargetMembership
   homeDir?: string
 }
 
-type WorktreeProjection = { kind: 'ready'; worktrees: WorktreeInfo[] } | { kind: 'filesystem' } | { kind: 'unknown' }
+type TargetMembershipProjection =
+  { kind: 'ready'; membership: WorkspacePaneTargetMembership } | { kind: 'filesystem' } | { kind: 'unknown' }
 
 interface TerminalCommandSession {
   terminalSessionId: string
@@ -58,13 +51,12 @@ export function createTerminalCommandApplication(
   dependencies: TerminalCommandApplicationDependencies,
 ): ServerTerminalCommandHost {
   const probeWorkspace = dependencies.workspaceProbe ?? workspaceProbeStateForRuntime
-  const readWorktrees = dependencies.readWorktrees ?? getRepoWorktreeMembership
+  const readMembership = dependencies.readMembership ?? getWorkspacePaneTargetMembership
   const homeDir = dependencies.homeDir ?? homedir()
 
   async function inspect(
     userId: string,
     terminalSessionId: string,
-    orderLikeDashboard: boolean,
     signal?: AbortSignal,
   ): Promise<TerminalCommandHostResult<{ sessions: TerminalCommandSession[] }>> {
     signal?.throwIfAborted()
@@ -72,46 +64,33 @@ export function createTerminalCommandApplication(
     if (!current) return { ok: false, message: 'current Goblin terminal is no longer available' }
     const coordinates = terminalSessionCoordinates(current)
     const scope = terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId)
-    const [sessions, worktrees, paneTabs] = await Promise.all([
+    const [sessions, membership] = await Promise.all([
       dependencies.manager.listSessionsForUser(userId, scope),
-      readWorktreeProjection(userId, coordinates.workspaceId, coordinates.workspaceRuntimeId, signal),
-      orderLikeDashboard && dependencies.readPaneTabs
-        ? dependencies.readPaneTabs(userId, coordinates.workspaceId, coordinates.workspaceRuntimeId, signal)
-        : undefined,
+      readTargetMembershipProjection(userId, coordinates.workspaceId, coordinates.workspaceRuntimeId, signal),
     ])
-    const orderedSessions = orderLikeDashboard
-      ? orderWorkspaceTerminals({
-          workspaceId: coordinates.workspaceId,
-          sessions,
-          worktrees: worktrees.kind === 'ready' ? worktrees.worktrees : [],
-          paneTabs,
-          terminalSessionId: (session) => session.terminalSessionId,
-          target: (session) => session.target,
-        })
-      : sessions
     return {
       ok: true,
       value: {
-        sessions: orderedSessions.map((session) =>
-          projectSession(session, session.terminalSessionId === terminalSessionId, worktrees, homeDir),
+        sessions: sessions.map((session) =>
+          projectSession(session, session.terminalSessionId === terminalSessionId, membership, homeDir),
         ),
       },
     }
   }
 
-  async function readWorktreeProjection(
+  async function readTargetMembershipProjection(
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
     signal?: AbortSignal,
-  ): Promise<WorktreeProjection> {
+  ): Promise<TargetMembershipProjection> {
     const probe = probeWorkspace(userId, workspaceId, workspaceRuntimeId)
     if (workspaceGitUnavailable(probe)) return { kind: 'filesystem' }
     if (!workspaceGitAvailable(probe)) return { kind: 'unknown' }
     try {
       return {
         kind: 'ready',
-        worktrees: await readWorktrees(workspaceId, { workspaceRuntimeId, signal }),
+        membership: await readMembership(workspaceId, { workspaceRuntimeId, signal }),
       }
     } catch {
       signal?.throwIfAborted()
@@ -128,7 +107,7 @@ export function createTerminalCommandApplication(
           message: "expected 'g term', 'g term list', or 'g term prune'",
         })
       }
-      const inspected = await inspect(userId, terminalSessionId, action === 'list', signal)
+      const inspected = await inspect(userId, terminalSessionId, signal)
       if (!inspected.ok) return inspected
       if (action === 'current') {
         const session = inspected.value.sessions.find((candidate) => candidate.current)
@@ -143,6 +122,7 @@ export function createTerminalCommandApplication(
       const orphaned = inspected.value.sessions.filter((session) => session.availability === 'orphaned')
       const closed: TerminalCommandSession[] = []
       const failed: TerminalCommandSession[] = []
+      signal?.throwIfAborted()
       // The caller is intentionally not exempt: `prune` means every orphan terminal.
       // If the current terminal is orphaned, closing its PTY can prevent this command's
       // response from being printed. That rare out-of-band case is accepted instead of
@@ -176,20 +156,26 @@ function commandOutput(output: string): TerminalCommandHostResult<GoblinServerCo
 function projectSession(
   session: TerminalSessionSummary,
   current: boolean,
-  projection: WorktreeProjection,
+  projection: TargetMembershipProjection,
   homeDir: string,
 ): TerminalCommandSession {
   const executionPath = terminalExecutionPath(session.target)
   const worktree =
-    projection.kind === 'ready' ? projection.worktrees.find((candidate) => candidate.path === executionPath) : undefined
+    projection.kind !== 'ready'
+      ? undefined
+      : session.target.kind === 'workspace-root'
+        ? projection.membership.source.kind === 'worktree'
+          ? projection.membership.source.identity
+          : undefined
+        : projection.membership.linkedWorktrees.find((candidate) => candidate.worktreePath === executionPath)
   const availability =
-    session.target.kind === 'workspace-root'
-      ? projection.kind === 'unknown'
-        ? 'unknown'
-        : 'available'
-      : projection.kind === 'unknown'
-        ? 'unknown'
-        : worktree && usableWorktree(worktree)
+    projection.kind === 'unknown'
+      ? 'unknown'
+      : projection.kind === 'filesystem'
+        ? session.target.kind === 'workspace-root'
+          ? 'available'
+          : 'orphaned'
+        : worktree
           ? 'available'
           : 'orphaned'
   const workspace = parseCanonicalWorkspaceLocator(terminalSessionCoordinates(session).workspaceId)
@@ -208,16 +194,16 @@ function projectSession(
 }
 
 function targetLabel(
-  projection: WorktreeProjection,
-  worktree: WorktreeInfo | undefined,
+  projection: TargetMembershipProjection,
+  worktree: WorkspacePaneWorktreeTargetIdentity | undefined,
   executionPath: string,
 ): string {
   if (projection.kind === 'filesystem') return 'workspace root'
-  return worktree?.branch ?? worktree?.headOid?.slice(0, 7) ?? (path.basename(executionPath) || executionPath)
-}
-
-function usableWorktree(worktree: WorktreeInfo): boolean {
-  return !worktree.isBare && worktree.isPrunable !== true && worktree.headOid !== undefined
+  return worktree?.head.kind === 'branch'
+    ? worktree.head.branchName
+    : worktree
+      ? 'detached'
+      : path.basename(executionPath) || executionPath
 }
 
 function formatCurrent(session: TerminalCommandSession): string {

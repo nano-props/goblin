@@ -86,7 +86,6 @@ import {
 import {
   createRemoteWorktree,
   getRemoteRepoWorktreePaths,
-  readRemoteWorktreeMembership,
   resolveRemoteWorktreePath,
   removeRemoteWorktree,
 } from '#/system/ssh/git/worktrees.ts'
@@ -135,7 +134,6 @@ export interface RepoSource {
   kind: 'local' | 'remote'
   getSnapshot(options?: RepoMembershipReadOptions): Promise<RepoSnapshot | null>
   getWorkspacePaneTargetMembership(options?: RepoMembershipReadOptions): Promise<WorkspacePaneTargetMembership>
-  getWorktreeMembership(options?: RepoMembershipReadOptions): Promise<WorktreeInfo[]>
   getStatus(options?: RepoMembershipReadOptions): Promise<WorktreeStatus[]>
   getPullRequests(scope: RepoPullRequestScope, options?: { signal?: AbortSignal }): Promise<PullRequestEntry[] | null>
   getLog(target: RepoLogTarget, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
@@ -595,9 +593,6 @@ function createLocalRepoSource(
       const identities = await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
       return workspacePaneTargetMembership(sourceWorktree, identities)
     },
-    async getWorktreeMembership(options) {
-      return await readWorktreeMembership(repoId, options?.signal)
-    },
     async getStatus(options) {
       if (!isValidCwd(repoId)) throw new Error('error.invalid-path')
       const available = await probeGitRepo(repoId)
@@ -839,12 +834,6 @@ async function createRemoteRepoSource(
     },
     async getWorkspacePaneTargetMembership(options) {
       return await getRemoteWorkspacePaneTargetMembership(target, { ...options, run })
-    },
-    async getWorktreeMembership(options) {
-      return await readRemoteWorktreeMembership(target, {
-        ...options,
-        run: run ?? ((command, remoteTarget, runOptions) => runRemoteCommand(remoteTarget, command, runOptions)),
-      })
     },
     async getStatus(options) {
       return await getRemoteStatus(target, { ...options, run })

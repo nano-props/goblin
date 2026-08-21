@@ -13,10 +13,7 @@ export interface GoblinCommandIo {
   stderr(message: string): void
 }
 
-// Minimal HTTP transport. Server-backed commands use the single
-// `/api/terminal-command` entry point. Kept narrow so a future capability (e.g. a
-// read endpoint, command-line websocket, file fallback) can extend
-// the interface without re-shaping every existing command.
+// Minimal HTTP transport for the single server-backed command entry point.
 export interface GoblinCommandTransport {
   postJson<T>(pathname: string, body: unknown, decode: (value: unknown) => T): Promise<T>
 }

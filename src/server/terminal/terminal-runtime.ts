@@ -54,7 +54,6 @@ import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import {
-  captureWorkspaceRuntimeEpochCapability,
   captureWorkspaceRuntimeMembershipCapability,
   isCurrentWorkspaceRuntime,
   onWorkspaceRuntimeClosed,
@@ -264,18 +263,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     broadcastWorkspaceTabsChanged: publishWorkspaceTabsChanged,
   })
-  const terminalCommandHost = createTerminalCommandApplication({
-    manager,
-    async readPaneTabs(userId, workspaceId, workspaceRuntimeId, signal) {
-      return await workspaceTabsCoordinator.snapshot({
-        userId,
-        workspaceId,
-        scope: terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId),
-        epochCapability: captureWorkspaceRuntimeEpochCapability(userId, workspaceId, workspaceRuntimeId),
-        signal,
-      })
-    },
-  })
+  const terminalCommandHost = createTerminalCommandApplication({ manager })
   const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
     async openRuntime(clientId, userId, input) {
       return await workspacePaneRuntimeApplication.open(clientId, userId, input)

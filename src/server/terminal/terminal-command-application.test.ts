@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { CodedError } from '#/shared/coded-error.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTargetMembership, WorkspacePaneWorktreeTargetIdentity } from '#/shared/git-types.ts'
 import { createTerminalCommandApplication } from '#/server/terminal/terminal-command-application.ts'
 
 const USER_ID = 'user_test'
@@ -61,6 +61,42 @@ function filesystemProbe() {
   }
 }
 
+function managerFor(sessions: TerminalSessionSummary[], current: TerminalSessionSummary | null = sessions[0]!) {
+  return {
+    getSessionSummaryForDurableId: vi.fn(() => current),
+    listSessionsForUser: vi.fn(async () => sessions),
+    closeSessionForUserOutcome: vi.fn(async (): Promise<{ kind: 'closed' | 'already-closed' | 'failed' }> => ({
+      kind: 'closed',
+    })),
+  }
+}
+
+function worktreeIdentity(worktreePath: string, branchName: string): WorkspacePaneWorktreeTargetIdentity {
+  return {
+    kind: 'git-worktree',
+    worktreePath,
+    head: { kind: 'branch', branchName },
+    materializedBranch: branchName,
+  }
+}
+
+function gitMembership(
+  sourcePath = '/repo',
+  linkedWorktrees: WorkspacePaneWorktreeTargetIdentity[] = [],
+): WorkspacePaneTargetMembership {
+  return {
+    source: { kind: 'worktree', identity: worktreeIdentity(sourcePath, 'main') },
+    linkedWorktrees,
+    branches: [],
+  }
+}
+
+function outputLine(output: string, terminalSessionId: string): string {
+  const line = output.split('\n').find((candidate) => candidate.includes(terminalSessionId))
+  if (!line) throw new Error(`missing terminal row: ${terminalSessionId}`)
+  return line
+}
+
 describe('terminal command application', () => {
   test('lists the current workspace terminals and identifies a prunable worktree as orphaned', async () => {
     const sessions = [
@@ -68,37 +104,23 @@ describe('terminal command application', () => {
       session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/orphan'),
       session(VALID_ID, 'terminal-runtime-valid', '/repo/valid'),
     ]
-    const manager = {
-      getSessionSummaryForDurableId: vi.fn(() => sessions[0]!),
-      listSessionsForUser: vi.fn(async () => sessions),
-      closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-    }
+    const manager = managerFor(sessions)
     const application = createTerminalCommandApplication({
       manager,
       workspaceProbe: vi.fn(() => gitProbe()),
-      readWorktrees: vi.fn(async () => [
-        { path: '/repo', headOid: '1'.repeat(40), branch: 'main', isBare: false, isPrimary: true },
-        {
-          path: '/repo/orphan',
-          headOid: '2'.repeat(40),
-          branch: 'orphan',
-          isBare: false,
-          isPrimary: false,
-          isPrunable: true,
-        },
-        { path: '/repo/valid', headOid: '3'.repeat(40), branch: 'valid', isBare: false, isPrimary: false },
-      ]),
+      readMembership: vi.fn(async () => gitMembership('/repo', [worktreeIdentity('/repo/valid', 'valid')])),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, ['list'])
 
     expect(result).toMatchObject({ ok: true })
     if (!result.ok) throw new Error('expected terminal list')
-    expect(result.value.output).toContain(CURRENT_ID)
-    expect(result.value.output).toContain(ORPHAN_ID)
-    expect(result.value.output).toContain('orphaned')
-    expect(result.value.output).toContain('valid')
-    expect(result.value.output).toContain('main')
+    expect(outputLine(result.value.output, CURRENT_ID)).toContain('available')
+    expect(outputLine(result.value.output, CURRENT_ID)).toContain('main')
+    expect(outputLine(result.value.output, ORPHAN_ID)).toContain('orphaned')
+    expect(outputLine(result.value.output, ORPHAN_ID)).toContain('orphan')
+    expect(outputLine(result.value.output, VALID_ID)).toContain('available')
+    expect(outputLine(result.value.output, VALID_ID)).toContain('valid')
   })
 
   test('prunes only definitively orphaned worktree terminals', async () => {
@@ -107,18 +129,11 @@ describe('terminal command application', () => {
       session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/missing'),
       session(VALID_ID, 'terminal-runtime-valid', '/repo/valid'),
     ]
-    const manager = {
-      getSessionSummaryForDurableId: vi.fn(() => sessions[0]!),
-      listSessionsForUser: vi.fn(async () => sessions),
-      closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-    }
+    const manager = managerFor(sessions)
     const application = createTerminalCommandApplication({
       manager,
       workspaceProbe: vi.fn(() => gitProbe()),
-      readWorktrees: vi.fn(async () => [
-        { path: '/repo', headOid: '1'.repeat(40), branch: 'main', isBare: false, isPrimary: true },
-        { path: '/repo/valid', headOid: '3'.repeat(40), branch: 'valid', isBare: false, isPrimary: false },
-      ]),
+      readMembership: vi.fn(async () => gitMembership('/repo', [worktreeIdentity('/repo/valid', 'valid')])),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, ['prune'])
@@ -133,15 +148,11 @@ describe('terminal command application', () => {
       session(CURRENT_ID, 'terminal-runtime-current'),
       session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/missing'),
     ]
-    const manager = {
-      getSessionSummaryForDurableId: vi.fn(() => sessions[0]!),
-      listSessionsForUser: vi.fn(async () => sessions),
-      closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-    }
+    const manager = managerFor(sessions)
     const application = createTerminalCommandApplication({
       manager,
       workspaceProbe: vi.fn(() => gitProbe()),
-      readWorktrees: vi.fn(async () => await Promise.reject(new Error('git unavailable'))),
+      readMembership: vi.fn(async () => await Promise.reject(new Error('git unavailable'))),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, ['prune'])
@@ -157,24 +168,12 @@ describe('terminal command application', () => {
       target: { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: RUNTIME_ID },
       canonicalTitle: 'shell\u001b[31m title',
     } as TerminalSessionSummary
-    const manager = {
-      getSessionSummaryForDurableId: vi.fn(() => current),
-      listSessionsForUser: vi.fn(async () => [current]),
-      closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-    }
+    const manager = managerFor([current])
     const application = createTerminalCommandApplication({
       manager,
       homeDir: '/Users/example',
       workspaceProbe: vi.fn(() => gitProbe()),
-      readWorktrees: vi.fn(async () => [
-        {
-          path: '/Users/example/Developer/repo',
-          headOid: '1'.repeat(40),
-          branch: 'main',
-          isBare: false,
-          isPrimary: true,
-        },
-      ]),
+      readMembership: vi.fn(async () => gitMembership('/Users/example/Developer/repo')),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, [])
@@ -190,13 +189,24 @@ describe('terminal command application', () => {
     expect(result.value.output).not.toContain('\u001b')
   })
 
+  test('identifies the Git source by membership instead of the workspace path spelling', async () => {
+    const current = session(CURRENT_ID, 'terminal-runtime-current')
+    const application = createTerminalCommandApplication({
+      manager: managerFor([current]),
+      workspaceProbe: vi.fn(() => gitProbe()),
+      readMembership: vi.fn(async () => gitMembership('/real/repo')),
+    })
+
+    const result = await application.execute(USER_ID, CURRENT_ID, [])
+
+    if (!result.ok) throw new Error('expected terminal details')
+    expect(result.value.output).toContain('Target:       main')
+    expect(result.value.output).toContain('Availability: available')
+  })
+
   test('keeps workspace root as the target for a non-Git directory', async () => {
     const current = session(CURRENT_ID, 'terminal-runtime-current')
-    const manager = {
-      getSessionSummaryForDurableId: vi.fn(() => current),
-      listSessionsForUser: vi.fn(async () => [current]),
-      closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-    }
+    const manager = managerFor([current])
     const application = createTerminalCommandApplication({
       manager,
       workspaceProbe: vi.fn(() => filesystemProbe()),
@@ -213,64 +223,16 @@ describe('terminal command application', () => {
   test('passes request cancellation to the authoritative worktree read', async () => {
     const current = session(CURRENT_ID, 'terminal-runtime-current')
     const signal = new AbortController().signal
-    const readWorktrees = vi.fn(async () => [
-      { path: '/repo', headOid: '1'.repeat(40), branch: 'main', isBare: false, isPrimary: true },
-    ])
+    const readMembership = vi.fn(async () => gitMembership())
     const application = createTerminalCommandApplication({
-      manager: {
-        getSessionSummaryForDurableId: vi.fn(() => current),
-        listSessionsForUser: vi.fn(async () => [current]),
-        closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-      },
+      manager: managerFor([current]),
       workspaceProbe: vi.fn(() => gitProbe()),
-      readWorktrees,
+      readMembership,
     })
 
     await application.execute(USER_ID, CURRENT_ID, ['list'], signal)
 
-    expect(readWorktrees).toHaveBeenCalledWith(WORKSPACE_ID, { workspaceRuntimeId: RUNTIME_ID, signal })
-  })
-
-  test('orders the shell list with the same worktree and pane-tab authority as the dashboard', async () => {
-    const sessions = [
-      session(VALID_ID, 'terminal-runtime-valid', '/repo/valid'),
-      session(ORPHAN_ID, 'terminal-runtime-other', '/repo/other'),
-      session(CURRENT_ID, 'terminal-runtime-current', '/repo/valid'),
-    ]
-    const application = createTerminalCommandApplication({
-      manager: {
-        getSessionSummaryForDurableId: vi.fn(() => sessions[2]!),
-        listSessionsForUser: vi.fn(async () => sessions),
-        closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-      },
-      workspaceProbe: vi.fn(() => gitProbe()),
-      readWorktrees: vi.fn(async () => [
-        { path: '/repo', headOid: '1'.repeat(40), branch: 'main', isBare: false, isPrimary: true },
-        { path: '/repo/valid', headOid: '2'.repeat(40), branch: 'valid', isBare: false, isPrimary: false },
-        { path: '/repo/other', headOid: '3'.repeat(40), branch: 'other', isBare: false, isPrimary: false },
-      ]),
-      readPaneTabs: vi.fn(
-        async () =>
-          ({
-            revision: 3,
-            entries: [
-              {
-                target: sessions[0]!.target,
-                tabs: [
-                  { type: 'terminal', runtimeSessionId: CURRENT_ID },
-                  { type: 'terminal', runtimeSessionId: VALID_ID },
-                ],
-              },
-            ],
-          }) satisfies WorkspacePaneTabsSnapshot,
-      ),
-    })
-
-    const result = await application.execute(USER_ID, CURRENT_ID, ['list'])
-
-    if (!result.ok) throw new Error('expected terminal list')
-    expect(result.value.output.indexOf(CURRENT_ID)).toBeLessThan(result.value.output.indexOf(VALID_ID))
-    expect(result.value.output.indexOf(VALID_ID)).toBeLessThan(result.value.output.indexOf(ORPHAN_ID))
+    expect(readMembership).toHaveBeenCalledWith(WORKSPACE_ID, { workspaceRuntimeId: RUNTIME_ID, signal })
   })
 
   test('does not shorten a remote path with the server home directory', async () => {
@@ -280,11 +242,7 @@ describe('terminal command application', () => {
       target: { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: RUNTIME_ID },
     } as TerminalSessionSummary
     const application = createTerminalCommandApplication({
-      manager: {
-        getSessionSummaryForDurableId: vi.fn(() => current),
-        listSessionsForUser: vi.fn(async () => [current]),
-        closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-      },
+      manager: managerFor([current]),
       homeDir: '/srv',
       workspaceProbe: vi.fn(() => filesystemProbe()),
     })
@@ -299,15 +257,80 @@ describe('terminal command application', () => {
   test('fails fast on unsupported terminal arguments', async () => {
     const current = session(CURRENT_ID, 'terminal-runtime-current')
     const application = createTerminalCommandApplication({
-      manager: {
-        getSessionSummaryForDurableId: vi.fn(() => current),
-        listSessionsForUser: vi.fn(async () => [current]),
-        closeSessionForUserOutcome: vi.fn(async () => ({ kind: 'closed' as const })),
-      },
+      manager: managerFor([current]),
     })
 
     await expect(application.execute(USER_ID, CURRENT_ID, ['unknown'])).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     } satisfies Partial<CodedError>)
+  })
+
+  test('reports partial prune completion after attempting every orphan', async () => {
+    const sessions = [
+      session(CURRENT_ID, 'terminal-runtime-current'),
+      session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/missing-a'),
+      session(VALID_ID, 'terminal-runtime-failed', '/repo/missing-b'),
+    ]
+    const manager = managerFor(sessions)
+    manager.closeSessionForUserOutcome
+      .mockResolvedValueOnce({ kind: 'closed' })
+      .mockResolvedValueOnce({ kind: 'failed' })
+    const application = createTerminalCommandApplication({
+      manager,
+      workspaceProbe: vi.fn(() => gitProbe()),
+      readMembership: vi.fn(async () => gitMembership()),
+    })
+
+    const result = await application.execute(USER_ID, CURRENT_ID, ['prune'])
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Pruned 1 orphan terminal. Failed to close 1 orphan terminal.',
+    })
+    expect(manager.closeSessionForUserOutcome).toHaveBeenCalledTimes(2)
+  })
+
+  test('allows prune to close its own orphan terminal', async () => {
+    const current = session(CURRENT_ID, 'terminal-runtime-current', '/repo/missing')
+    const manager = managerFor([current])
+    const application = createTerminalCommandApplication({
+      manager,
+      workspaceProbe: vi.fn(() => gitProbe()),
+      readMembership: vi.fn(async () => gitMembership()),
+    })
+
+    const result = await application.execute(USER_ID, CURRENT_ID, ['prune'])
+
+    expect(result).toEqual({ ok: true, value: { output: 'Pruned 1 orphan terminal.' } })
+    expect(manager.closeSessionForUserOutcome).toHaveBeenCalledWith(USER_ID, 'terminal-runtime-current')
+  })
+
+  test('stops before prune mutation when the request is cancelled after inspection', async () => {
+    const controller = new AbortController()
+    const current = session(CURRENT_ID, 'terminal-runtime-current', '/repo/missing')
+    const manager = managerFor([current])
+    manager.listSessionsForUser.mockImplementation(async () => {
+      controller.abort()
+      return [current]
+    })
+    const application = createTerminalCommandApplication({
+      manager,
+      workspaceProbe: vi.fn(() => gitProbe()),
+      readMembership: vi.fn(async () => gitMembership()),
+    })
+
+    await expect(application.execute(USER_ID, CURRENT_ID, ['prune'], controller.signal)).rejects.toThrow()
+    expect(manager.closeSessionForUserOutcome).not.toHaveBeenCalled()
+  })
+
+  test('reports when the current terminal no longer exists', async () => {
+    const manager = managerFor([], null)
+    const application = createTerminalCommandApplication({ manager })
+
+    await expect(application.execute(USER_ID, CURRENT_ID, ['list'])).resolves.toEqual({
+      ok: false,
+      message: 'current Goblin terminal is no longer available',
+    })
+    expect(manager.listSessionsForUser).not.toHaveBeenCalled()
   })
 })

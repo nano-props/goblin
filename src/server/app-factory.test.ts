@@ -80,6 +80,10 @@ const worktreeRemovalApplicationStub = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
 }
 
+const terminalCommandHostStub = {
+  execute: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
+}
+
 vi.mock('node:fs/promises', () => ({
   access: mocks.access,
   readFile: mocks.readFile,
@@ -123,6 +127,7 @@ describe('server app body limit', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
@@ -150,6 +155,7 @@ describe('server app body limit', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     // A small, well-formed body: validation will run after the body
     // limit middleware, so we expect 400 (BAD_REQUEST) — not 413.
@@ -176,6 +182,7 @@ describe('server app body limit', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const request = (authenticated: boolean) =>
       app.request(
@@ -211,6 +218,7 @@ describe('server app body limit', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const response = await app.request('http://127.0.0.1:32100/api/login', {
       method: 'POST',
@@ -230,6 +238,7 @@ describe('server app body limit', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const response = await app.request('http://127.0.0.1:32100/api/login', {
       method: 'POST',
@@ -277,6 +286,7 @@ describe('server app html static', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
 
     const response = await app.request(new Request('http://127.0.0.1:32100/assets/missing-old-build.js'))
@@ -298,6 +308,7 @@ describe('server app html static', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
 
     const response = await app.request(
@@ -332,6 +343,7 @@ describe('server app html static', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     for (const path of ['/repos/abc123', '/repos/abc123/changes', '/settings', '/settings/general']) {
       const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
@@ -357,6 +369,7 @@ describe('server app html static', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/host'))
     expect(response.status).toBe(200)
@@ -377,6 +390,7 @@ describe('server app html static', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/unknown'))
     expect(response.status).toBe(404)
@@ -405,6 +419,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const request = (accessToken?: string) =>
       app.request(
@@ -434,6 +449,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
@@ -460,6 +476,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     // 5 MiB body — well over the 1 MiB cap; Content-Length is set.
     const response = await app.request(
@@ -485,6 +502,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/settings/prefs', {
@@ -513,6 +531,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const form = new FormData()
     form.append('files', new File([new Uint8Array([1])], 'a.bin'))
@@ -549,6 +568,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
@@ -578,6 +598,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
@@ -603,6 +624,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
+      terminalCommandHost: terminalCommandHostStub,
     })
     // Two-kilobyte body to a hypothetical /api/health endpoint —
     // 1 KiB is plenty for the JSON requests health probes actually
