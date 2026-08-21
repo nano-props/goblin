@@ -163,4 +163,15 @@ describe('terminal notification provider', () => {
       options: { body: 'Test body', silent: true },
     })
   })
+
+  test('treats a synchronous browser permission failure as unavailable', async () => {
+    Object.defineProperty(Notification, 'permission', { configurable: true, value: 'default' })
+    vi.spyOn(Notification, 'requestPermission').mockImplementation(() => {
+      throw new Error('permission API unavailable')
+    })
+
+    await expect(createTerminalNotificationProvider().sendTestNotification(testNotificationInput)).resolves.toBe(false)
+
+    expect(wsMock.notificationInstances).toHaveLength(0)
+  })
 })

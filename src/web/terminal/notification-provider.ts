@@ -43,9 +43,7 @@ async function showBrowserNotification(title: string, body: string, onClick?: ()
   if (typeof Notification === 'undefined') return false
   if (Notification.permission === 'denied') return false
   const permission =
-    Notification.permission === 'granted'
-      ? Notification.permission
-      : await Notification.requestPermission().catch(() => null)
+    Notification.permission === 'granted' ? Notification.permission : await requestNotificationPermission()
   if (permission !== 'granted') return false
   try {
     const notification = new Notification(title, { body, silent: true })
@@ -59,5 +57,13 @@ async function showBrowserNotification(title: string, body: string, onClick?: ()
     return true
   } catch {
     return false
+  }
+}
+
+async function requestNotificationPermission(): Promise<NotificationPermission | null> {
+  try {
+    return await Notification.requestPermission()
+  } catch {
+    return null
   }
 }

@@ -434,12 +434,14 @@ export class TerminalSession {
 
   private async commitResize(proposal: PendingResize): Promise<void> {
     const { terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows } = proposal
-    const outcome = await terminalClient
-      .resize({ terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows })
-      .then(
-        (result) => ({ result, error: null }),
-        (error: unknown) => ({ result: { ok: false, message: 'error.unavailable' } as const, error }),
-      )
+    const outcome = await (async () => {
+      try {
+        const result = await terminalClient.resize({ terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows })
+        return { result, error: null }
+      } catch (error) {
+        return { result: { ok: false, message: 'error.unavailable' } as const, error }
+      }
+    })()
     this.finishResizeCommit(proposal, outcome.result, outcome.error)
   }
 

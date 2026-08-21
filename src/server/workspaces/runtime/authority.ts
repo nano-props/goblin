@@ -895,9 +895,10 @@ async function settleRemoteWorkspaceLifecycleAttempt(
   terminalCommitPlan: (result: RemoteWorkspaceConnectionResult) => RemoteWorkspaceTerminalCommitPlan,
   previousLifecycle: RemoteWorkspaceRuntimeLifecycle,
 ): Promise<RemoteWorkspaceLifecycleRunResult> {
-  const resolution = await resolve(controller.signal).then(
-    (result) => ({ kind: 'resolved', result }) as const,
-    () => {
+  const resolution = await (async () => {
+    try {
+      return { kind: 'resolved', result: await resolve(controller.signal) } as const
+    } catch {
       if (
         state.currentWorkspaceRuntimeId !== workspaceRuntimeId ||
         state.remoteAttemptController !== controller ||
@@ -915,8 +916,8 @@ async function settleRemoteWorkspaceLifecycleAttempt(
           lifecycle: { kind: 'failed', reason: 'unknown' },
         } satisfies RemoteWorkspaceConnectionResult,
       } as const
-    },
-  )
+    }
+  })()
   if (resolution.kind === 'superseded') return resolution.result
   const { result } = resolution
 

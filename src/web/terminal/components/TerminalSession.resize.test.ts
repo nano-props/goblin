@@ -27,6 +27,7 @@ describe('TerminalSession resize', () => {
   test.each([
     'server rejection',
     'transport failure',
+    'synchronous transport failure',
     'session mismatch',
     'generation mismatch',
     'canonical size mismatch',
@@ -35,6 +36,10 @@ describe('TerminalSession resize', () => {
       terminalCalls.resize.mockResolvedValueOnce({ ok: false, message: 'error.unavailable' })
     } else if (failure === 'transport failure') {
       terminalCalls.resize.mockRejectedValueOnce(new Error('resize failed'))
+    } else if (failure === 'synchronous transport failure') {
+      terminalCalls.resize.mockImplementationOnce(() => {
+        throw new Error('resize bridge unavailable')
+      })
     } else {
       terminalCalls.resize.mockResolvedValueOnce({
         ok: true,

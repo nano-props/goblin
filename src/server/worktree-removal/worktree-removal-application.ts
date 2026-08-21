@@ -66,20 +66,22 @@ export class WorktreeRemovalApplication {
   ): Promise<RepoMutationResult> {
     if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.workspace-runtime-stale' }
     const worktreePath = terminalSessionExecutionPath(input.repoRoot, input.worktreePath)
-    const capture = await this.deps.physicalWorktrees
-      .capture({
-        userId,
-        workspaceId: input.repoRoot,
-        workspaceRuntimeId: input.workspaceRuntimeId,
-        worktreePath,
-      })
-      .then(
-        (capability) => ({ kind: 'captured', capability }) as const,
-        (error: unknown) => {
-          if (isRemoteWorkspaceRuntimeFailure(error)) throw error
-          return { kind: 'failed', message: error instanceof Error ? error.message : String(error) } as const
-        },
-      )
+    const capture = await (async () => {
+      try {
+        return {
+          kind: 'captured',
+          capability: await this.deps.physicalWorktrees.capture({
+            userId,
+            workspaceId: input.repoRoot,
+            workspaceRuntimeId: input.workspaceRuntimeId,
+            worktreePath,
+          }),
+        } as const
+      } catch (error) {
+        if (isRemoteWorkspaceRuntimeFailure(error)) throw error
+        return { kind: 'failed', message: error instanceof Error ? error.message : String(error) } as const
+      }
+    })()
     if (capture.kind === 'failed') return { ok: false, message: capture.message }
     const physicalCapability = capture.capability
     try {
