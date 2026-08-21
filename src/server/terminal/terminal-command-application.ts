@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
+import stringWidth from 'string-width'
 import type { GoblinServerCommandResult } from '#/shared/g-command.ts'
 import { tildifyPath } from '#/shared/paths.ts'
 import {
@@ -231,7 +232,20 @@ function formatList(sessions: readonly TerminalCommandSession[]): string {
     terminalSafeLine(session.path),
   ])
   const headings = ['CURRENT', 'ID', 'TITLE', 'PHASE', 'AVAILABILITY', 'TARGET', 'PATH']
-  return [headings, ...rows].map((row) => row.join('\t')).join('\n')
+  const widths = headings.map((heading, index) =>
+    Math.max(stringWidth(heading), ...rows.map((row) => stringWidth(row[index] ?? ''))),
+  )
+  return [headings, ...rows]
+    .map((row) =>
+      row
+        .map((value, index) => {
+          if (index === row.length - 1) return value
+          const width = widths[index] ?? stringWidth(value)
+          return value.padEnd(value.length + width - stringWidth(value))
+        })
+        .join('  '),
+    )
+    .join('\n')
 }
 
 function terminalSafeLine(value: string): string {

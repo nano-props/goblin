@@ -4,6 +4,7 @@ import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { CodedError } from '#/shared/coded-error.ts'
 import type { WorkspacePaneTargetMembership, WorkspacePaneWorktreeTargetIdentity } from '#/shared/git-types.ts'
 import { createTerminalCommandApplication } from '#/server/terminal/terminal-command-application.ts'
+import stringWidth from 'string-width'
 
 const USER_ID = 'user_test'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
@@ -125,16 +126,17 @@ describe('terminal command application', () => {
     expect(outputLine(result.value.output, ORPHAN_ID)).toContain('/repo/orphan  worktree')
     expect(outputLine(result.value.output, VALID_ID)).toContain('available')
     expect(outputLine(result.value.output, VALID_ID)).toContain('功能')
-    expect(result.value.output.split('\n')[0]).toBe('CURRENT\tID\tTITLE\tPHASE\tAVAILABILITY\tTARGET\tPATH')
-    expect(outputLine(result.value.output, VALID_ID).split('\t')).toEqual([
-      '',
-      VALID_ID,
-      'shell 功能 name',
-      'open',
-      'available',
-      '功能',
-      '/repo/my  valid  ',
-    ])
+    const lines = result.value.output.split('\n')
+    const headings = lines[0] ?? ''
+    const validLine = outputLine(result.value.output, VALID_ID)
+    expect(lines).toHaveLength(4)
+    expect(headings).toContain('CURRENT  ID')
+    expect(validLine).toContain('shell 功能 name')
+    expect(validLine.endsWith('/repo/my  valid  ')).toBe(true)
+    expect(stringWidth(validLine.slice(0, validLine.indexOf('/repo/my  valid')))).toBe(
+      stringWidth(headings.slice(0, headings.indexOf('PATH'))),
+    )
+    expect(result.value.output).not.toContain('\t')
   })
 
   test('prunes only definitively orphaned worktree terminals', async () => {
