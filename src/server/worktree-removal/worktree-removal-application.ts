@@ -6,7 +6,10 @@ import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/works
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type {
+  PhysicalWorktreeCapture,
+  ResolvePhysicalWorktreeIdentityInput,
+} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/workspaces/runtime/remote-failure.ts'
 import { WorkspaceRuntimeStaleError } from '#/server/workspaces/runtime/authority.ts'
@@ -30,6 +33,9 @@ interface AffectedWorktreeScope {
   scope: string
   worktreePath: string
 }
+
+type WorktreeRemovalCaptureOutcome =
+  { kind: 'captured'; capability: PhysicalWorktreeExecutionCapability } | { kind: 'failed'; message: string }
 
 interface WorktreeRemovalApplicationDependencies {
   worktreeOperations: PhysicalWorktreeOperationCoordinator
@@ -66,22 +72,12 @@ export class WorktreeRemovalApplication {
   ): Promise<RepoMutationResult> {
     if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.workspace-runtime-stale' }
     const worktreePath = terminalSessionExecutionPath(input.repoRoot, input.worktreePath)
-    const capture = await (async () => {
-      try {
-        return {
-          kind: 'captured',
-          capability: await this.deps.physicalWorktrees.capture({
-            userId,
-            workspaceId: input.repoRoot,
-            workspaceRuntimeId: input.workspaceRuntimeId,
-            worktreePath,
-          }),
-        } as const
-      } catch (error) {
-        if (isRemoteWorkspaceRuntimeFailure(error)) throw error
-        return { kind: 'failed', message: error instanceof Error ? error.message : String(error) } as const
-      }
-    })()
+    const capture = await this.captureWorktreeForRemoval({
+      userId,
+      workspaceId: input.repoRoot,
+      workspaceRuntimeId: input.workspaceRuntimeId,
+      worktreePath,
+    })
     if (capture.kind === 'failed') return { ok: false, message: capture.message }
     const physicalCapability = capture.capability
     try {
@@ -142,6 +138,17 @@ export class WorktreeRemovalApplication {
 
   private isCurrentRuntime(userId: string, input: { repoRoot: WorkspaceId; workspaceRuntimeId: string }): boolean {
     return this.deps.isCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
+  }
+
+  private async captureWorktreeForRemoval(
+    input: ResolvePhysicalWorktreeIdentityInput,
+  ): Promise<WorktreeRemovalCaptureOutcome> {
+    try {
+      return { kind: 'captured', capability: await this.deps.physicalWorktrees.capture(input) }
+    } catch (error) {
+      if (isRemoteWorkspaceRuntimeFailure(error)) throw error
+      return { kind: 'failed', message: error instanceof Error ? error.message : String(error) }
+    }
   }
 
   private async quiesce(
