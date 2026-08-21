@@ -60,7 +60,7 @@ For a command that needs a client intent, no listening window produces the same 
 
 ## What this design is not
 
-- It is not a general CLI for repo operations. The server already exposes rich HTTP routes for those; `g` reuses them via the transport, but `g` itself is for _user-facing_ actions that benefit from terminal ergonomics (open a tab, jump to a branch).
+- It is not a general CLI for repo operations. Server-owned capabilities stay behind their owning applications; `g` reaches them only through the consolidated command endpoint for user-facing terminal actions.
 - It is not a place for backend logic. Server-side operations stay in their owning repo, terminal, or settings applications behind the consolidated route. `g` is a wrapper, not a peer.
 - It is not the only path for client intents. Electron IPC still works for menu-driven commands. `g` is one of several producers feeding the same intent router.
 

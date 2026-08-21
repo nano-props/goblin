@@ -5,6 +5,7 @@ import { GOBLIN_SERVER_COMMAND_REQUEST_SCHEMA } from '#/shared/g-command.ts'
 import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 import { publishClientIntent } from '#/server/realtime/client-intent-broker.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 
 const VIEW_TAB_BY_COMMAND = {
   delta: 'changes',
@@ -19,6 +20,9 @@ export function createTerminalCommandRoutes(host: ServerTerminalCommandHost) {
     const request = await parseHttpBody(GOBLIN_SERVER_COMMAND_REQUEST_SCHEMA, c)
     if (request.command === 'term') {
       const { terminalSessionId, args } = request.payload
+      if (!isValidTerminalSessionId(terminalSessionId)) {
+        return errorJson(c, 'BAD_REQUEST', 'g term must run inside a current Goblin terminal')
+      }
       const result = await host.execute(requiredUserId(c), terminalSessionId, args, c.req.raw.signal)
       return result.ok ? c.json(result.value) : errorJson(c, 'TERMINAL_UNAVAILABLE', result.message, 409)
     }

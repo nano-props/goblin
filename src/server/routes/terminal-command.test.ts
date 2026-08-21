@@ -125,6 +125,19 @@ describe('terminal command routes', () => {
     expect(await response.json()).toMatchObject({ ok: false, message: "'info' does not take arguments" })
   })
 
+  test('rejects a terminal command without a current Goblin terminal identity', async () => {
+    const host = terminalCommandHost()
+    const response = await createTestApp(host).request('/api/terminal-command', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goblin-access-token': 'secret' },
+      body: JSON.stringify({ command: 'term', payload: { args: ['list'] } }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ message: 'g term must run inside a current Goblin terminal' })
+    expect(host.execute).not.toHaveBeenCalled()
+  })
+
   test('reports terminal application failures', async () => {
     const host: ServerTerminalCommandHost = {
       execute: vi.fn(async () => ({ ok: false as const, message: 'terminal no longer exists' })),

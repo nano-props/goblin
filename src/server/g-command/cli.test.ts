@@ -262,15 +262,15 @@ describe('g command cli', () => {
   test('g term requires a terminal identity from a newly opened Goblin terminal', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
-    postJson.mockRejectedValue(new Error('current Goblin terminal is no longer available'))
+    postJson.mockRejectedValue(new Error('g term must run inside a current Goblin terminal'))
 
     const code = await runGoblinCommand(['term', 'list'], {}, io, transport)
 
     expect(code).toBe(1)
-    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('current Goblin terminal'))
+    expect(io.stderr).toHaveBeenCalledWith(expect.stringContaining('must run inside a current Goblin terminal'))
     expect(postJson).toHaveBeenCalledWith(
       '/api/terminal-command',
-      { command: 'term', payload: { terminalSessionId: '', args: ['list'] } },
+      { command: 'term', payload: { args: ['list'] } },
       expect.any(Function),
     )
   })

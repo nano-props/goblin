@@ -98,7 +98,7 @@ function outputLine(output: string, terminalSessionId: string): string {
 }
 
 describe('terminal command application', () => {
-  test('lists the current workspace terminals and identifies a prunable worktree as orphaned', async () => {
+  test('lists the current workspace terminals and identifies a missing worktree as orphaned', async () => {
     const sessions = [
       session(CURRENT_ID, 'terminal-runtime-current'),
       session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/orphan'),
@@ -244,7 +244,8 @@ describe('terminal command application', () => {
     const application = createTerminalCommandApplication({
       manager: managerFor([current]),
       homeDir: '/srv',
-      workspaceProbe: vi.fn(() => filesystemProbe()),
+      workspaceProbe: vi.fn(() => gitProbe()),
+      readMembership: vi.fn(async () => gitMembership('/srv/repo')),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, [])

@@ -8,14 +8,14 @@ export const TERM_COMMAND: GoblinCommand = {
   summary: 'Inspect or prune Goblin terminals.',
   async run(ctx): Promise<number> {
     try {
+      const terminalSessionId = ctx.env[GOBLIN_TERMINAL_SESSION_ID_ENV]
+      const args = ctx.args.slice(1)
+      const payload = terminalSessionId === undefined ? { args } : { terminalSessionId, args }
       const result = await ctx.transport.postJson(
         '/api/terminal-command',
         {
           command: 'term',
-          payload: {
-            terminalSessionId: ctx.env[GOBLIN_TERMINAL_SESSION_ID_ENV] ?? '',
-            args: ctx.args.slice(1),
-          },
+          payload,
         },
         (value) => v.parse(GOBLIN_SERVER_COMMAND_RESULT_SCHEMA, value),
       )
