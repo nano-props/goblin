@@ -150,6 +150,28 @@ describe('workspace pane destination navigation', () => {
     await expect(committed).resolves.toEqual({ kind: 'superseded' })
   })
 
+  test.each([
+    ['settings', (actions: ReturnType<typeof primaryNavigationActions>['actions']) => actions.openSettings('general')],
+    ['workspace', (actions: ReturnType<typeof primaryNavigationActions>['actions']) => actions.activateWorkspace(REPO_ID)],
+  ])('%s primary navigation supersedes pending destination navigation', async (_name, navigate) => {
+    seedDestinationRepo()
+    const presentation = beginPresentation('feature/destination')
+    const routeCommit = Promise.withResolvers<boolean>()
+    const routeNavigation = deferredRouteCommit(routeCommit.promise)
+    const committed = commitWorkspacePaneDestinationRoute(
+      presentation,
+      DESTINATION_ROUTE,
+      testNavigation(routeNavigation.commit, routeNavigation.commitFilesystem),
+    )
+    await routeNavigation.started
+
+    const { actions } = primaryNavigationActions()
+    navigate(actions)
+    routeCommit.resolve(true)
+
+    await expect(committed).resolves.toEqual({ kind: 'superseded' })
+  })
+
   test('an externally observed route supersedes pending destination navigation', async () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')

@@ -1083,6 +1083,19 @@ describe('TerminalComposer', () => {
     expect(buttonByAccessibleName(container, LABELS.showKeys)).toBeTruthy()
   })
 
+  test('uses screen-reader text instead of callout-producing button attributes', async () => {
+    const { container } = render()
+    await expand(container)
+
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__btn')]
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) {
+      expect(button.hasAttribute('title')).toBe(false)
+      expect(button.hasAttribute('aria-label')).toBe(false)
+      expect(button.querySelector('.sr-only')?.textContent?.trim()).not.toBe('')
+    }
+  })
+
   test('does not restore the More trigger over an input explicitly focused while the menu closes', async () => {
     const user = userEvent.setup()
     const { container } = render()
@@ -1110,5 +1123,4 @@ describe('TerminalComposer', () => {
     expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
     expect(document.activeElement).toBe(more)
   })
-
 })

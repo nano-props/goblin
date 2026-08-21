@@ -141,6 +141,23 @@ describe('WorkspaceRootNavigator', () => {
     expect(menuTrigger?.parentElement?.className).not.toContain('opacity-0')
     expect(menuTrigger?.parentElement?.className).toContain('pointer-events-auto')
   })
+
+  test('reveals the desktop row action on hover or focus and keeps it visible while its menu is open', async () => {
+    const { container } = renderNavigator(<WorkspaceRootNavigator workspaceId={WORKSPACE_ID} selected={false} />)
+    const menuTrigger = container.querySelector('button[aria-label="action.menu"]')
+    if (!(menuTrigger instanceof HTMLButtonElement)) throw new Error('missing workspace root action menu')
+    const action = menuTrigger.parentElement
+    if (!(action instanceof HTMLElement)) throw new Error('missing workspace root action wrapper')
+
+    expect(action.className).toContain('opacity-0')
+    expect(action.className).toContain('group-hover:opacity-100')
+    expect(action.className).toContain('group-focus-within:opacity-100')
+
+    await fireEvent.click(menuTrigger)
+
+    expect(action.className).not.toContain('opacity-0')
+    expect(action.className).toContain('pointer-events-auto')
+  })
 })
 
 function renderNavigator(element: VNode) {

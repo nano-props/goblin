@@ -55,6 +55,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
@@ -68,7 +69,7 @@ vi.mock('#/web/settings/actions.ts', () => ({
   removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
 }))
 
-const intentListeners = new Set<(event: any) => void>()
+const intentListeners = new Set<(event: ClientEffectIntent) => void>()
 let nativeIntentSubscriptionStarts = 0
 const closeAllOverlays = vi.fn()
 const openWorkspacePathDialogSpy = vi.fn()
@@ -149,7 +150,7 @@ beforeEach(() => {
     value: currentNativeBridge({
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => true),
-      onIntent: vi.fn((cb: (event: any) => void) => {
+      onIntent: vi.fn((cb: (event: ClientEffectIntent) => void) => {
         nativeIntentSubscriptionStarts += 1
         intentListeners.add(cb)
         return () => {
@@ -180,7 +181,7 @@ function readyFilesystemWorkspace(workspaceId: WorkspaceId, workspaceRuntimeId: 
   return workspace
 }
 
-function emitIntent(event: any) {
+function emitIntent(event: ClientEffectIntent) {
   for (const listener of intentListeners) listener(event)
 }
 
@@ -529,11 +530,12 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('open-recent-workspace opens without store activation and then delegates activation to navigation', async () => {
+    const recentWorkspaceId = workspaceIdForTest('goblin+file:///tmp/recent-workspace')
     workspacesStore.setState({
       openWorkspaceMembership: vi.fn(() =>
         Promise.resolve({
           ok: true as const,
-          workspaceId: workspaceIdForTest('goblin+file:///tmp/recent-workspace'),
+          workspaceId: recentWorkspaceId,
         }),
       ),
     })
@@ -543,15 +545,15 @@ describe('useClientEffectIntentRouter', () => {
     await flushTestUpdates(() => {
       emitIntent({
         type: 'open-recent-workspace-requested',
-        entry: { id: 'goblin+file:///tmp/recent-workspace' },
+        entry: { id: recentWorkspaceId },
       })
     })
 
     await waitFor(() => {
       expect(workspacesStore.getState().openWorkspaceMembership).toHaveBeenCalledWith({
-        id: 'goblin+file:///tmp/recent-workspace',
+        id: recentWorkspaceId,
       })
-      expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/recent-workspace')
+      expect(activateWorkspaceSpy).toHaveBeenCalledWith(recentWorkspaceId)
     })
   })
 

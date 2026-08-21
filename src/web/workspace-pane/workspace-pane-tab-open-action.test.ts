@@ -29,7 +29,11 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import {
+  clearWorkspacePaneTabOpener,
+  recordWorkspacePaneTabOpener,
+  workspacePaneTabOpener,
+} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
@@ -61,6 +65,7 @@ import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
 
@@ -109,6 +114,43 @@ afterEach(() => {
 })
 
 describe('openWorkspacePaneTab', () => {
+  test('isolates opener records by workspace runtime identity', () => {
+    const runtimeA = 'workspace-runtime-a'
+    const runtimeB = 'workspace-runtime-b'
+    const target = { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH }
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      workspaceRuntimeId: runtimeA,
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
+      currentBranchName: 'feature/worktree',
+    })
+
+    expect(recordWorkspacePaneTabOpener(target, runtimeA, 'workspace-pane:changes', 'workspace-pane:status')).toBe(
+      'recorded',
+    )
+    workspacesStore.setState({
+      workspaces: { [REPO_ID]: { ...repo, workspaceRuntimeId: runtimeB } },
+      workspaceOrder: [REPO_ID],
+    })
+    expect(recordWorkspacePaneTabOpener(target, runtimeB, 'workspace-pane:changes', 'workspace-pane:files')).toBe(
+      'recorded',
+    )
+
+    const baseScope = tabOpenerScopeKey(target)
+    expect(workspacesStore.getState().tabOpenerIdentityByScope).toMatchObject({
+      [`${baseScope}\0${runtimeA}`]: { 'workspace-pane:changes': 'workspace-pane:status' },
+      [`${baseScope}\0${runtimeB}`]: { 'workspace-pane:changes': 'workspace-pane:files' },
+    })
+
+    clearWorkspacePaneTabOpener(target, runtimeA, 'workspace-pane:changes')
+
+    expect(workspacesStore.getState().tabOpenerIdentityByScope[`${baseScope}\0${runtimeA}`]).toBeUndefined()
+    expect(workspacesStore.getState().tabOpenerIdentityByScope[`${baseScope}\0${runtimeB}`]).toEqual({
+      'workspace-pane:changes': 'workspace-pane:files',
+    })
+  })
+
   test('rejects branch-only static tabs on the workspace-root surface', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

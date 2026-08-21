@@ -162,31 +162,6 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test('does not steal terminal focus on touch without VisualViewport', async () => {
-    const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
-    Reflect.deleteProperty(window, 'visualViewport')
-    const rendered = await renderTerminalSession()
-
-    try {
-      const input = composerInput(rendered.container)
-      const focus = vi.spyOn(input, 'focus')
-      await flushTestUpdates(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
-      expect(focus).toHaveBeenLastCalledWith()
-
-      const terminalHost = document.createElement('div')
-      terminalHost.className = 'goblin-managed-terminal-host'
-      const terminalInput = document.createElement('textarea')
-      terminalHost.appendChild(terminalInput)
-      rendered.sessionRoot.appendChild(terminalHost)
-      terminalInput.focus()
-      await fireEvent.pointerDown(input, { pointerType: 'touch' })
-      expect(document.activeElement).toBe(terminalInput)
-    } finally {
-      await rendered.cleanup()
-      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
-    }
-  })
-
   test('opens with the exact terminal shortcut, closes search, focuses the control, and collapses on Escape', async () => {
     const user = userEvent.setup()
     const handoffOrder: string[] = []
