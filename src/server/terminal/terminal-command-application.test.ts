@@ -101,14 +101,14 @@ describe('terminal command application', () => {
   test('lists the current workspace terminals and identifies a missing worktree as orphaned', async () => {
     const sessions = [
       session(CURRENT_ID, 'terminal-runtime-current'),
-      session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/orphan'),
-      session(VALID_ID, 'terminal-runtime-valid', '/repo/valid'),
+      session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/orphan%20%20worktree'),
+      session(VALID_ID, 'terminal-runtime-valid', '/repo/my%20%20valid'),
     ]
     const manager = managerFor(sessions)
     const application = createTerminalCommandApplication({
       manager,
       workspaceProbe: vi.fn(() => gitProbe()),
-      readMembership: vi.fn(async () => gitMembership('/repo', [worktreeIdentity('/repo/valid', 'valid')])),
+      readMembership: vi.fn(async () => gitMembership('/repo', [worktreeIdentity('/repo/my  valid', 'valid')])),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, ['list'])
@@ -118,9 +118,11 @@ describe('terminal command application', () => {
     expect(outputLine(result.value.output, CURRENT_ID)).toContain('available')
     expect(outputLine(result.value.output, CURRENT_ID)).toContain('main')
     expect(outputLine(result.value.output, ORPHAN_ID)).toContain('orphaned')
-    expect(outputLine(result.value.output, ORPHAN_ID)).toContain('orphan')
+    expect(outputLine(result.value.output, ORPHAN_ID)).toContain('orphan  worktree')
+    expect(outputLine(result.value.output, ORPHAN_ID)).toContain('/repo/orphan  worktree')
     expect(outputLine(result.value.output, VALID_ID)).toContain('available')
     expect(outputLine(result.value.output, VALID_ID)).toContain('valid')
+    expect(outputLine(result.value.output, VALID_ID)).toContain('/repo/my  valid')
   })
 
   test('prunes only definitively orphaned worktree terminals', async () => {
@@ -162,7 +164,7 @@ describe('terminal command application', () => {
   })
 
   test('shows Git targets by branch and shortens local paths without terminal control characters', async () => {
-    const workspaceId = workspaceIdForTest('goblin+file:///Users/example/Developer/repo')
+    const workspaceId = workspaceIdForTest('goblin+file:///Users/example/Developer/my%20%20repo')
     const current = {
       ...session(CURRENT_ID, 'terminal-runtime-current'),
       target: { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: RUNTIME_ID },
@@ -173,7 +175,7 @@ describe('terminal command application', () => {
       manager,
       homeDir: '/Users/example',
       workspaceProbe: vi.fn(() => gitProbe()),
-      readMembership: vi.fn(async () => gitMembership('/Users/example/Developer/repo')),
+      readMembership: vi.fn(async () => gitMembership('/Users/example/Developer/my  repo')),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, [])
@@ -185,7 +187,7 @@ describe('terminal command application', () => {
       },
     })
     if (!result.ok) throw new Error('expected terminal details')
-    expect(result.value.output).toContain('Path:         ~/Developer/repo')
+    expect(result.value.output).toContain('Path:         ~/Developer/my  repo')
     expect(result.value.output).not.toContain('\u001b')
   })
 

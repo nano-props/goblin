@@ -84,6 +84,21 @@ const WorkspaceRuntimeCloseSchema = v.object({
   clientId: ClientIdSchema,
 })
 const EmptyBodySchema = v.optional(v.object({}))
+const GoblinCommandArgsSchema = v.pipe(v.array(v.pipe(v.string(), v.maxLength(64))), v.maxLength(2))
+const GoblinViewCommandPayloadSchema = v.strictObject({ args: GoblinCommandArgsSchema })
+const GoblinTerminalCommandPayloadSchema = v.strictObject({
+  terminalSessionId: v.optional(v.pipe(v.string(), v.maxLength(128))),
+  args: GoblinCommandArgsSchema,
+})
+
+export const TERMINAL_COMMAND_PROCEDURE_SCHEMAS = {
+  execute: v.variant('command', [
+    v.strictObject({ command: v.literal('delta'), payload: GoblinViewCommandPayloadSchema }),
+    v.strictObject({ command: v.literal('info'), payload: GoblinViewCommandPayloadSchema }),
+    v.strictObject({ command: v.literal('log'), payload: GoblinViewCommandPayloadSchema }),
+    v.strictObject({ command: v.literal('term'), payload: GoblinTerminalCommandPayloadSchema }),
+  ]),
+} as const
 
 export const WORKSPACE_PROCEDURE_SCHEMAS = {
   pathSuggestions: v.object({ prefix: DirectoryPathPrefixSchema }),

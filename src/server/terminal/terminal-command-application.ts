@@ -210,11 +210,11 @@ function formatCurrent(session: TerminalCommandSession): string {
   return [
     `Terminal:     ${session.terminalSessionId}`,
     `Runtime:      ${session.terminalRuntimeSessionId}`,
-    `Title:        ${oneLine(session.title ?? '-')}`,
-    `Process:      ${oneLine(session.processName)}`,
+    `Title:        ${foldTerminalText(session.title ?? '-')}`,
+    `Process:      ${foldTerminalText(session.processName)}`,
     `Phase:        ${session.phase}`,
-    `Target:       ${oneLine(session.targetLabel)}`,
-    `Path:         ${oneLine(session.path)}`,
+    `Target:       ${terminalSafeLine(session.targetLabel)}`,
+    `Path:         ${terminalSafeLine(session.path)}`,
     `Availability: ${session.availability}`,
   ].join('\n')
 }
@@ -224,11 +224,11 @@ function formatList(sessions: readonly TerminalCommandSession[]): string {
   const rows = sessions.map((session) => [
     session.current ? '*' : '',
     session.terminalSessionId,
-    oneLine(session.title ?? session.processName),
+    foldTerminalText(session.title ?? session.processName),
     session.phase,
     session.availability,
-    oneLine(session.targetLabel),
-    oneLine(session.path),
+    terminalSafeLine(session.targetLabel),
+    terminalSafeLine(session.path),
   ])
   const headings = ['CURRENT', 'ID', 'TITLE', 'PHASE', 'AVAILABILITY', 'TARGET', 'PATH']
   const widths = headings.map((heading, index) =>
@@ -237,16 +237,16 @@ function formatList(sessions: readonly TerminalCommandSession[]): string {
   return [headings, ...rows]
     .map((row) =>
       row
-        .map((value, index) => value.padEnd(widths[index] ?? value.length))
-        .join('  ')
-        .trimEnd(),
+        .map((value, index) => (index === row.length - 1 ? value : value.padEnd(widths[index] ?? value.length)))
+        .join('  '),
     )
     .join('\n')
 }
 
-function oneLine(value: string): string {
-  return value
-    .replace(/[\u0000-\u001f\u007f-\u009f]/gu, ' ')
-    .replace(/\s+/gu, ' ')
-    .trim()
+function terminalSafeLine(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f]/gu, ' ')
+}
+
+function foldTerminalText(value: string): string {
+  return terminalSafeLine(value).replace(/\s+/gu, ' ').trim()
 }

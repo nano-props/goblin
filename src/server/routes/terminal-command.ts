@@ -1,7 +1,7 @@
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
-import { GOBLIN_SERVER_COMMAND_REQUEST_SCHEMA } from '#/shared/g-command.ts'
+import { TERMINAL_COMMAND_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 import { publishClientIntent } from '#/server/realtime/client-intent-broker.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
@@ -17,13 +17,15 @@ export function createTerminalCommandRoutes(host: ServerTerminalCommandHost) {
   const app = createRouteApp()
 
   app.post('/', async (c) => {
-    const request = await parseHttpBody(GOBLIN_SERVER_COMMAND_REQUEST_SCHEMA, c)
+    const request = await parseHttpBody(TERMINAL_COMMAND_PROCEDURE_SCHEMAS.execute, c)
     if (request.command === 'term') {
       const { terminalSessionId, args } = request.payload
       if (!isValidTerminalSessionId(terminalSessionId)) {
         return errorJson(c, 'BAD_REQUEST', 'g term must run inside a current Goblin terminal')
       }
       const result = await host.execute(requiredUserId(c), terminalSessionId, args, c.req.raw.signal)
+      // This endpoint is a private CLI boundary: the human-readable message owns
+      // failure detail, while one transport code keeps the protocol deliberately small.
       return result.ok ? c.json(result.value) : errorJson(c, 'TERMINAL_UNAVAILABLE', result.message, 409)
     }
     if (request.payload.args.length > 0) {
