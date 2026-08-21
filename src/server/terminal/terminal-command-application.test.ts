@@ -4,6 +4,7 @@ import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { CodedError } from '#/shared/coded-error.ts'
 import type { WorkspacePaneTargetMembership, WorkspacePaneWorktreeTargetIdentity } from '#/shared/git-types.ts'
 import { createTerminalCommandApplication } from '#/server/terminal/terminal-command-application.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import stringWidth from 'string-width'
 
 const USER_ID = 'user_test'
@@ -175,6 +176,30 @@ describe('terminal command application', () => {
 
     expect(result).toEqual({ ok: false, message: 'worktree state is unavailable; no terminals were closed' })
     expect(manager.closeSessionForUserOutcome).not.toHaveBeenCalled()
+  })
+
+  test('propagates a classified remote failure to the runtime request boundary', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
+    const current = {
+      ...session(CURRENT_ID, 'terminal-runtime-current'),
+      target: { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: RUNTIME_ID },
+    } as TerminalSessionSummary
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId,
+      workspaceRuntimeId: RUNTIME_ID,
+      reason: 'unreachable',
+    })
+    const controller = new AbortController()
+    const application = createTerminalCommandApplication({
+      manager: managerFor([current]),
+      workspaceProbe: vi.fn(() => gitProbe()),
+      readMembership: vi.fn(async () => {
+        controller.abort(new DOMException('request aborted', 'AbortError'))
+        throw failure
+      }),
+    })
+
+    await expect(application.execute(USER_ID, CURRENT_ID, ['list'], controller.signal)).rejects.toBe(failure)
   })
 
   test('shows Git targets by branch and shortens local paths without terminal control characters', async () => {

@@ -6,6 +6,7 @@ import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-comma
 import { publishClientIntent } from '#/server/realtime/client-intent-broker.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
+import { runGitWorkspaceRuntimeRequest } from '#/server/workspaces/runtime/request.ts'
 
 const VIEW_TAB_BY_COMMAND = {
   delta: 'changes',
@@ -23,7 +24,14 @@ export function createTerminalCommandRoutes(host: ServerTerminalCommandHost) {
       if (!isValidTerminalSessionId(terminalSessionId)) {
         return errorJson(c, 'BAD_REQUEST', 'g term must run inside a current Goblin terminal')
       }
-      const result = await host.execute(requiredUserId(c), terminalSessionId, args, c.req.raw.signal)
+      const userId = requiredUserId(c)
+      const signal = c.req.raw.signal
+      const result = await runGitWorkspaceRuntimeRequest({
+        userId,
+        label: 'g-term',
+        signal,
+        run: () => host.execute(userId, terminalSessionId, args, signal),
+      })
       // This endpoint is a private CLI boundary: the human-readable message owns
       // failure detail, while one transport code keeps the protocol deliberately small.
       return result.ok ? c.json(result.value) : errorJson(c, 'TERMINAL_UNAVAILABLE', result.message, 409)

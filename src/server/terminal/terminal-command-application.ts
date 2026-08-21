@@ -16,6 +16,7 @@ import { padTerminalTextEnd } from '#/server/common/terminal-text.ts'
 import { getWorkspacePaneTargetMembership } from '#/server/repos/read-paths.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { workspaceProbeStateForRuntime } from '#/server/workspaces/runtime/authority.ts'
+import { isRemoteWorkspaceRuntimeFailure } from '#/server/workspaces/runtime/remote-failure.ts'
 import type { ServerTerminalCommandHost, TerminalCommandHostResult } from '#/server/terminal/terminal-command-host.ts'
 
 interface TerminalCommandManager {
@@ -94,7 +95,8 @@ export function createTerminalCommandApplication(
         kind: 'ready',
         membership: await readMembership(workspaceId, { workspaceRuntimeId, signal }),
       }
-    } catch {
+    } catch (error) {
+      if (isRemoteWorkspaceRuntimeFailure(error)) throw error
       signal?.throwIfAborted()
       return { kind: 'unknown' }
     }

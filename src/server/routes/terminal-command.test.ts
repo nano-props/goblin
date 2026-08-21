@@ -7,6 +7,8 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 import { GOBLIN_SERVER_COMMAND_RESULT_SCHEMA } from '#/shared/g-command.ts'
 import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/realtime/client-intent-broker.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 
@@ -153,5 +155,29 @@ describe('terminal command routes', () => {
 
     expect(response.status).toBe(409)
     expect(await response.json()).toMatchObject({ message: 'terminal no longer exists' })
+  })
+
+  test('routes classified remote failures through the workspace runtime request boundary', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
+    const host: ServerTerminalCommandHost = {
+      execute: vi.fn(async () => {
+        throw new RemoteWorkspaceRuntimeFailureError({
+          workspaceId,
+          workspaceRuntimeId: 'runtime-remote-failure',
+          reason: 'unreachable',
+        })
+      }),
+    }
+    const response = await createTestApp(host).request('/api/terminal-command', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goblin-access-token': 'secret' },
+      body: JSON.stringify({
+        command: 'term',
+        payload: { terminalSessionId: TERMINAL_SESSION_ID, args: ['list'] },
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
   })
 })
