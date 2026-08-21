@@ -9,6 +9,7 @@ import { GOBLIN_SERVER_COMMAND_RESULT_SCHEMA } from '#/shared/g-command.ts'
 import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/realtime/client-intent-broker.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { runGoblinCommand } from '#/server/g-command/cli.ts'
 
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 
@@ -157,7 +158,7 @@ describe('terminal command routes', () => {
     expect(await response.json()).toMatchObject({ message: 'terminal no longer exists' })
   })
 
-  test('routes classified remote failures through the workspace runtime request boundary', async () => {
+  test('presents classified remote failures as readable CLI errors', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
     const host: ServerTerminalCommandHost = {
       execute: vi.fn(async () => {
@@ -168,16 +169,23 @@ describe('terminal command routes', () => {
         })
       }),
     }
-    const response = await createTestApp(host).request('/api/terminal-command', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goblin-access-token': 'secret' },
-      body: JSON.stringify({
-        command: 'term',
-        payload: { terminalSessionId: TERMINAL_SESSION_ID, args: ['list'] },
-      }),
-    })
+    const app = createTestApp(host)
+    const transport = createHttpTransport(
+      { GOBLIN_SERVER_URL: 'http://127.0.0.1:32100', GOBLIN_SERVER_ACCESS_TOKEN: 'secret' },
+      async (input, init) => await app.fetch(new Request(input, init)),
+    )
+    const stdout = vi.fn()
+    const stderr = vi.fn()
 
-    expect(response.status).toBe(400)
-    expect(await response.json()).toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
+    const exitCode = await runGoblinCommand(
+      ['term', 'list'],
+      { GOBLIN_TERMINAL_SESSION_ID: TERMINAL_SESSION_ID },
+      { stdout, stderr },
+      transport,
+    )
+
+    expect(exitCode).toBe(1)
+    expect(stdout).not.toHaveBeenCalled()
+    expect(stderr).toHaveBeenCalledWith('g: request failed (400): Failed to read repository')
   })
 })

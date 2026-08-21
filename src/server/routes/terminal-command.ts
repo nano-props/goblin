@@ -7,6 +7,16 @@ import { publishClientIntent } from '#/server/realtime/client-intent-broker.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { runGitWorkspaceRuntimeRequest } from '#/server/workspaces/runtime/request.ts'
+import { CodedError } from '#/shared/coded-error.ts'
+import type { DictKey } from '#/shared/i18n/en.ts'
+import { getServerI18nSnapshot } from '#/server/i18n.ts'
+
+const TERMINAL_COMMAND_RUNTIME_ERROR_KEYS = [
+  'error.failed-read-repo',
+  'error.workspace-runtime-settlement-failed',
+] as const satisfies readonly DictKey[]
+
+type TerminalCommandRuntimeErrorKey = (typeof TERMINAL_COMMAND_RUNTIME_ERROR_KEYS)[number]
 
 const VIEW_TAB_BY_COMMAND = {
   delta: 'changes',
@@ -26,15 +36,23 @@ export function createTerminalCommandRoutes(host: ServerTerminalCommandHost) {
       }
       const userId = requiredUserId(c)
       const signal = c.req.raw.signal
-      const result = await runGitWorkspaceRuntimeRequest({
-        userId,
-        label: 'g-term',
-        signal,
-        run: () => host.execute(userId, terminalSessionId, args, signal),
-      })
-      // This endpoint is a private CLI boundary: the human-readable message owns
-      // failure detail, while one transport code keeps the protocol deliberately small.
-      return result.ok ? c.json(result.value) : errorJson(c, 'TERMINAL_UNAVAILABLE', result.message, 409)
+      try {
+        const result = await runGitWorkspaceRuntimeRequest({
+          userId,
+          label: 'g-term',
+          signal,
+          run: () => host.execute(userId, terminalSessionId, args, signal),
+        })
+        // This endpoint is a private CLI boundary: the human-readable message owns
+        // failure detail, while one transport code keeps the protocol deliberately small.
+        return result.ok ? c.json(result.value) : errorJson(c, 'TERMINAL_UNAVAILABLE', result.message, 409)
+      } catch (error) {
+        if (!(error instanceof CodedError)) throw error
+        const messageKey = terminalCommandRuntimeErrorKey(error.message)
+        if (!messageKey) throw error
+        const { dict } = await getServerI18nSnapshot(c.req.header('accept-language'))
+        return errorJson(c, error.code, dict[messageKey])
+      }
     }
     if (request.payload.args.length > 0) {
       return errorJson(c, 'BAD_REQUEST', `'${request.command}' does not take arguments`)
@@ -49,6 +67,10 @@ export function createTerminalCommandRoutes(host: ServerTerminalCommandHost) {
   })
 
   return app
+}
+
+function terminalCommandRuntimeErrorKey(message: string): TerminalCommandRuntimeErrorKey | null {
+  return TERMINAL_COMMAND_RUNTIME_ERROR_KEYS.find((key) => key === message) ?? null
 }
 
 function requiredUserId(context: Parameters<typeof userIdFromContext>[0]): string {
