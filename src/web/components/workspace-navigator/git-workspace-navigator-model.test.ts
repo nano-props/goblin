@@ -1,22 +1,20 @@
 import { describe, expect, test } from 'vitest'
-import {
-  gitWorkspaceNavigatorRowIdentity,
-  gitWorkspaceNavigatorRows,
-} from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
+import { gitWorkspaceNavigatorRows } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
+import type { GitWorkspaceNavigatorRow } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import { createRepoBranch, createRepoWorktreeSnapshotForTest } from '#/web/test-utils/repo-store.ts'
 
 const WORKTREE_PATH = '/tmp/feature-worktree'
 
 describe('gitWorkspaceNavigatorRows', () => {
   test('uses a materialized worktree as the target identity at its branch position', () => {
-    const branches = [createRepoBranch('main'), createRepoBranch('feature/example'), createRepoBranch('later')]
+    const branches = navigatorBranches()
     const rows = gitWorkspaceNavigatorRows({
       branches,
       worktrees: [createRepoWorktreeSnapshotForTest('feature/example', WORKTREE_PATH)],
       viewMode: 'all',
     })
 
-    expect(rows.map(gitWorkspaceNavigatorRowIdentity)).toEqual([
+    expect(rows.map(rowIdentity)).toEqual([
       { kind: 'branch', branchName: 'main' },
       { kind: 'worktree', worktreePath: WORKTREE_PATH },
       { kind: 'branch', branchName: 'later' },
@@ -24,7 +22,7 @@ describe('gitWorkspaceNavigatorRows', () => {
   })
 
   test('preserves a rebasing worktree identity and position while changing its presentation', () => {
-    const branches = [createRepoBranch('main'), createRepoBranch('feature/example'), createRepoBranch('later')]
+    const branches = navigatorBranches()
     const worktree = {
       ...createRepoWorktreeSnapshotForTest('feature/example', WORKTREE_PATH),
       head: { kind: 'detached' as const },
@@ -32,7 +30,7 @@ describe('gitWorkspaceNavigatorRows', () => {
     }
     const rows = gitWorkspaceNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' })
 
-    expect(rows.map(gitWorkspaceNavigatorRowIdentity)).toEqual([
+    expect(rows.map(rowIdentity)).toEqual([
       { kind: 'branch', branchName: 'main' },
       { kind: 'worktree', worktreePath: WORKTREE_PATH },
       { kind: 'branch', branchName: 'later' },
@@ -50,9 +48,7 @@ describe('gitWorkspaceNavigatorRows', () => {
     }
 
     expect(
-      gitWorkspaceNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' }).map(
-        gitWorkspaceNavigatorRowIdentity,
-      ),
+      gitWorkspaceNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' }).map(rowIdentity),
     ).toEqual([
       { kind: 'branch', branchName: 'main' },
       { kind: 'branch', branchName: 'feature/example' },
@@ -67,9 +63,17 @@ describe('gitWorkspaceNavigatorRows', () => {
     }
 
     expect(
-      gitWorkspaceNavigatorRows({ branches: [], worktrees: [worktree], viewMode: 'all' }).map(
-        gitWorkspaceNavigatorRowIdentity,
-      ),
+      gitWorkspaceNavigatorRows({ branches: [], worktrees: [worktree], viewMode: 'all' }).map(rowIdentity),
     ).toEqual([{ kind: 'worktree', worktreePath: WORKTREE_PATH }])
   })
 })
+
+function navigatorBranches() {
+  return [createRepoBranch('main'), createRepoBranch('feature/example'), createRepoBranch('later')]
+}
+
+function rowIdentity(row: GitWorkspaceNavigatorRow) {
+  return row.kind === 'branch'
+    ? { kind: 'branch' as const, branchName: row.branch.name }
+    : { kind: 'worktree' as const, worktreePath: row.worktree.path }
+}

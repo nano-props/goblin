@@ -55,14 +55,14 @@ type WorkspacePaneTargetStaticTabPlacement = 'after-opener' | 'append'
 export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   input: WorkspacePaneTargetStaticTabActionOptions,
 ): Promise<WorkspacePaneActionOutcome> {
-  return await dispatchWorkspacePaneTargetStaticTabAction(input, 'after-opener')
+  return dispatchWorkspacePaneTargetStaticTabAction(input, 'after-opener')
 }
 
 /** Shows a target-owned static tab from a generic entry and appends it when newly opened. */
 export async function dispatchShowWorkspacePaneTargetStaticTabAction(
   input: WorkspacePaneTargetStaticTabActionOptions,
 ): Promise<WorkspacePaneActionOutcome> {
-  return await dispatchWorkspacePaneTargetStaticTabAction(input, 'append')
+  return dispatchWorkspacePaneTargetStaticTabAction(input, 'append')
 }
 
 async function dispatchWorkspacePaneTargetStaticTabAction(
@@ -92,7 +92,7 @@ async function dispatchWorkspacePaneTargetStaticTabAction(
   const admission = workspacePaneStaticTabOpenAdmission(resolvedInput)
   if (admission) return admission
   const navigationGeneration = beginAppNavigation()
-  return await runWorkspacePaneAction(location, () =>
+  return runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(resolvedInput, { kind: 'current', navigationGeneration }),
   )
 }
@@ -178,7 +178,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   const admission = workspacePaneStaticTabOpenAdmission(input)
   if (admission) return admission
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneAction(location, () =>
+  return runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(input, {
       kind: 'destination',
       presentation,

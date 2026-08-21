@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type {
   TerminalBellRealtimeEvent,
@@ -9,7 +9,6 @@ import type {
   TerminalSessionClosedEvent,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { readTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import {
@@ -72,7 +71,7 @@ const projection = vi.hoisted(() => ({
   retryPresentation: vi.fn(),
 }))
 
-const geometryMocks = vi.hoisted(() => ({ preloadTerminalFont: vi.fn(async () => {}) }))
+const geometryMocks = vi.hoisted(() => ({ preloadTerminalFont: vi.fn().mockResolvedValue(undefined) }))
 const runtimeMembershipIndex = vi.hoisted<TerminalRuntimeMembershipIndex>(() => new Map())
 
 type RealtimeListeners = {
@@ -234,7 +233,7 @@ describe('TerminalSessionProvider', () => {
     expect(projection.setRuntimeMembershipIndex).toHaveBeenLastCalledWith(runtimeMembershipIndex)
     expect(projection.setPreferredSelectedTerminalSessionIds).toHaveBeenLastCalledWith({})
 
-    await flushTestUpdates(async () => {
+    await flushTestUpdates(() => {
       workspacesStore.setState({
         selectedTerminalSessionIdByTerminalFilesystemTarget: { target: TERMINAL_SESSION_ID },
       })

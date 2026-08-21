@@ -10,10 +10,14 @@ export function compactTerminalProcessName(processName: string): string {
   return compactPath(workingName) ?? workingName
 }
 
+// Devin sessions and the supported Ubuntu VM environment prepend presentation
+// wrappers to the terminal-owned title. Removing those wrappers is current UI
+// behavior, not a legacy-format fallback; repeat the normalization because the
+// wrappers can be nested by remote sessions.
 function preprocessTitle(title: string): string {
   let workingTitle = normalizeTitle(title)
   while (workingTitle) {
-    const nextTitle = stripUbuntuVmPrefix(stripLeadingLabel(workingTitle))
+    const nextTitle = stripUbuntuVmPrefix(stripDevinPrefix(workingTitle))
     if (nextTitle === workingTitle) return workingTitle
     workingTitle = normalizeTitle(nextTitle)
   }
@@ -96,7 +100,7 @@ function normalizeTitle(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
 }
 
-function stripLeadingLabel(value: string): string {
+function stripDevinPrefix(value: string): string {
   const match = /^(devin):\s+(.+)$/i.exec(value)
   if (!match) return value
   return match[2]?.trim() || value

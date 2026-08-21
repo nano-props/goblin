@@ -76,39 +76,13 @@ describe('workspace pane tab close presentation', () => {
   })
 
   test("projects a retired terminal's canonical before-state through the workspace-root surface", async () => {
-    const terminalSessionId = 'term-111111111111111111111'
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    markRepoGitUnavailable(REPO_ID)
-    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
-    setWorkspacePaneTabsForTargetQueryData({
-      ...paneTarget,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneStaticTabEntry('history'),
-        workspacePaneStaticTabEntry('files'),
-      ],
-    })
-    const sourceRoute = { kind: 'terminal' as const, terminalSessionId }
+    const { input, paneTarget, repo, sourceRoute } = retiredTerminalPresentationInput()
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
       async (_target, _route, options) => {
         options?.onCommit?.()
         return true
       },
     )
-    const input = {
-      workspaceId: REPO_ID,
-      workspacePaneRoute: sourceRoute,
-      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
-      terminalSessionId,
-      tabsBeforeRetirement: [
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
-        workspacePaneStaticTabEntry('history'),
-        workspacePaneStaticTabEntry('files'),
-      ],
-    }
 
     await expect(
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
@@ -123,8 +97,10 @@ describe('workspace pane tab close presentation', () => {
       expect.objectContaining({ replace: true, routePrecondition: { kind: 'exact-route', route: sourceRoute } }),
     )
     expect(feedbackMocks.warning).not.toHaveBeenCalled()
+  })
 
-    resetAppNavigationForTest()
+  test('does not supersede an explicit navigation with retired terminal presentation', async () => {
+    const { input } = retiredTerminalPresentationInput()
     const explicitGeneration = beginAppNavigation()
     const explicitNavigation = registerAppNavigation(explicitGeneration, '/pending-explicit-navigation')
     if (!explicitNavigation) throw new Error('missing explicit navigation registration')
@@ -210,6 +186,41 @@ describe('workspace pane tab close presentation', () => {
     })
   })
 })
+
+function retiredTerminalPresentationInput() {
+  const terminalSessionId = 'term-111111111111111111111'
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  markRepoGitUnavailable(REPO_ID)
+  terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+  const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+  setWorkspacePaneTabsForTargetQueryData({
+    ...paneTarget,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+    tabs: [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+      workspacePaneStaticTabEntry('files'),
+    ],
+  })
+  const sourceRoute = { kind: 'terminal' as const, terminalSessionId }
+  return {
+    repo,
+    paneTarget,
+    sourceRoute,
+    input: {
+      workspaceId: REPO_ID,
+      workspacePaneRoute: sourceRoute,
+      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
+      terminalSessionId,
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneStaticTabEntry('files'),
+      ],
+    },
+  }
+}
 
 function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest()

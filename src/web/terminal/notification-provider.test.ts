@@ -59,7 +59,7 @@ describe('terminal notification provider', () => {
     expect(wsMock.notificationInstances).toHaveLength(0)
   })
 
-  test('does not fall through to browser notifications when native handles the request as false', async () => {
+  test('returns a native rejection without issuing a browser notification', async () => {
     const notifyBell = vi.fn(async () => false)
     Object.defineProperty(window, 'goblinNative', {
       configurable: true,
@@ -78,7 +78,7 @@ describe('terminal notification provider', () => {
     expect(wsMock.notificationInstances).toHaveLength(0)
   })
 
-  test('falls back to browser notifications when no native notification provider exists', async () => {
+  test('uses browser notifications when the native provider is unavailable', async () => {
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
 
@@ -94,7 +94,48 @@ describe('terminal notification provider', () => {
     dispose()
   })
 
-  test('sends test notifications through the same provider chain', async () => {
+  test('keeps the browser provider selected when a native bridge appears later', async () => {
+    const provider = createTerminalNotificationProvider()
+    const notifyBell = vi.fn(async () => true)
+    Object.defineProperty(window, 'goblinNative', {
+      configurable: true,
+      value: currentNativeBridge({
+        terminal: {
+          notifyBell,
+          sendTestNotification: async () => true,
+          setBadge: () => {},
+        },
+      }),
+    })
+
+    await expect(provider.notifyBell(bellInput)).resolves.toBe(true)
+
+    expect(wsMock.notificationInstances).toHaveLength(1)
+    expect(notifyBell).not.toHaveBeenCalled()
+  })
+
+  test('keeps the captured native provider when the global bridge is removed later', async () => {
+    const notifyBell = vi.fn(async () => true)
+    Object.defineProperty(window, 'goblinNative', {
+      configurable: true,
+      value: currentNativeBridge({
+        terminal: {
+          notifyBell,
+          sendTestNotification: async () => true,
+          setBadge: () => {},
+        },
+      }),
+    })
+    const provider = createTerminalNotificationProvider()
+    delete (window as Partial<Window>).goblinNative
+
+    await expect(provider.notifyBell(bellInput)).resolves.toBe(true)
+
+    expect(notifyBell).toHaveBeenCalledWith(bellInput)
+    expect(wsMock.notificationInstances).toHaveLength(0)
+  })
+
+  test('sends test notifications through the selected native provider', async () => {
     const sendTestNotification = vi.fn(async () => true)
     Object.defineProperty(window, 'goblinNative', {
       configurable: true,

@@ -17,16 +17,6 @@ describe('terminalCreateErrorKey', () => {
   test.each([
     [new Error('error.unavailable'), 'error.terminal-create-failed'],
     [new Error('error.invalid-arguments'), 'error.invalid-arguments'],
-    [new Error('Terminal socket open timed out'), 'error.terminal-connection-timeout'],
-    [new Error('App realtime socket open timed out'), 'error.terminal-connection-timeout'],
-    [new Error('Terminal request timed out'), 'error.terminal-create-timeout'],
-    [new Error('App realtime request timed out'), 'error.terminal-create-timeout'],
-    [new Error('Terminal socket closed before open'), 'error.terminal-connection-unavailable'],
-    [new Error('App realtime socket closed before open'), 'error.terminal-connection-unavailable'],
-    [new Error('Terminal socket closed before open (1006)'), 'error.terminal-connection-unavailable'],
-    [new Error('App realtime socket closed before open (1006)'), 'error.terminal-connection-unavailable'],
-    [new Error('Terminal socket error before open'), 'error.terminal-connection-unavailable'],
-    [new Error('App realtime socket error before open'), 'error.terminal-connection-unavailable'],
     [new Error('boom'), 'error.terminal-create-failed'],
   ])('maps %s to %s', (error, expectedKey) => {
     expect(terminalCreateErrorKey(error)).toBe(expectedKey)

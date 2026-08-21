@@ -16,8 +16,6 @@ import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requireGitWorkspaceClientState } from '#/web/stores/workspaces/git-workspace-client-state.ts'
@@ -29,7 +27,6 @@ const mocks = vi.hoisted(() => ({
   openWorkspaceEditor: vi.fn(),
   openWorkspaceInFinder: vi.fn(),
   openWorkspaceTerminal: vi.fn(),
-  openRepoUrl: vi.fn(),
   openExternalUrl: vi.fn(),
   toastWarning: vi.fn(),
 }))
@@ -64,7 +61,7 @@ describe('useBranchActions', () => {
     mocks.toastWarning.mockReset()
   })
 
-  test('openTerminal routes to the remote IPC for remote repos', async () => {
+  test('openTerminal passes the remote worktree execution target', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -103,7 +100,12 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
-      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
+      {
+        kind: 'git-worktree',
+        workspaceId: target!.id,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+ssh://example/srv/repo-feature'),
+      },
       'ghostty',
     )
   })
@@ -166,7 +168,7 @@ describe('useBranchActions', () => {
     }
   })
 
-  test('openEditor routes to the remote IPC for remote repos', async () => {
+  test('openEditor passes the remote worktree execution target', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -205,12 +207,17 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
-      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
+      {
+        kind: 'git-worktree',
+        workspaceId: target!.id,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+ssh://example/srv/repo-feature'),
+      },
       'vscode',
     )
   })
 
-  test('openTerminal uses the embedded server route for non-remote repos', async () => {
+  test('openTerminal passes the local worktree execution target', async () => {
     const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -226,7 +233,12 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
-      worktreeTarget(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature'),
+      {
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+file:///tmp/local-feature'),
+      },
       'ghostty',
     )
   })
@@ -268,7 +280,12 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
-      worktreeTarget(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature'),
+      {
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+file:///tmp/local-feature'),
+      },
       'vscode',
     )
   })
@@ -289,7 +306,12 @@ describe('useBranchActions', () => {
     })
 
     expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(
-      worktreeTarget(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature'),
+      {
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+file:///tmp/local-feature'),
+      },
     )
   })
 
@@ -337,12 +359,6 @@ describe('useBranchActions', () => {
     })
   })
 })
-
-function worktreeTarget(workspaceId: WorkspaceId, workspaceRuntimeId: string, worktreePath: string) {
-  const target = gitWorktreeFilesystemExecutionTarget(workspaceId, workspaceRuntimeId, worktreePath)
-  if (!target) throw new Error('invalid test worktree target')
-  return target
-}
 
 function renderBranchActions(repo: RepoPresentationForTest) {
   const branch = repo.snapshot.branches[0]!

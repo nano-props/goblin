@@ -44,7 +44,7 @@ describe('remote lifecycle projection acceptance', () => {
     })
   })
 
-  test('rejects a projection for a replaced runtime generation', async () => {
+  test('rejects a projection for a replaced runtime generation', () => {
     workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
@@ -54,7 +54,7 @@ describe('remote lifecycle projection acceptance', () => {
     expect(accept({ kind: 'ready', attemptId: 1, target })).toBe(false)
   })
 
-  test('applies only runtime entries represented by this window', async () => {
+  test('applies only runtime entries represented by this window', () => {
     acceptRemoteWorkspaceLifecycleSnapshot(workspacesStore.setState, workspacesStore.getState, {
       runtimes: [
         {

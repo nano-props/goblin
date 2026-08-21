@@ -39,14 +39,14 @@ export function isBranchActionBlocked(repo: Pick<BranchActionRepo, 'branchAction
   return repo.branchAction.phase !== 'idle'
 }
 
-export function isActiveServerBranchAction(operation: RepoServerOperationState): boolean {
+function isActiveServerBranchAction(operation: RepoServerOperationState): boolean {
   return (
     serverBranchActionReason(operation) !== null &&
     (operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling')
   )
 }
 
-export function serverBranchActionReason(operation: RepoServerOperationState): RepoOperationState['reason'] {
+function serverBranchActionReason(operation: RepoServerOperationState): RepoOperationState['reason'] {
   switch (operation.kind) {
     case 'pull':
       return 'branch:pull'

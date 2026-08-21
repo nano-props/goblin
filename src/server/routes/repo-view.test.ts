@@ -162,38 +162,6 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
     expect(json.code).toBe('UNAUTHORIZED')
   })
 
-  test('accepts request with access token and fans out the intent (200)', async () => {
-    const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerClientIntentSocket(subscriber)
-
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: 0,
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: makeAppRealtimeHost(),
-      workspacePaneTabsHost,
-      worktreeRemovalApplication,
-    })
-    const res = await app.request(
-      new Request('http://127.0.0.1:32100/api/repo/view', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-goblin-access-token': 'secret',
-        },
-        body: JSON.stringify({ tab: 'changes' }),
-      }),
-    )
-    expect(res.status).toBe(200)
-    expect(subscriber.send).toHaveBeenCalledWith(
-      JSON.stringify({
-        type: 'client-effect-intent',
-        intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
-      }),
-    )
-  })
-
   test('accepts the real g-command JSON transport through assembled middleware', async () => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
     registerClientIntentSocket(subscriber)

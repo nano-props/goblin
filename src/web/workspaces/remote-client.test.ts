@@ -42,7 +42,16 @@ describe('remote client web helpers', () => {
   })
 
   test('tests remote repository through embedded server in web host mode', async () => {
-    mockFetch(async () => ({
+    const target = {
+      id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
+      alias: 'prod',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+    }
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         ok: true,
@@ -60,16 +69,10 @@ describe('remote client web helpers', () => {
     }))
     const { testRemoteWorkspaceConnection } = await import('#/web/workspaces/remote-client.ts')
 
-    await expect(
-      testRemoteWorkspaceConnection({
-        id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
-        alias: 'prod',
-        host: 'example.com',
-        user: 'alice',
-        port: 22,
-        remotePath: '/srv/repo',
-        displayName: 'prod:repo',
-      }),
-    ).resolves.toMatchObject({ ok: true })
+    await expect(testRemoteWorkspaceConnection(target)).resolves.toMatchObject({ ok: true })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/remote/test-workspace',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ target }) }),
+    )
   })
 })

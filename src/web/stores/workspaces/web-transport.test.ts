@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -7,27 +7,28 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 describe('repo web transport helpers', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
     vi.resetModules()
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {
-          runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        },
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        open: vi.fn(() => ({})),
+    vi.stubGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: {
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        search: '',
+      },
+      open: vi.fn(() => ({})),
     })
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
   test('copy-patch helper uses embedded server route in web host mode', async () => {
-    mockFetch(async () => ({
+    const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'diff --git a/file b/file' }),
     }))
@@ -37,6 +38,10 @@ describe('repo web transport helpers', () => {
       ok: true,
       message: 'diff --git a/file b/file',
     })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/patch',
+      expect.objectContaining({ method: 'POST' }),
+    )
   })
 
   test('open repo URL opens browser with server-provided URL in web host mode', async () => {
@@ -56,20 +61,6 @@ describe('repo web transport helpers', () => {
   })
 
   test('remote target resolution uses embedded server routes in web host mode', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {
-          runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        },
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-      },
-    })
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({

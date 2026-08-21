@@ -9,15 +9,15 @@ if (!WORKSPACE_ID || !SECOND_WORKSPACE_ID) throw new Error('invalid workspace lo
 const TARGET = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-1' }
 
 describe('RuntimeProjectionScope', () => {
-  test('coalesces overlapping lane invalidations into one follow-up operation', async () => {
+  test('coalesces overlapping work in one lane into a single follow-up operation', async () => {
     const first = Promise.withResolvers<string>()
     const second = Promise.withResolvers<string>()
     const publish = vi.fn()
     const reject = vi.fn()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    const runFirst = vi.fn(async () => await first.promise)
-    const runSecond = vi.fn(async () => await second.promise)
+    const runFirst = vi.fn(() => first.promise)
+    const runSecond = vi.fn(() => second.promise)
     scope.runLatest('recovery', runFirst, publish, reject)
     scope.runLatest('recovery', runSecond, publish, reject)
     second.resolve('new')
@@ -44,9 +44,9 @@ describe('RuntimeProjectionScope', () => {
     scope.track(unsubscribe)
     scope.runLatest(
       'recovery',
-      async (signal) => {
+      (signal) => {
         taskSignal = signal
-        return await deferred.promise
+        return deferred.promise
       },
       publish,
       reject,
@@ -73,8 +73,8 @@ describe('RuntimeProjectionScopeRegistry', () => {
     const lateFailure = Promise.withResolvers<string>()
     const publish = vi.fn()
     const reject = vi.fn()
-    oldScope.runLatest('success', async () => await lateSuccess.promise, publish, reject)
-    oldScope.runLatest('failure', async () => await lateFailure.promise, publish, reject)
+    oldScope.runLatest('success', () => lateSuccess.promise, publish, reject)
+    oldScope.runLatest('failure', () => lateFailure.promise, publish, reject)
 
     currentRuntimeId = 'repo-runtime-2'
     const replacement = registry.scopeFor({ workspaceId: TARGET.workspaceId, workspaceRuntimeId: currentRuntimeId })

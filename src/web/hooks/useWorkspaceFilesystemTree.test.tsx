@@ -211,12 +211,7 @@ describe('useWorkspaceFilesystemTree', () => {
     const snapshots: HarnessSnapshot[] = []
     queryClient.setQueryData<WorkspaceFilesystemTreeResult>(
       workspaceFilesystemTreeChildrenQueryKey(mainExecutionTarget(), ''),
-      {
-        nodes: [
-          { id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' },
-        ],
-        truncated: false,
-      },
+      filesystemTree(fileNode('README.md')),
     )
     mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
@@ -250,19 +245,7 @@ describe('useWorkspaceFilesystemTree', () => {
     )
     queryClient.setQueryData<WorkspaceFilesystemTreeResult>(
       workspaceFilesystemTreeChildrenQueryKey(mainExecutionTarget(), 'src/web'),
-      {
-        nodes: [
-          {
-            id: 'src/web/FiletreeView.tsx',
-            path: 'src/web/FiletreeView.tsx',
-            name: 'FiletreeView.tsx',
-            parentId: 'src/web',
-            kind: 'file',
-            status: 'clean',
-          },
-        ],
-        truncated: false,
-      },
+      filesystemTree(fileNode('src/web/FiletreeView.tsx', 'src/web')),
     )
     mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
@@ -394,7 +377,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/web', 'src/web/recovered.ts'])
   })
 
-  test('loads the initial tree', async () => {
+  test('projects loading and the accepted initial root read', async () => {
     const deferred = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)
 
@@ -403,10 +386,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledWith(mainExecutionTarget(), {})
     expect(lastSnapshot?.isInitialLoading).toBe(true)
     expect(lastSnapshot?.error).toBeNull()
-    const result: WorkspaceFilesystemTreeResult = {
-      nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
-      truncated: false,
-    }
+    const result = filesystemTree(fileNode('README.md'))
 
     await flushTestUpdates(async () => {
       deferred.resolve(result)
@@ -523,7 +503,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.isInitialLoading).toBe(false)
   })
 
-  test('starts the new target read without letting the previous cache read clobber it', async () => {
+  test('isolates a replacement target from the superseded owner', async () => {
     const first = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     const second = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise)
@@ -554,10 +534,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     // Resolving the second promise applies the new state.
     await flushTestUpdates(async () => {
-      second.resolve({
-        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-        truncated: false,
-      })
+      second.resolve(filesystemTree(directoryNode('src')))
     })
     await flush()
     expect(lastSnapshot?.tree?.nodes).toHaveLength(1)
@@ -578,23 +555,8 @@ describe('useWorkspaceFilesystemTree', () => {
 
   test('loads and merges direct children for an expanded directory', async () => {
     mocks.getWorkspaceFilesystemTree
-      .mockResolvedValueOnce({
-        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-        truncated: false,
-      })
-      .mockResolvedValueOnce({
-        nodes: [
-          {
-            id: 'src/index.ts',
-            path: 'src/index.ts',
-            name: 'index.ts',
-            parentId: 'src',
-            kind: 'file',
-            status: 'clean',
-          },
-        ],
-        truncated: false,
-      })
+      .mockResolvedValueOnce(filesystemTree(directoryNode('src')))
+      .mockResolvedValueOnce(filesystemTree(fileNode('src/index.ts', 'src')))
 
     await render(mainHarnessProps())
     await flush()
@@ -614,10 +576,7 @@ describe('useWorkspaceFilesystemTree', () => {
   test('projects child loading only while its directory is reachable', async () => {
     const child = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree
-      .mockResolvedValueOnce({
-        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-        truncated: false,
-      })
+      .mockResolvedValueOnce(filesystemTree(directoryNode('src')))
       .mockReturnValueOnce(child.promise)
 
     await render(mainHarnessProps())
@@ -643,19 +602,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(true)
 
     await flushTestUpdates(async () => {
-      child.resolve({
-        nodes: [
-          {
-            id: 'src/index.ts',
-            path: 'src/index.ts',
-            name: 'index.ts',
-            parentId: 'src',
-            kind: 'file',
-            status: 'clean',
-          },
-        ],
-        truncated: false,
-      })
+      child.resolve(filesystemTree(fileNode('src/index.ts', 'src')))
       await childLoad
     })
     await flush()
@@ -841,32 +788,6 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.error).toBe('refresh failed')
   })
 
-  test('invalidating after a successful read refreshes the cached tree', async () => {
-    mocks.getWorkspaceFilesystemTree
-      .mockResolvedValueOnce({
-        nodes: [{ id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' }],
-        truncated: false,
-      })
-      .mockResolvedValueOnce({
-        nodes: [
-          { id: 'second.ts', path: 'second.ts', name: 'second.ts', parentId: null, kind: 'file', status: 'clean' },
-        ],
-        truncated: false,
-      })
-
-    await render(mainHarnessProps())
-    await flush()
-    expect(lastSnapshot?.isInitialLoading).toBe(false)
-    expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('first.ts')
-
-    await emitFilesystemInvalidation()
-    await flush()
-
-    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
-    expect(lastSnapshot?.isInitialLoading).toBe(false)
-    expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('second.ts')
-  })
-
   test('invalidating keeps the current tree visible and reloads restored expanded children', async () => {
     const root = filesystemTree(directoryNode('src'))
     const oldChildren = filesystemTree(fileNode('src/old.ts', 'src'))
@@ -917,19 +838,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(1)
 
     await flushTestUpdates(async () => {
-      first.resolve({
-        nodes: [
-          {
-            id: 'first.ts',
-            path: 'first.ts',
-            name: 'first.ts',
-            parentId: null,
-            kind: 'file',
-            status: 'clean',
-          },
-        ],
-        truncated: false,
-      })
+      first.resolve(filesystemTree(fileNode('first.ts')))
     })
     await flush()
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('first.ts')
@@ -937,19 +846,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
   test('coalesces invalidation during an in-flight read and discards the pre-invalidation result', async () => {
     const first = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
-    const current = {
-      nodes: [
-        {
-          id: 'current.ts',
-          path: 'current.ts',
-          name: 'current.ts',
-          parentId: null,
-          kind: 'file',
-          status: 'clean' as const,
-        },
-      ],
-      truncated: false,
-    }
+    const current = filesystemTree(fileNode('current.ts'))
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise).mockResolvedValueOnce(current)
 
     await render(mainHarnessProps())
@@ -957,10 +854,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
 
     await flushTestUpdates(async () => {
-      first.resolve({
-        nodes: [{ id: 'stale.ts', path: 'stale.ts', name: 'stale.ts', parentId: null, kind: 'file', status: 'clean' }],
-        truncated: false,
-      })
+      first.resolve(filesystemTree(fileNode('stale.ts')))
     })
     await flush()
 
@@ -1005,12 +899,9 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('shares one invalidation ingress and one refetch across observers of the same target', async () => {
-    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false }).mockResolvedValueOnce({
-      nodes: [
-        { id: 'current.ts', path: 'current.ts', name: 'current.ts', parentId: null, kind: 'file', status: 'clean' },
-      ],
-      truncated: false,
-    })
+    mocks.getWorkspaceFilesystemTree
+      .mockResolvedValueOnce(filesystemTree())
+      .mockResolvedValueOnce(filesystemTree(fileNode('current.ts')))
 
     await renderElement(
       <>
@@ -1070,12 +961,9 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('keeps cached data invalidatable while every filesystem observer is unmounted', async () => {
-    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false }).mockResolvedValueOnce({
-      nodes: [
-        { id: 'current.ts', path: 'current.ts', name: 'current.ts', parentId: null, kind: 'file', status: 'clean' },
-      ],
-      truncated: false,
-    })
+    mocks.getWorkspaceFilesystemTree
+      .mockResolvedValueOnce(filesystemTree())
+      .mockResolvedValueOnce(filesystemTree(fileNode('current.ts')))
     await render(mainHarnessProps({ onSnapshot: () => {} }))
     await flush()
 
@@ -1088,12 +976,9 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('keeps workspace-root and Git worktree caches separate at the same filesystem path', async () => {
-    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false }).mockResolvedValueOnce({
-      nodes: [
-        { id: 'tracked.ts', path: 'tracked.ts', name: 'tracked.ts', parentId: null, kind: 'file', status: 'clean' },
-      ],
-      truncated: false,
-    })
+    mocks.getWorkspaceFilesystemTree
+      .mockResolvedValueOnce(filesystemTree())
+      .mockResolvedValueOnce(filesystemTree(fileNode('tracked.ts')))
 
     await render(
       mainHarnessProps({

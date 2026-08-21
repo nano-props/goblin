@@ -103,8 +103,9 @@ function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
 /**
  * The single client bridge. Replaces the previous
  * `electronBridge()` / `webBridge()` pair: there is no longer a
- * runtime-specific factory, just one bridge whose every method
- * reads `window.goblinNative` lazily for genuinely native capabilities.
+ * runtime-specific factory. Native shell capabilities read
+ * `window.goblinNative` at their call boundary, while stateful server clients
+ * bind their dependencies once when the shared realtime client is created.
  *
  * Why this is the right shape:
  *
@@ -196,10 +197,9 @@ function createClientBridge(): ClientBridge {
   }
 }
 
-// The collapsed bridge is `kind()`-agnostic — every method reads
-// `window.goblinNative` lazily, so the same instance handles both
-// the Electron-embedded runtime (where `goblinNative` is exposed by
-// the preload) and the standalone web runtime (where it isn't).
+// The collapsed bridge is `kind()`-agnostic. Stateless native capability
+// methods read `window.goblinNative` at their call boundary, so the same outer
+// bridge handles embedded Electron and standalone web runtimes.
 //
 // We rebuild the outer bridge on every call rather than memoizing:
 // the inner terminal client is memoized separately (it owns the

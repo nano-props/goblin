@@ -8,7 +8,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   updateWorkspacePaneTabs,
@@ -21,8 +21,6 @@ import {
   runtimeWorkspacePaneTargetForTest,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
-import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { workspacePaneTabTargetBlocksInteraction } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -68,7 +66,7 @@ describe('workspace pane tabs canonical projection', () => {
 describe('updateWorkspacePaneTabs', () => {
   test('does not block target interaction for open-static updates', async () => {
     const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
-    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await serverTabs.promise })
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: () => serverTabs.promise })
 
     const update = updateWorkspacePaneTabs({
       ...target(),
@@ -170,9 +168,9 @@ describe('updateWorkspacePaneTabs', () => {
     const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     const requestStarted = Promise.withResolvers<void>()
     installWorkspacePaneTabsTestBridge({
-      updateWorkspaceTabs: async () => {
+      updateWorkspaceTabs: () => {
         requestStarted.resolve()
-        return await serverTabs.promise
+        return serverTabs.promise
       },
     })
     seedTabs([workspacePaneStaticTabEntry('status')])
@@ -193,9 +191,9 @@ describe('updateWorkspacePaneTabs', () => {
     const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     const requestStarted = Promise.withResolvers<void>()
     installWorkspacePaneTabsTestBridge({
-      updateWorkspaceTabs: async () => {
+      updateWorkspaceTabs: () => {
         requestStarted.resolve()
-        return await serverTabs.promise
+        return serverTabs.promise
       },
     })
     const update = updateWorkspacePaneTabs({

@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import type { VNodeChild } from 'vue'
-import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { TerminalSessionView } from '#/web/terminal/components/TerminalSessionView.tsx'
@@ -51,37 +51,23 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
     const navigation = useAppNavigation()
     const projectionRecovery = useTerminalProjectionRecoveryActions()
 
-    const createTerminalForSlot = async (base: TerminalSessionBase) => {
-      await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+    const createTerminalForSlot = () =>
+      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         location: props.target.location,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
-        showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) => {
-          if (base.target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
-            return showCreatedTerminalWorkspacePaneRuntimeTab(
-              props.target.location,
-              presentation,
-              terminalSessionId,
-              navigation,
-              routeRequest,
-            )
-          }
-          if (base.target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
-            return showCreatedTerminalWorkspacePaneRuntimeTab(
-              props.target.location,
-              presentation,
-              terminalSessionId,
-              navigation,
-              routeRequest,
-            )
-          }
-          return false
-        },
+        showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>
+          showCreatedTerminalWorkspacePaneRuntimeTab(
+            props.target.location,
+            presentation,
+            terminalSessionId,
+            navigation,
+            routeRequest,
+          ),
         focusTerminal,
         t,
         logMessage: 'workspace pane terminal create failed',
       })
-    }
 
     return () => {
       const base = workspacePaneLocationTerminalBase(props.target.location)

@@ -46,7 +46,7 @@ async function commitFilesystemTerminalDestination(input: {
   location: FilesystemWorkspacePaneLocation
   terminalSessionId: string
 }): Promise<WorkspacePaneActionOutcome> {
-  return await commitQueuedTerminalDestination(input.location, async () => {
+  return commitQueuedTerminalDestination(input.location, async () => {
     const projectionOutcome = terminalPaneProjectionOutcome(
       input.location.paneTarget,
       input.location.workspaceRuntimeId,

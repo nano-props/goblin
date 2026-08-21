@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import {
   disposeAllRepoOperationSchedulers,
   disposeRepoOperationScheduler,
@@ -15,6 +15,9 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace/runtime-scheduler')
 
 beforeEach(() => {
+  disposeAllRepoOperationSchedulers()
+})
+afterEach(() => {
   disposeAllRepoOperationSchedulers()
 })
 
@@ -145,7 +148,7 @@ describe('workspace runtime task scheduling', () => {
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
   })
 
-  test('local guard helpers name the scheduler-only admission sets', () => {
+  test('derives local admission guards from scheduler operation state', () => {
     expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toEqual({
       fetchBusy: false,
@@ -158,6 +161,7 @@ describe('workspace runtime task scheduling', () => {
       [{ key: 'branchAction', reason: 'branch:pull', target: 'feature/a' }],
       'queued',
     )
+    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(true)
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toMatchObject({
       fetchBusy: false,
       branchOperationPhase: 'queued',

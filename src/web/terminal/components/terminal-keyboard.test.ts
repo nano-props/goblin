@@ -67,12 +67,10 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('returns null when modifier keys are pressed', () => {
+  test.each(['ctrlKey', 'altKey', 'metaKey'] as const)('returns null when %s is pressed', (modifier) => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
-      expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true, ctrlKey: true }))).toBeNull()
-      expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true, altKey: true }))).toBeNull()
-      expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true, metaKey: true }))).toBeNull()
+      expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true, [modifier]: true }))).toBeNull()
     })
   })
 
@@ -83,41 +81,47 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('returns null when key is already the correct shifted character', () => {
+  test.each([
+    ['<', 'Comma'],
+    ['?', 'Slash'],
+    ['《', 'Comma'],
+    ['？', 'Slash'],
+  ])('returns null when %s is already the shifted character', (key, code) => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
-      expect(resolver.inputForEvent(keyEvent({ key: '<', code: 'Comma', shiftKey: true }))).toBeNull()
-      expect(resolver.inputForEvent(keyEvent({ key: '?', code: 'Slash', shiftKey: true }))).toBeNull()
-      expect(resolver.inputForEvent(keyEvent({ key: '《', code: 'Comma', shiftKey: true }))).toBeNull()
-      expect(resolver.inputForEvent(keyEvent({ key: '？', code: 'Slash', shiftKey: true }))).toBeNull()
+      expect(resolver.inputForEvent(keyEvent({ key, code, shiftKey: true }))).toBeNull()
     })
   })
 
-  test('US QWERTY: returns shifted char when key reports unshifted char', () => {
+  test.each([
+    [',', 'Comma', '<'],
+    ['.', 'Period', '>'],
+    ['/', 'Slash', '?'],
+    [';', 'Semicolon', ':'],
+    ["'", 'Quote', '"'],
+    ['[', 'BracketLeft', '{'],
+    [']', 'BracketRight', '}'],
+    ['\\', 'Backslash', '|'],
+  ])('maps US QWERTY %s (%s) to %s', (key, code, expected) => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
-      expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true }))).toBe('<')
-      expect(resolver.inputForEvent(keyEvent({ key: '.', code: 'Period', shiftKey: true }))).toBe('>')
-      expect(resolver.inputForEvent(keyEvent({ key: '/', code: 'Slash', shiftKey: true }))).toBe('?')
-      expect(resolver.inputForEvent(keyEvent({ key: ';', code: 'Semicolon', shiftKey: true }))).toBe(':')
-      expect(resolver.inputForEvent(keyEvent({ key: "'", code: 'Quote', shiftKey: true }))).toBe('"')
-      expect(resolver.inputForEvent(keyEvent({ key: '[', code: 'BracketLeft', shiftKey: true }))).toBe('{')
-      expect(resolver.inputForEvent(keyEvent({ key: ']', code: 'BracketRight', shiftKey: true }))).toBe('}')
-      expect(resolver.inputForEvent(keyEvent({ key: '\\', code: 'Backslash', shiftKey: true }))).toBe('|')
+      expect(resolver.inputForEvent(keyEvent({ key, code, shiftKey: true }))).toBe(expected)
     })
   })
 
-  test('Chinese layout: returns full-width shifted char when key reports full-width unshifted char', () => {
+  test.each([
+    ['，', 'Comma', '《'],
+    ['。', 'Period', '》'],
+    ['、', 'Slash', '？'],
+    ['；', 'Semicolon', '：'],
+    ['‘', 'Quote', '“'],
+    ['’', 'Quote', '”'],
+    ['【', 'BracketLeft', '｛'],
+    ['】', 'BracketRight', '｝'],
+  ])('maps Chinese layout %s (%s) to %s', (key, code, expected) => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
-      expect(resolver.inputForEvent(keyEvent({ key: '，', code: 'Comma', shiftKey: true }))).toBe('《')
-      expect(resolver.inputForEvent(keyEvent({ key: '。', code: 'Period', shiftKey: true }))).toBe('》')
-      expect(resolver.inputForEvent(keyEvent({ key: '、', code: 'Slash', shiftKey: true }))).toBe('？')
-      expect(resolver.inputForEvent(keyEvent({ key: '；', code: 'Semicolon', shiftKey: true }))).toBe('：')
-      expect(resolver.inputForEvent(keyEvent({ key: '‘', code: 'Quote', shiftKey: true }))).toBe('“')
-      expect(resolver.inputForEvent(keyEvent({ key: '’', code: 'Quote', shiftKey: true }))).toBe('”')
-      expect(resolver.inputForEvent(keyEvent({ key: '【', code: 'BracketLeft', shiftKey: true }))).toBe('｛')
-      expect(resolver.inputForEvent(keyEvent({ key: '】', code: 'BracketRight', shiftKey: true }))).toBe('｝')
+      expect(resolver.inputForEvent(keyEvent({ key, code, shiftKey: true }))).toBe(expected)
     })
   })
 
@@ -175,31 +179,17 @@ describe('SafariShiftKeyResolver', () => {
 })
 
 describe('terminalInputForMacOptionArrow', () => {
-  test('returns escape sequence for Option+Arrow on Mac', () => {
+  test.each([
+    ['Mac normal cursor mode', { isMac: true, applicationCursorKeysMode: false }, '\x1bb'],
+    ['non-Mac platform', { isMac: false, applicationCursorKeysMode: false }, null],
+    ['application cursor mode', { isMac: true, applicationCursorKeysMode: true }, null],
+  ] as const)('maps Option+Arrow for %s', (_scenario, options, expected) => {
     expect(
       terminalInputForMacOptionArrow(
         { type: 'keydown', key: 'ArrowLeft', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false },
-        { isMac: true, applicationCursorKeysMode: false },
+        options,
       ),
-    ).toBe('\x1bb')
-  })
-
-  test('returns null when not on Mac', () => {
-    expect(
-      terminalInputForMacOptionArrow(
-        { type: 'keydown', key: 'ArrowLeft', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false },
-        { isMac: false, applicationCursorKeysMode: false },
-      ),
-    ).toBeNull()
-  })
-
-  test('returns null in application cursor keys mode', () => {
-    expect(
-      terminalInputForMacOptionArrow(
-        { type: 'keydown', key: 'ArrowLeft', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false },
-        { isMac: true, applicationCursorKeysMode: true },
-      ),
-    ).toBeNull()
+    ).toBe(expected)
   })
 })
 
@@ -228,29 +218,35 @@ describe('terminalInputForVirtualKey', () => {
 })
 
 describe('isMacNavigatorPlatform', () => {
-  test('recognizes Mac platforms', () => {
-    expect(isMacNavigatorPlatform('MacIntel')).toBe(true)
-    expect(isMacNavigatorPlatform('iPhone')).toBe(true)
-    expect(isMacNavigatorPlatform('iPad')).toBe(true)
-    expect(isMacNavigatorPlatform('Win32')).toBe(false)
-    expect(isMacNavigatorPlatform('Linux x86_64')).toBe(false)
+  test.each([
+    ['MacIntel', true],
+    ['iPhone', true],
+    ['iPad', true],
+    ['Win32', false],
+    ['Linux x86_64', false],
+  ] as const)('maps %s to %s', (platform, expected) => {
+    expect(isMacNavigatorPlatform(platform)).toBe(expected)
   })
 })
 
 describe('isDesktopMacNavigatorPlatform', () => {
-  test('excludes iOS platforms from the strict desktop gate', () => {
-    expect(isDesktopMacNavigatorPlatform('MacIntel')).toBe(true)
-    expect(isDesktopMacNavigatorPlatform('MacPPC')).toBe(true)
-    expect(isDesktopMacNavigatorPlatform('iPhone')).toBe(false)
-    expect(isDesktopMacNavigatorPlatform('iPad')).toBe(false)
-    expect(isDesktopMacNavigatorPlatform('Win32')).toBe(false)
+  test.each([
+    ['MacIntel', true],
+    ['MacPPC', true],
+    ['iPhone', false],
+    ['iPad', false],
+    ['Win32', false],
+  ] as const)('maps %s to %s', (platform, expected) => {
+    expect(isDesktopMacNavigatorPlatform(platform)).toBe(expected)
   })
 })
 
 describe('isImeOwnedKeyboardEvent', () => {
-  test('recognizes active composition and the WebKit compatibility event', () => {
-    expect(isImeOwnedKeyboardEvent({ isComposing: true, keyCode: 0 })).toBe(true)
-    expect(isImeOwnedKeyboardEvent({ isComposing: false, keyCode: 229 })).toBe(true)
-    expect(isImeOwnedKeyboardEvent({ isComposing: false, keyCode: 27 })).toBe(false)
+  test.each([
+    ['active composition', { isComposing: true, keyCode: 0 }, true],
+    ['WebKit composition event', { isComposing: false, keyCode: 229 }, true],
+    ['ordinary key event', { isComposing: false, keyCode: 27 }, false],
+  ] as const)('maps %s to %s', (_scenario, event, expected) => {
+    expect(isImeOwnedKeyboardEvent(event)).toBe(expected)
   })
 })

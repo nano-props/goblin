@@ -24,6 +24,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalAttachResult, TerminalRestartResult } from '#/shared/terminal-types.ts'
 import { waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/terminal/components/TerminalSession.ts'
+import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 
@@ -117,7 +118,6 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
       processName: 'zsh',
     })
 
-    // Controller mode: metadata doesn't change (processName was already set during attach)
     expect(notify).toHaveBeenCalledTimes(0)
     expect(xtermMocks.terminals[0]!.write).not.toHaveBeenCalled()
     await flushTerminalStart()
@@ -167,28 +167,6 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('before exit', expect.any(Function))
     expect(session.snapshot()).toMatchObject({ phase: 'open', message: null, processName: 'zsh', canonicalTitle: null })
     expect(terminalCalls.close).not.toHaveBeenCalled()
-  })
-
-  test('keeps hydrated title when selecting a mirrored session', async () => {
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      processName: 'zsh',
-      canonicalTitle: '~/Developer/goblin — npm run dev',
-      role: 'viewer',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-
-    session.attach(host)
-
-    expect(session.snapshot()).toMatchObject({
-      processName: 'zsh',
-      canonicalTitle: '~/Developer/goblin — npm run dev',
-    })
   })
 
   test('does not issue a direct close when disposed before restart reaches main', async () => {
@@ -339,11 +317,12 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
       canonicalSize: { cols: 100, rows: 30 },
     })
     const pending = session.pendingAuthoritativeRuntimeBinding()
+    if (!pending) throw new Error('expected pending authoritative binding')
     expect(pending).toEqual({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 2,
     })
-    expect(session.commitPendingAuthoritativeHydration(pending!)).toBe(true)
+    expect(session.commitPendingAuthoritativeHydration(pending)).toBe(true)
 
     oldAttach.resolve(
       attachResult('pty_session_1_aaaaaaaaa', {
@@ -544,6 +523,122 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
     })
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('recovered committed binding', expect.any(Function))
     expect(session.snapshot().presentationRecovery).toBeUndefined()
+  })
+
+  test('does not retry an error session when a later layout notification arrives', async () => {
+    terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    expect(session.snapshot().phase).toBe('error')
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
+
+    MockResizeObserver.instances[0]!.emit()
+    await flushTerminalStart()
+
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
+    expect(session.snapshot().phase).toBe('error')
+  })
+
+  test('does not turn a local attach transport failure into authoritative runtime error metadata', async () => {
+    terminalCalls.attach.mockRejectedValueOnce(new Error('transport unavailable'))
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+
+    session.attach(host)
+    await flushTerminalStart()
+
+    expect(session.snapshot().phase).toBe('open')
+    expect(session.addressableRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+    })
+    expect(host.querySelector('.goblin-managed-terminal-frame .xterm')).toBeNull()
+    expect(warnSpy).toHaveBeenCalledWith('terminal start request failed before an authoritative response', {
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      operation: 'attach',
+      error: expect.any(Error),
+    })
+    warnSpy.mockRestore()
+  })
+
+  test('fast-fails an indeterminate attach until authoritative hydration arrives', async () => {
+    terminalCalls.attach
+      .mockRejectedValueOnce(
+        new ClientRealtimeRequestError('socket disconnected', {
+          kind: 'disconnected',
+          delivery: 'indeterminate',
+          outageId: 1,
+        }),
+      )
+      .mockResolvedValueOnce(
+        attachResult('pty_session_1_aaaaaaaaa', {
+          terminalRuntimeGeneration: 1,
+          snapshot: 'authoritative recovery',
+        }),
+      )
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    const settled = vi.fn()
+
+    session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
+    await flushTerminalStart()
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
+    expect(xtermMocks.terminals[0]!.focus).not.toHaveBeenCalled()
+    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
+    expect(session.snapshot().presentationRecovery).toBe('failed')
+
+    session.hydrate({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 0,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    expect(session.pendingAuthoritativeRuntimeBinding()).toBeNull()
+    await flushTerminalStart()
+
+    expect(terminalCalls.attach.mock.calls).toEqual([
+      [
+        {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 0,
+          cols: 100,
+          rows: 30,
+        },
+      ],
+      [
+        {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          cols: 100,
+          rows: 30,
+        },
+      ],
+    ])
+    expect(terminalCalls.restart).not.toHaveBeenCalled()
+    expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('authoritative recovery', expect.any(Function))
+    expect(xtermMocks.terminals.at(-1)!.focus).not.toHaveBeenCalled()
+    expect(settled).toHaveBeenCalledOnce()
+    expect(host.contains(document.activeElement)).toBe(false)
   })
 
   test('destroys the detached xterm and opens a fresh view on reattach', async () => {

@@ -68,6 +68,7 @@ vi.mock('#/web/keyboard/branch-action-shortcuts.ts', () => ({
 }))
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
+const originalNavigatorPlatform = window.navigator.platform
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/keyboard-repo')
 const REPO_PATH = '/tmp/keyboard-repo'
 const WORKTREE_PATH = '/tmp/keyboard-worktree'
@@ -102,6 +103,10 @@ afterEach(() => {
   resetAppNavigationForTest()
   setTerminalSessionCommandBridge(null)
   delete testWindow.goblinNative
+  Object.defineProperty(window.navigator, 'platform', {
+    configurable: true,
+    value: originalNavigatorPlatform,
+  })
   document.body.replaceChildren()
 })
 

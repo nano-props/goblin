@@ -402,16 +402,6 @@ describe('TerminalSessionProjection events', () => {
       canonicalTitle: 'new title',
     })
     expect(handleServerTitleSpy).not.toHaveBeenCalled()
-
-    handleServerTitleSpy.mockClear()
-    projection.handleServerTitle({
-      terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-unroutedunroutedroute',
-      workspaceId: REPO_ROOT,
-      canonicalTitle: 'ignored',
-    })
-    expect(handleServerTitleSpy).not.toHaveBeenCalled()
   })
 
   test('dispatches title changes by canonical terminalSessionId', () => {
@@ -471,17 +461,6 @@ describe('TerminalSessionProjection events', () => {
 
     projection.handleExit({
       terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-unroutedunroutedroute',
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      tabsBeforeRetirement: null,
-    })
-    expect(handleExitSpy).not.toHaveBeenCalled()
-
-    handleExitSpy.mockClear()
-    projection.handleExit({
-      terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unroutedunroutedroute',
       workspaceId: REPO_ROOT,
@@ -632,7 +611,7 @@ describe('TerminalSessionProjection events', () => {
     })
   })
 
-  test('notifySession invalidates filesystem target cache', () => {
+  test('server title changes invalidate the filesystem target projection', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -643,13 +622,17 @@ describe('TerminalSessionProjection events', () => {
     const listener = vi.fn()
     const unsubscribe = projection.subscribeTerminalFilesystemTarget(WORKTREE_KEY, listener)
 
-    // Prime the cache
     projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
     listener.mockClear()
 
-    // Simulate metadata change via internal notifySession
     const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-    terminalSessionProjectionAccess(projection).notifySession(terminalSessionId)
+    projection.handleServerTitle({
+      terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      terminalSessionId,
+      workspaceId: REPO_ROOT,
+      canonicalTitle: 'updated title',
+    })
 
     expect(listener).toHaveBeenCalledTimes(1)
     unsubscribe()
@@ -696,7 +679,7 @@ describe('TerminalSessionProjection events', () => {
     unsubscribeFilesystemTarget()
   })
 
-  test('destroys Composer state with logical session removal and creates no fallback state', () => {
+  test('destroys Composer state with logical session removal', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },

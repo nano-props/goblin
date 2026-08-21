@@ -24,7 +24,7 @@ const closeTarget = terminalBase
 const terminalView: WorkspacePaneTerminalTabSummary = {
   type: 'terminal',
   terminalSessionId: 'term-111111111111111111111',
-  terminalFilesystemTargetKey: 'repo\0worktree',
+  terminalFilesystemTargetKey: 'terminal-target-test',
   index: 1,
   title: 'Terminal 1',
   fullTitle: 'Terminal 1',
@@ -81,6 +81,9 @@ describe('workspace pane runtime tab close actions', () => {
     ).resolves.toEqual({ kind: 'committed', projection: 'applied' })
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
+  })
+
+  test('derives the confirmed close identity from the runtime tab provider', () => {
     expect(
       workspacePaneRuntimeTabConfirmedCloseIdentity({
         type: 'terminal',
@@ -90,7 +93,7 @@ describe('workspace pane runtime tab close actions', () => {
     ).toBe('terminal:term-111111111111111111111')
   })
 
-  test('stops pane presentation when terminal close committed without a current pane projection', async () => {
+  test('preserves a committed close with failed pane projection', async () => {
     const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'failed' as const }))
 
     await expect(

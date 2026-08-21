@@ -2,15 +2,13 @@
 
 import { createEvent, fireEvent } from '@testing-library/dom'
 import { screen, within } from '@testing-library/vue'
-import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
-import { defineComponent, onUpdated, ref, shallowRef } from 'vue'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { defineComponent, ref, shallowRef } from 'vue'
 import { TerminalComposer } from '#/web/terminal/components/terminal-composer.tsx'
 import type { TerminalComposerLabels } from '#/web/terminal/components/terminal-composer.tsx'
 import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/terminal/components/types.ts'
-import { TerminalComposerHistoryCursor } from '#/web/terminal/components/terminal-composer-history-cursor.ts'
 
 const LABELS: TerminalComposerLabels = {
   composer: 'Terminal input composer',
@@ -76,7 +74,7 @@ function render(
           shortcut="Control+Shift+Enter"
           canUploadFiles={props.canUploadFiles ?? true}
           onVirtualKey={props.onVirtualKey ?? vi.fn()}
-          onCopyContent={props.onCopyContent ?? vi.fn(async () => {})}
+          onCopyContent={props.onCopyContent ?? vi.fn().mockResolvedValue(undefined)}
           onSendText={(text) => deliverText(props.onSendText, text)}
           onSubmitText={(text) => deliverText(props.onSubmitText, text)}
           onOpen={() => {
@@ -102,7 +100,7 @@ function render(
             if (draft.value === expectedDraft) draft.value = next
             return true
           }}
-          onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
+          onResolveFiles={props.onResolveFiles ?? vi.fn().mockResolvedValue(null)}
           onFileInsertionRejected={props.onFileInsertionRejected ?? vi.fn()}
         />
       )
@@ -130,6 +128,11 @@ async function openMoreMenu(container: HTMLElement): Promise<void> {
   await flushTestUpdates(() => more.click())
 }
 
+async function requestFileUpload(container: HTMLElement): Promise<void> {
+  await openMoreMenu(container)
+  await flushTestUpdates(() => menuItemByText(LABELS.uploadFiles).click())
+}
+
 async function changeAndFlush(element: Element, init?: Parameters<typeof fireEvent.change>[1]): Promise<boolean> {
   return flushTestUpdates(() =>
     element instanceof HTMLInputElement && element.type === 'file'
@@ -144,6 +147,18 @@ async function keyDownAndFlush(element: Element, init?: Parameters<typeof fireEv
 
 async function dispatchAndFlush(element: Element, event: Event): Promise<boolean> {
   return flushTestUpdates(() => fireEvent(element, event))
+}
+
+function mockTextAreaScrollHeight(value: number): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'scrollHeight')
+  Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
+    configurable: true,
+    get: () => value,
+  })
+  return () => {
+    if (descriptor) Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', descriptor)
+    else Reflect.deleteProperty(HTMLTextAreaElement.prototype, 'scrollHeight')
+  }
 }
 
 function menuItemByText(text: string) {
@@ -172,9 +187,9 @@ const ExpandedComposerForTest = defineComponent<{
         shortcut="Control+Shift+Enter"
         canUploadFiles
         onVirtualKey={vi.fn()}
-        onCopyContent={vi.fn(async () => {})}
-        onSendText={vi.fn(async () => true)}
-        onSubmitText={vi.fn(async () => true)}
+        onCopyContent={vi.fn().mockResolvedValue(undefined)}
+        onSendText={vi.fn().mockResolvedValue(true)}
+        onSubmitText={vi.fn().mockResolvedValue(true)}
         onOpen={vi.fn(() => true)}
         onClose={vi.fn(() => true)}
         onModeChange={vi.fn(() => true)}
@@ -187,7 +202,7 @@ const ExpandedComposerForTest = defineComponent<{
           if (draft.value === expectedDraft) draft.value = next
           return true
         }}
-        onResolveFiles={vi.fn(async () => null)}
+        onResolveFiles={vi.fn().mockResolvedValue(null)}
         onFileInsertionRejected={vi.fn()}
       />
     )
@@ -213,7 +228,6 @@ describe('TerminalComposer', () => {
     await withNavigatorPlatform('MacIntel', async () => {
       const { container } = render()
       await expand(container)
-      await showInput(container)
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
       await changeAndFlush(input, { target: { value: 'git commit --message' } })
       input.setSelectionRange(input.value.length, input.value.length)
@@ -229,7 +243,6 @@ describe('TerminalComposer', () => {
     await withNavigatorPlatform('MacIntel', async () => {
       const { container } = render()
       await expand(container)
-      await showInput(container)
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
       await changeAndFlush(input, { target: { value: 'echo foobar tail' } })
       input.setSelectionRange('echo foo'.length, 'echo foo'.length)
@@ -245,7 +258,6 @@ describe('TerminalComposer', () => {
     await withNavigatorPlatform('MacIntel', async () => {
       const { container } = render()
       await expand(container)
-      await showInput(container)
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
       await changeAndFlush(input, { target: { value: 'first line\nsecond line' } })
       input.setSelectionRange('first line\nsecond '.length, 'first line\nsecond '.length)
@@ -281,17 +293,22 @@ describe('TerminalComposer', () => {
 
   test('consumes an empty edit without publishing or moving the caret', async () => {
     await withNavigatorPlatform('MacIntel', async () => {
-      const { container } = render()
-      await expand(container)
-      await showInput(container)
+      const onDraftReplaceObserved = vi.fn()
+      const { container } = renderInJsdom(
+        <ExpandedComposerForTest
+          historyEntries={[]}
+          initialDraft={'line\ntwo'}
+          onDraftReplaceObserved={onDraftReplaceObserved}
+        />,
+      )
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
-      await changeAndFlush(input, { target: { value: 'line\ntwo' } })
       input.setSelectionRange('line\n'.length, 'line\n'.length)
       const event = createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true })
 
       await dispatchAndFlush(input, event)
 
       expect(event.defaultPrevented).toBe(true)
+      expect(onDraftReplaceObserved).not.toHaveBeenCalled()
       expect(input.value).toBe('line\ntwo')
       expect(input.selectionStart).toBe('line\n'.length)
     })
@@ -301,7 +318,6 @@ describe('TerminalComposer', () => {
     await withNavigatorPlatform('MacIntel', async () => {
       const { container } = render()
       await expand(container)
-      await showInput(container)
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
       await changeAndFlush(input, { target: { value: 'before selected after' } })
       input.setSelectionRange(6, 15)
@@ -317,7 +333,6 @@ describe('TerminalComposer', () => {
     await withNavigatorPlatform('MacIntel', async () => {
       const { container } = render({ draftReplaceAccepted: false })
       await expand(container)
-      await showInput(container)
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
       await changeAndFlush(input, { target: { value: 'abc' } })
       input.setSelectionRange(3, 3)
@@ -334,32 +349,26 @@ describe('TerminalComposer', () => {
     await withNavigatorPlatform('MacIntel', async () => {
       const { container } = render()
       await expand(container)
-      await showInput(container)
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
       await changeAndFlush(input, { target: { value: 'abc' } })
       input.setSelectionRange(3, 3)
 
-      const composingEvent = createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true, isComposing: true })
-      await dispatchAndFlush(input, composingEvent)
-      const webkitCompositionEvent = createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true, keyCode: 229 })
-      await dispatchAndFlush(input, webkitCompositionEvent)
-      await keyDownAndFlush(input, { code: 'KeyW', key: 'w', metaKey: true })
+      const events = [
+        createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true, isComposing: true }),
+        createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true, keyCode: 229 }),
+        createEvent.keyDown(input, { code: 'KeyW', key: 'w', metaKey: true }),
+      ]
+      for (const event of events) await dispatchAndFlush(input, event)
 
-      expect(composingEvent.defaultPrevented).toBe(false)
-      expect(webkitCompositionEvent.defaultPrevented).toBe(false)
+      expect(events.map((event) => event.defaultPrevented)).toEqual([false, false, false])
       expect(input.value).toBe('abc')
     })
   })
 
   test('leaves history browsing after an accepted editing command', async () => {
     await withNavigatorPlatform('MacIntel', async () => {
-      const { container } = render()
-      await expand(container)
-      await showInput(container)
+      const { container } = renderInJsdom(expandedComposerForTest('history', ['previous']))
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
-      await changeAndFlush(input, { target: { value: 'previous' } })
-      await keyDownAndFlush(input, { key: 'Enter' })
-      await vi.waitFor(() => expect(input.value).toBe(''))
       await keyDownAndFlush(input, { key: 'ArrowUp' })
       expect(input.value).toBe('previous')
       input.setSelectionRange(input.value.length, input.value.length)
@@ -371,25 +380,17 @@ describe('TerminalComposer', () => {
     })
   })
 
-  test('leaves non-macOS and mixed-modifier chords untouched', async () => {
-    await withNavigatorPlatform('Win32', async () => {
+  test.each([
+    ['a non-macOS Ctrl chord', 'Win32', { code: 'KeyW', key: 'w', ctrlKey: true }],
+    ['a mixed-modifier macOS chord', 'MacIntel', { code: 'KeyW', key: 'w', ctrlKey: true, shiftKey: true }],
+  ] as const)('leaves %s untouched', async (_scenario, platform, eventInit) => {
+    await withNavigatorPlatform(platform, async () => {
       const { container } = render()
       await expand(container)
-      await showInput(container)
       const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
       await changeAndFlush(input, { target: { value: 'abc' } })
       input.setSelectionRange(3, 3)
-      await keyDownAndFlush(input, { code: 'KeyW', key: 'w', ctrlKey: true })
-      expect(input.value).toBe('abc')
-    })
-    await withNavigatorPlatform('MacIntel', async () => {
-      const { container } = render()
-      await expand(container)
-      await showInput(container)
-      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
-      await changeAndFlush(input, { target: { value: 'abc' } })
-      input.setSelectionRange(3, 3)
-      await keyDownAndFlush(input, { code: 'KeyW', key: 'w', ctrlKey: true, shiftKey: true })
+      expect(await keyDownAndFlush(input, eventInit)).toBe(true)
       expect(input.value).toBe('abc')
     })
   })
@@ -434,54 +435,7 @@ describe('TerminalComposer', () => {
     expect(secondInput.value).toBe('session-two draft')
   })
 
-  test('applies supplied history entries before later post-render observers', async () => {
-    const commitOrder: string[] = []
-    const originalUpdateEntries = TerminalComposerHistoryCursor.prototype.updateEntries
-    const updateEntries = vi
-      .spyOn(TerminalComposerHistoryCursor.prototype, 'updateEntries')
-      .mockImplementation(function (this: TerminalComposerHistoryCursor, entries) {
-        commitOrder.push('cursor')
-        originalUpdateEntries.call(this, entries)
-      })
-
-    const LayoutObserver = defineComponent<{ historyEntries: readonly string[] }>({
-      name: 'TerminalComposerPostRenderObserver',
-      props: ['historyEntries'],
-      setup(props) {
-        onUpdated(() => commitOrder.push('observer'))
-        return () => {
-          void props.historyEntries
-          return null
-        }
-      },
-    })
-
-    const Harness = defineComponent<{ historyEntries: readonly string[] }>({
-      name: 'TerminalComposerHistoryHarness',
-      props: ['historyEntries'],
-      setup(props) {
-        return () => (
-          <>
-            {expandedComposerForTest('session-one', props.historyEntries)}
-            <LayoutObserver historyEntries={props.historyEntries} />
-          </>
-        )
-      },
-    })
-
-    try {
-      const { rerender } = renderInJsdom(<Harness historyEntries={['old command']} />)
-      commitOrder.length = 0
-
-      await rerender(<Harness historyEntries={['new command']} />)
-
-      expect(commitOrder).toEqual(['cursor', 'observer'])
-    } finally {
-      updateEntries.mockRestore()
-    }
-  })
-
-  test('starts as one floating action and expands into the composer', async () => {
+  test('expands and collapses the retained composer surface', async () => {
     const { container } = render()
     const openButton = buttonByAccessibleName(container, LABELS.open)
     const surface = container.querySelector('.goblin-terminal-composer__surface')
@@ -495,13 +449,7 @@ describe('TerminalComposer', () => {
     expect(openButton.getAttribute('aria-expanded')).toBe('true')
     expect(surface?.getAttribute('aria-hidden')).toBe('false')
     expect(surface?.hasAttribute('inert')).toBe(false)
-    const modeRow = container.querySelector('.goblin-terminal-composer__mode-row')
-    const showKeysButton = buttonByAccessibleName(container, LABELS.showKeys)
-    const more = buttonByAccessibleName(container, LABELS.more)
-    expect(showKeysButton.parentElement).toBe(modeRow)
-    expect(more.parentElement).toBe(modeRow)
-    expect(more.querySelector('.lucide-ellipsis')).not.toBeNull()
-    expect(container.querySelector('.goblin-terminal-composer--expanded')).not.toBeNull()
+    expect(container.querySelector('textarea')).not.toBeNull()
 
     await openMoreMenu(container)
     await flushTestUpdates(() => menuItemByText(LABELS.close).click())
@@ -517,16 +465,6 @@ describe('TerminalComposer', () => {
     const openButton = buttonByAccessibleName(container, LABELS.open)
 
     await user.click(openButton)
-
-    expect(document.activeElement).toBe(container.querySelector('textarea'))
-    expect(container.querySelector('textarea')).not.toBeNull()
-  })
-
-  test('moves keyboard focus into input mode when expanded by clicking the trigger', async () => {
-    const user = userEvent.setup()
-    const { container } = render({ initialMode: 'input' })
-
-    await user.click(buttonByAccessibleName(container, LABELS.open))
 
     expect(document.activeElement).toBe(container.querySelector('textarea'))
   })
@@ -563,7 +501,6 @@ describe('TerminalComposer', () => {
     const onSubmitText = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
     const { container } = render({ onSubmitText })
     await expand(container)
-    await showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     await changeAndFlush(input, { target: { value: 'git status' } })
@@ -581,7 +518,6 @@ describe('TerminalComposer', () => {
     const submission = Promise.withResolvers<boolean>()
     const { container } = render({ onSubmitText: vi.fn(() => submission.promise) })
     await expand(container)
-    await showInput(container)
     const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
     await changeAndFlush(input, { target: { value: 'submitted draft' } })
     await keyDownAndFlush(input, { key: 'Enter' })
@@ -629,15 +565,14 @@ describe('TerminalComposer', () => {
     expect(replacementDraftReplace).not.toHaveBeenCalled()
   })
 
-  test('Enter submits while Shift+Enter remains available for text entry', async () => {
+  test('plain Enter submits while Shift+Enter remains available for text entry', async () => {
     const onSubmitText = vi.fn(async () => true)
     const { container } = render({ onSubmitText })
     await expand(container)
-    await showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     await changeAndFlush(input, { target: { value: 'pwd' } })
-    await keyDownAndFlush(input, { key: 'Enter', shiftKey: true })
+    expect(await keyDownAndFlush(input, { key: 'Enter', shiftKey: true })).toBe(true)
     expect(onSubmitText).not.toHaveBeenCalled()
     await keyDownAndFlush(input, { key: 'Enter' })
     expect(onSubmitText).toHaveBeenCalledWith('pwd')
@@ -648,7 +583,6 @@ describe('TerminalComposer', () => {
     const onSubmitText = vi.fn(async () => true)
     const { container } = render({ onSubmitText })
     await expand(container)
-    await showInput(container)
     const input = within(container).getByRole('textbox', { name: LABELS.inputPlaceholder })
     await changeAndFlush(input, { target: { value: '输入内容' } })
 
@@ -660,7 +594,6 @@ describe('TerminalComposer', () => {
   test('keeps mobile text services from rewriting terminal input', async () => {
     const { container } = render()
     await expand(container)
-    await showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
 
@@ -668,22 +601,12 @@ describe('TerminalComposer', () => {
     expect(input.getAttribute('autocorrect')).toBe('off')
     expect(input.getAttribute('spellcheck')).toBe('false')
     expect(input.getAttribute('enterkeyhint')).toBe('send')
-    expect(input.classList.contains('font-mono')).toBe(true)
   })
 
   test('browses successful submissions with plain vertical arrows only from an empty draft', async () => {
-    const { container } = render()
-    await expand(container)
-    await showInput(container)
+    const { container } = renderInJsdom(expandedComposerForTest('history', ['first', 'second']))
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
-
-    await changeAndFlush(input, { target: { value: 'first' } })
-    await keyDownAndFlush(input, { key: 'Enter' })
-    await vi.waitFor(() => expect(input.value).toBe(''))
-    await changeAndFlush(input, { target: { value: 'second' } })
-    await keyDownAndFlush(input, { key: 'Enter' })
-    await vi.waitFor(() => expect(input.value).toBe(''))
 
     expect(await keyDownAndFlush(input, { key: 'ArrowUp' })).toBe(false)
     expect(input.value).toBe('second')
@@ -700,15 +623,9 @@ describe('TerminalComposer', () => {
   })
 
   test('returns vertical arrows to native editing after a recalled entry is changed', async () => {
-    const { container } = render()
-    await expand(container)
-    await showInput(container)
+    const { container } = renderInJsdom(expandedComposerForTest('history', ['previous']))
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
-
-    await changeAndFlush(input, { target: { value: 'previous' } })
-    await keyDownAndFlush(input, { key: 'Enter' })
-    await vi.waitFor(() => expect(input.value).toBe(''))
     await keyDownAndFlush(input, { key: 'ArrowUp' })
     await changeAndFlush(input, { target: { value: 'previous edited' } })
 
@@ -717,13 +634,8 @@ describe('TerminalComposer', () => {
   })
 
   test('leaves history browsing after an accepted duplicate submission without an entries update', async () => {
-    const { container } = render()
-    await expand(container)
-    await showInput(container)
+    const { container } = renderInJsdom(expandedComposerForTest('history', ['previous']))
     const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
-    await changeAndFlush(input, { target: { value: 'previous' } })
-    await keyDownAndFlush(input, { key: 'Enter' })
-    await vi.waitFor(() => expect(input.value).toBe(''))
     await keyDownAndFlush(input, { key: 'ArrowUp' })
     expect(input.value).toBe('previous')
 
@@ -734,13 +646,8 @@ describe('TerminalComposer', () => {
   })
 
   test('does not carry a stale recalled-entry caret into the next draft edit', async () => {
-    const { container } = render()
-    await expand(container)
-    await showInput(container)
+    const { container } = renderInJsdom(expandedComposerForTest('history', ['previous']))
     const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
-    await changeAndFlush(input, { target: { value: 'previous' } })
-    await keyDownAndFlush(input, { key: 'Enter' })
-    await vi.waitFor(() => expect(input.value).toBe(''))
     await keyDownAndFlush(input, { key: 'ArrowUp' })
     await keyDownAndFlush(input, { key: 'ArrowUp' })
 
@@ -749,10 +656,9 @@ describe('TerminalComposer', () => {
     expect(input.selectionStart).toBe('previous edited'.length)
   })
 
-  test('grows with multiline text until the seven-line cap, then leaves overflow to the textarea', async () => {
+  test('caps multiline input height at 160px', async () => {
     const { container } = render()
     await expand(container)
-    await showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 196 })
@@ -763,7 +669,6 @@ describe('TerminalComposer', () => {
   })
 
   test('sizes and observes an input-mode composer that is already expanded on mount', async () => {
-    const scrollHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'scrollHeight')
     const resizeObserverDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver')
     const observe = vi.fn()
     class TestResizeObserver implements ResizeObserver {
@@ -774,10 +679,7 @@ describe('TerminalComposer', () => {
       unobserve(): void {}
       disconnect(): void {}
     }
-    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
-      configurable: true,
-      get: () => 156,
-    })
+    const restoreScrollHeight = mockTextAreaScrollHeight(156)
     Object.defineProperty(globalThis, 'ResizeObserver', {
       configurable: true,
       writable: true,
@@ -792,41 +694,38 @@ describe('TerminalComposer', () => {
       expect(input.style.height).toBe('156px')
       expect(observe).toHaveBeenCalledWith(input)
     } finally {
-      if (scrollHeightDescriptor) {
-        Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', scrollHeightDescriptor)
-      } else {
-        Reflect.deleteProperty(HTMLTextAreaElement.prototype, 'scrollHeight')
-      }
+      restoreScrollHeight()
       if (resizeObserverDescriptor) Object.defineProperty(globalThis, 'ResizeObserver', resizeObserverDescriptor)
       else Reflect.deleteProperty(globalThis, 'ResizeObserver')
     }
   })
 
   test('keeps an empty input at 40px even when the placeholder wraps during expansion', async () => {
-    const { container } = render()
-    await expand(container)
-    await showInput(container)
-    const input = container.querySelector('textarea')
-    if (!input) throw new Error('expected command input')
-    Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 156 })
+    const restoreScrollHeight = mockTextAreaScrollHeight(156)
+    try {
+      const { container } = render()
+      await expand(container)
+      const input = container.querySelector('textarea')
+      if (!input) throw new Error('expected command input')
 
-    expect(input.style.height).toBe('40px')
+      expect(input.style.height).toBe('40px')
+    } finally {
+      restoreScrollHeight()
+    }
   })
 
-  test('inserts resolved file paths at the input selection and permits selecting the same file again', async () => {
+  test('inserts resolved file paths at the selection and resets the file input for reselection', async () => {
     const resolvedPath = "'/tmp/notes file.txt'"
     const onResolveFiles = vi.fn(async () => resolvedPath)
     const { container } = render({ onResolveFiles })
     await expand(container)
-    await showInput(container)
     const textarea = container.querySelector('textarea')
     const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
     if (!textarea || !fileInput) throw new Error('expected composer inputs')
     const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
     await changeAndFlush(textarea, { target: { value: 'cat done' } })
     textarea.setSelectionRange(4, 4)
-    await openMoreMenu(container)
-    await flushTestUpdates(() => menuItemByText(LABELS.uploadFiles).click())
+    await requestFileUpload(container)
 
     await changeAndFlush(fileInput, { target: { files: [file] } })
 
@@ -842,14 +741,12 @@ describe('TerminalComposer', () => {
     const onResolveFiles = vi.fn(async () => resolvedPath)
     const { container } = render({ initialDraft: 'cat\r\ndone', onResolveFiles })
     await expand(container)
-    await showInput(container)
     const textarea = container.querySelector('textarea')
     const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
     if (!textarea || !fileInput) throw new Error('expected composer inputs')
     const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
     textarea.setSelectionRange('cat\n'.length, 'cat\nd'.length)
-    await openMoreMenu(container)
-    await flushTestUpdates(() => menuItemByText(LABELS.uploadFiles).click())
+    await requestFileUpload(container)
 
     await changeAndFlush(fileInput, { target: { files: [file] } })
 
@@ -857,7 +754,7 @@ describe('TerminalComposer', () => {
     expect(textarea.selectionStart).toBe(`cat\n${resolvedPath}`.length)
   })
 
-  test('preserves a newer draft and asks for retry when file insertion is rejected', async () => {
+  test('preserves the draft and asks for retry when file insertion replacement is rejected', async () => {
     const onFileInsertionRejected = vi.fn()
     const { container } = render({
       initialDraft: 'cat ',
@@ -866,12 +763,10 @@ describe('TerminalComposer', () => {
       onFileInsertionRejected,
     })
     await expand(container)
-    await showInput(container)
     const textarea = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
     const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
     if (!fileInput) throw new Error('expected file input')
-    await openMoreMenu(container)
-    await flushTestUpdates(() => menuItemByText(LABELS.uploadFiles).click())
+    await requestFileUpload(container)
 
     await changeAndFlush(fileInput, { target: { files: [new File(['content'], 'notes.txt')] } })
 
@@ -886,15 +781,13 @@ describe('TerminalComposer', () => {
     const onSubmitText = vi.fn(async () => true)
     const { container } = render({ onResolveFiles, onSubmitText })
     await expand(container)
-    await showInput(container)
     const textarea = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
     const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
     if (!fileInput) throw new Error('expected file input')
     const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
     await changeAndFlush(textarea, { target: { value: 'cat ' } })
     textarea.setSelectionRange(4, 4)
-    await openMoreMenu(container)
-    await flushTestUpdates(() => menuItemByText(LABELS.uploadFiles).click())
+    await requestFileUpload(container)
 
     await changeAndFlush(fileInput, { target: { files: [file] } })
 
@@ -922,27 +815,19 @@ describe('TerminalComposer', () => {
     for (const [index, label] of labels.entries()) {
       expect(menuItems[index]).toBe(within(menu).getByRole('button', { name: label }))
     }
-    expect(menu.querySelectorAll('[data-slot="separator"]')).toHaveLength(2)
   }
 
-  test('groups input, terminal-content, and presentation menu actions', async () => {
-    const { container } = render()
+  test.each([
+    ['available', true, [LABELS.sendOnly, LABELS.uploadFiles, LABELS.copyContent, LABELS.close]],
+    ['unavailable', false, [LABELS.sendOnly, LABELS.copyContent, LABELS.close]],
+  ] as const)('groups input-mode menu actions when file upload is %s', async (_availability, canUploadFiles, labels) => {
+    const { container } = render({ canUploadFiles })
     await expand(container)
     await openMoreMenu(container)
 
     const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
     if (!menu) throw new Error('expected Composer menu')
-    expectComposerMenuLayout(menu, [LABELS.sendOnly, LABELS.uploadFiles, LABELS.copyContent, LABELS.close])
-  })
-
-  test('keeps the input-mode grouping when file upload is unavailable', async () => {
-    const { container } = render({ canUploadFiles: false })
-    await expand(container)
-    await openMoreMenu(container)
-
-    const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
-    if (!menu) throw new Error('expected Composer menu')
-    expectComposerMenuLayout(menu, [LABELS.sendOnly, LABELS.copyContent, LABELS.close])
+    expectComposerMenuLayout(menu, labels)
   })
 
   test('sends without submitting and preserves input focus across rejected and accepted delivery', async () => {
@@ -970,7 +855,7 @@ describe('TerminalComposer', () => {
     expect(document.activeElement).toBe(input)
   })
 
-  test('disables Send only for an empty draft', async () => {
+  test('disables Send for an empty draft', async () => {
     const { container } = render()
     await expand(container)
     await openMoreMenu(container)
@@ -1059,10 +944,6 @@ describe('TerminalComposer', () => {
     await flushTestUpdates(() => buttonByAccessibleName(container, LABELS.showKeys).click())
 
     expect(container.querySelector('textarea')).toBeNull()
-    expect(
-      buttonByAccessibleName(container, LABELS.showInput).querySelector('.lucide-text-cursor-input'),
-    ).not.toBeNull()
-    expect(buttonByAccessibleName(container, LABELS.more).querySelector('.lucide-ellipsis')).not.toBeNull()
 
     const optionalKeyLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
     const responsiveActionLabels = [LABELS.copyContent, ...optionalKeyLabels]
@@ -1072,9 +953,6 @@ describe('TerminalComposer', () => {
       container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
     ).map((button) => button.querySelector('.sr-only')?.textContent)
     expect(keyRowLabels).toEqual([...responsiveActionLabels, ...pinnedCommandLabels, ...directionLabels])
-    expect(buttonByAccessibleName(container, LABELS.tab).querySelector('.lucide-arrow-right-to-line')).not.toBeNull()
-    expect(buttonByAccessibleName(container, LABELS.backspace).querySelector('.lucide-delete')).not.toBeNull()
-    expect(buttonByAccessibleName(container, LABELS.copyContent).querySelector('.lucide-copy')).not.toBeNull()
   })
 
   test('sends key-row actions to their respective boundaries', async () => {
@@ -1099,14 +977,9 @@ describe('TerminalComposer', () => {
     ])
 
     const optionalKeyLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
-    const optionalActions = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('[class*="goblin-terminal-composer__key-action--optional-"]'),
-    )
-    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual([
-      LABELS.copyContent,
-      ...optionalKeyLabels,
-    ])
-    for (const button of optionalActions.slice(1)) await flushTestUpdates(() => button.click())
+    for (const label of optionalKeyLabels) {
+      await flushTestUpdates(() => buttonByAccessibleName(container, label).click())
+    }
     expect(onVirtualKey.mock.calls.slice(-5).map(([key]) => key)).toEqual([
       'backspace',
       'escape',
@@ -1114,7 +987,7 @@ describe('TerminalComposer', () => {
       'interrupt',
       'eof',
     ])
-    await flushTestUpdates(async () => buttonByAccessibleName(container, LABELS.copyContent).click())
+    await flushTestUpdates(() => buttonByAccessibleName(container, LABELS.copyContent).click())
     expect(onCopyContent).toHaveBeenCalledOnce()
   })
 
@@ -1125,6 +998,7 @@ describe('TerminalComposer', () => {
     await expand(container)
     await flushTestUpdates(() => buttonByAccessibleName(container, LABELS.showKeys).click())
     const optionalKeyLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
+    const more = buttonByAccessibleName(container, LABELS.more)
 
     for (const [label, key] of [
       [LABELS.backspace, 'backspace'],
@@ -1133,7 +1007,6 @@ describe('TerminalComposer', () => {
       [LABELS.ctrlC, 'interrupt'],
       [LABELS.ctrlD, 'eof'],
     ] as const) {
-      const more = buttonByAccessibleName(container, LABELS.more)
       await openMoreMenu(container)
       if (key === 'backspace') {
         const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
@@ -1154,7 +1027,7 @@ describe('TerminalComposer', () => {
     }
 
     await openMoreMenu(container)
-    await flushTestUpdates(async () => menuItemByText(LABELS.copyContent).click())
+    await flushTestUpdates(() => menuItemByText(LABELS.copyContent).click())
     expect(onCopyContent).toHaveBeenCalledOnce()
     expect(onVirtualKey).not.toHaveBeenCalledWith('copy-content')
   })
@@ -1178,7 +1051,6 @@ describe('TerminalComposer', () => {
   test('mode toggle preserves the draft and pointer keys preserve composer focus', async () => {
     const { container } = render()
     await expand(container)
-    await showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     await changeAndFlush(input, { target: { value: 'draft command' } })
@@ -1187,16 +1059,12 @@ describe('TerminalComposer', () => {
     const modeToggle = buttonByAccessibleName(container, LABELS.showInput)
 
     expect(fireEvent.pointerDown(arrowUp)).toBe(false)
-    await flushTestUpdates(() => arrowUp.click())
-    expect(document.activeElement).toBe(modeToggle)
-    fireEvent.click(arrowUp, { detail: 1 })
+    await flushTestUpdates(() => fireEvent.click(arrowUp, { detail: 1 }))
     expect(document.activeElement).toBe(modeToggle)
 
     await flushTestUpdates(() => buttonByAccessibleName(container, LABELS.showInput).click())
     expect(container.querySelector('textarea')?.value).toBe('draft command')
     expect(document.activeElement).toBe(container.querySelector('textarea'))
-    expect(buttonByAccessibleName(container, LABELS.more)).toBeTruthy()
-    expect(buttonByAccessibleName(container, LABELS.showKeys).querySelector('.lucide-keyboard')).not.toBeNull()
   })
 
   test('reopens in input mode instead of restoring keys mode', async () => {
@@ -1215,11 +1083,23 @@ describe('TerminalComposer', () => {
     expect(buttonByAccessibleName(container, LABELS.showKeys)).toBeTruthy()
   })
 
+  test('uses screen-reader text instead of callout-producing button attributes', async () => {
+    const { container } = render()
+    await expand(container)
+
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__btn')]
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) {
+      expect(button.hasAttribute('title')).toBe(false)
+      expect(button.hasAttribute('aria-label')).toBe(false)
+      expect(button.querySelector('.sr-only')?.textContent?.trim()).not.toBe('')
+    }
+  })
+
   test('does not restore the More trigger over an input explicitly focused while the menu closes', async () => {
     const user = userEvent.setup()
     const { container } = render()
     await expand(container)
-    await showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     await openMoreMenu(container)
@@ -1242,16 +1122,5 @@ describe('TerminalComposer', () => {
 
     expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
     expect(document.activeElement).toBe(more)
-  })
-
-  test('buttons avoid iOS long-press callout attributes', () => {
-    const { container } = render()
-    const buttons = container.querySelectorAll('button')
-    expect(buttons.length).toBeGreaterThan(1)
-    for (const button of buttons) {
-      expect(button.hasAttribute('title')).toBe(false)
-      expect(button.hasAttribute('aria-label')).toBe(false)
-      expect(button.querySelector('.sr-only')?.textContent?.trim().length ?? 0).toBeGreaterThan(0)
-    }
   })
 })

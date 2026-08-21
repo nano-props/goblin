@@ -88,7 +88,7 @@ function expectMissingReadProvider(composable: () => unknown): void {
 }
 
 describe('terminal filesystem target projections', () => {
-  test('reads count, pending, bell, output, descriptor, and sessions fields', async () => {
+  test('reads count, pending, bell, output, descriptor, and sessions fields', () => {
     const descriptor = terminalDescriptorForTest({
       terminalSessionId: SESSION_ID,
       index: 0,
@@ -141,7 +141,7 @@ describe('terminal filesystem target projections', () => {
 })
 
 describe('null targets', () => {
-  test('derive safe empty values while retaining the provider boundary', async () => {
+  test('derive safe empty values while retaining the provider boundary', () => {
     const context = makeReadContext()
     expect(renderValue(context, () => useTerminalFilesystemTargetCount(null)).textContent).toBe('0')
     expect(renderValue(context, () => useTerminalFilesystemTargetCreatePending(null)).textContent).toBe('false')
@@ -156,7 +156,7 @@ describe('null targets', () => {
     ).toBe(EMPTY_TERMINAL_SNAPSHOT.phase)
   })
 
-  test('still requires the read provider for every target shape', async () => {
+  test('still requires the read provider for every target shape', () => {
     expectMissingReadProvider(() => useTerminalFilesystemTargetCount(null))
     expectMissingReadProvider(() => useTerminalSnapshot(null))
     expectMissingReadProvider(() => useWorkspaceTerminalBellCounts([]))

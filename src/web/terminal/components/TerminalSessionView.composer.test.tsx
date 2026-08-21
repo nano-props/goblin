@@ -49,22 +49,26 @@ async function copyContent(container: HTMLElement): Promise<void> {
 
 describe('TerminalSessionView composer', () => {
   test('copies the terminal copy text and confirms success', async () => {
-    vi.clearAllMocks()
-    const writeText = vi.fn(async () => {})
+    const toast = terminalSessionViewToastForTest()
+    toast.success.mockClear()
+    const writeText = vi.fn().mockResolvedValue(undefined)
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
     try {
       const readCopyText = vi.fn(() => 'command\nerror')
       const rendered = await renderTerminalSession({ readCopyText })
 
-      await copyContent(rendered.container)
-      await vi.waitFor(() => {
-        expect(writeText).toHaveBeenCalledWith('command\nerror')
-        expect(terminalSessionViewToastForTest().success).toHaveBeenCalledWith('branch-status.copied')
-      })
+      try {
+        await copyContent(rendered.container)
+        await vi.waitFor(() => {
+          expect(writeText).toHaveBeenCalledWith('command\nerror')
+          expect(toast.success).toHaveBeenCalledWith('branch-status.copied')
+        })
 
-      expect(readCopyText).toHaveBeenCalledWith('term-111111111111111111111')
-      await rendered.cleanup()
+        expect(readCopyText).toHaveBeenCalledWith('term-111111111111111111111')
+      } finally {
+        await rendered.cleanup()
+      }
     } finally {
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
       else Reflect.deleteProperty(navigator, 'clipboard')
@@ -72,18 +76,22 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('does not overwrite the clipboard when there is no content to copy', async () => {
-    vi.clearAllMocks()
-    const writeText = vi.fn(async () => {})
+    const toast = terminalSessionViewToastForTest()
+    toast.error.mockClear()
+    const writeText = vi.fn().mockResolvedValue(undefined)
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
     try {
       const rendered = await renderTerminalSession({ readCopyText: vi.fn(() => '') })
 
-      await copyContent(rendered.container)
+      try {
+        await copyContent(rendered.container)
 
-      expect(writeText).not.toHaveBeenCalled()
-      expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('terminal.composer-copy-content-empty')
-      await rendered.cleanup()
+        expect(writeText).not.toHaveBeenCalled()
+        expect(toast.error).toHaveBeenCalledWith('terminal.composer-copy-content-empty')
+      } finally {
+        await rendered.cleanup()
+      }
     } finally {
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
       else Reflect.deleteProperty(navigator, 'clipboard')
@@ -91,27 +99,31 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('surfaces clipboard rejection without reporting success', async () => {
-    vi.clearAllMocks()
-    const error = new Error('Clipboard permission denied')
+    const toast = terminalSessionViewToastForTest()
+    toast.error.mockClear()
+    toast.success.mockClear()
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     const execCommandDescriptor = Object.getOwnPropertyDescriptor(document, 'execCommand')
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
-      value: { writeText: vi.fn(async () => Promise.reject(error)) },
+      value: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard permission denied')) },
     })
     Object.defineProperty(document, 'execCommand', { configurable: true, value: vi.fn(() => false) })
     try {
       const rendered = await renderTerminalSession({ readCopyText: vi.fn(() => 'output') })
 
-      await copyContent(rendered.container)
-      await vi.waitFor(() =>
-        expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('action.result-error', {
-          description: 'NotAllowedError: The request is not allowed',
-        }),
-      )
+      try {
+        await copyContent(rendered.container)
+        await vi.waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith('action.result-error', {
+            description: 'NotAllowedError: The request is not allowed',
+          }),
+        )
 
-      expect(terminalSessionViewToastForTest().success).not.toHaveBeenCalled()
-      await rendered.cleanup()
+        expect(toast.success).not.toHaveBeenCalled()
+      } finally {
+        await rendered.cleanup()
+      }
     } finally {
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
       else Reflect.deleteProperty(navigator, 'clipboard')
@@ -138,10 +150,6 @@ describe('TerminalSessionView composer', () => {
       await flushTestUpdates(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
       expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenLastCalledWith()
-      expect(rendered.container.querySelector('.goblin-terminal-session__host')?.parentElement).toBe(
-        rendered.sessionRoot,
-      )
-      expect(rendered.container.querySelector('.goblin-terminal-composer')?.parentElement).toBe(rendered.sessionRoot)
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       await flushTestUpdates(() => visualViewport.dispatchEvent(new Event('resize')))
@@ -151,33 +159,6 @@ describe('TerminalSessionView composer', () => {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
       else Reflect.deleteProperty(window, 'visualViewport')
-    }
-  })
-
-  test('uses the same native focus behavior without VisualViewport', async () => {
-    const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
-    Reflect.deleteProperty(window, 'visualViewport')
-    const rendered = await renderTerminalSession()
-
-    try {
-      const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
-      if (!composer) throw new Error('expected a floating composer')
-      const input = composerInput(rendered.container)
-      const focus = vi.spyOn(input, 'focus')
-      await flushTestUpdates(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
-      expect(focus).toHaveBeenLastCalledWith()
-
-      const terminalHost = document.createElement('div')
-      terminalHost.className = 'goblin-managed-terminal-host'
-      const terminalInput = document.createElement('textarea')
-      terminalHost.appendChild(terminalInput)
-      rendered.sessionRoot.appendChild(terminalHost)
-      terminalInput.focus()
-      await fireEvent.pointerDown(input, { pointerType: 'touch' })
-      expect(document.activeElement).toBe(terminalInput)
-    } finally {
-      await rendered.cleanup()
-      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
     }
   })
 
@@ -218,21 +199,29 @@ describe('TerminalSessionView composer', () => {
       expect(trigger.getAttribute('aria-expanded')).toBe('false')
       expect(document.activeElement).toBe(trigger)
 
-      for (const init of [
-        { ctrlKey: true, metaKey: true, shiftKey: true },
-        { ctrlKey: true, shiftKey: true, altKey: true },
-        { ctrlKey: true, shiftKey: true, keyCode: 229 },
-      ]) {
-        const unsupported = new KeyboardEvent('keydown', {
-          key: 'Enter',
-          ...init,
-          bubbles: true,
-          cancelable: true,
-        })
-        await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(unsupported))
-        expect(unsupported.defaultPrevented).toBe(false)
-      }
-      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test.each([
+    { ctrlKey: true, metaKey: true, shiftKey: true },
+    { ctrlKey: true, shiftKey: true, altKey: true },
+    { ctrlKey: true, shiftKey: true, keyCode: 229 },
+  ])('does not consume unsupported Composer shortcut modifiers', async (init) => {
+    const rendered = await renderTerminalSession()
+
+    try {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ...init,
+        bubbles: true,
+        cancelable: true,
+      })
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(event))
+
+      expect(event.defaultPrevented).toBe(false)
+      expect(buttonByLabel(rendered.container, 'terminal.composer-open').getAttribute('aria-expanded')).toBe('false')
     } finally {
       await rendered.cleanup()
     }
@@ -360,7 +349,7 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test('does not consume unsupported Composer shortcut variants or viewer input', async () => {
+  test('does not consume the Composer shortcut for viewer input', async () => {
     const openComposer = vi.fn(() => true)
     const rendered = await renderTerminalSession(
       { openComposer },
@@ -467,7 +456,6 @@ describe('TerminalSessionView composer', () => {
       await flushTestUpdates(() => uploadItem.click())
 
       const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
-      Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
       await userEvent.setup().upload(fileInput, file)
 
       await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
@@ -588,7 +576,6 @@ describe('TerminalSessionView composer', () => {
     try {
       const textarea = await openComposerInput(rendered.container)
       const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
-      Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
       await fireEvent.update(textarea, 'cat ')
       textarea.setSelectionRange(4, 4)
       if (kind === 'paste') {

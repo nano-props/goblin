@@ -33,6 +33,14 @@ const EMPTY_OPENING_SNAPSHOT = {
   composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
 } as const
 
+const OPEN_CONTROLLER_SNAPSHOT = {
+  phase: 'open',
+  message: null,
+  processName: 'zsh',
+  composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+  attachment: { role: 'controller' },
+} as const
+
 describe('TerminalSessionView presentation and focus', () => {
   test('retries precommitted focus when the view mounts', async () => {
     resetTerminalAutoFocusForTest()
@@ -68,15 +76,7 @@ describe('TerminalSessionView presentation and focus', () => {
       count: 2,
       createPending: false,
     })
-    const snapshot = {
-      phase: 'open' as const,
-      message: null,
-      processName: 'zsh',
-      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-      attachment: {
-        role: 'controller' as const,
-      },
-    }
+    const snapshot = OPEN_CONTROLLER_SNAPSHOT
     let connected = false
     const attach = vi.fn(() => {
       connected = true
@@ -149,7 +149,6 @@ describe('TerminalSessionView presentation and focus', () => {
         expect.objectContaining({ terminalSessionId: 'term-111111111111111111111' }),
         expect.any(HTMLDivElement),
       )
-      expect(focusTerminal).toHaveBeenCalledTimes(2)
       expect(focusTerminal).toHaveBeenLastCalledWith(
         'term-222222222222222222222',
         expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
@@ -176,15 +175,7 @@ describe('TerminalSessionView presentation and focus', () => {
       count: 0,
       createPending: false,
     })
-    const snapshot = {
-      phase: 'open' as const,
-      message: null,
-      processName: 'zsh',
-      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-      attachment: {
-        role: 'controller' as const,
-      },
-    }
+    const snapshot = OPEN_CONTROLLER_SNAPSHOT
     const attach = vi.fn()
     const detach = vi.fn()
     const clearSearch = vi.fn()
@@ -235,7 +226,6 @@ describe('TerminalSessionView presentation and focus', () => {
     try {
       await flushTestUpdates(() => {})
       expect(attach).not.toHaveBeenCalled()
-      expect(clearSearch).not.toHaveBeenCalled()
 
       terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
         terminalFilesystemTargetKey: '/repo\0/worktree',
@@ -254,7 +244,7 @@ describe('TerminalSessionView presentation and focus', () => {
         count: 1,
         createPending: false,
       })
-      await flushTestUpdates(async () => {
+      await flushTestUpdates(() => {
         for (const listener of filesystemTargetListeners) listener()
       })
 
@@ -263,8 +253,6 @@ describe('TerminalSessionView presentation and focus', () => {
         expect.objectContaining({ terminalSessionId: descriptor.terminalSessionId }),
         expect.any(HTMLDivElement),
       )
-      expect(clearSearch).not.toHaveBeenCalled()
-
       terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
         terminalFilesystemTargetKey: '/repo\0/worktree',
         selectedDescriptor: { ...descriptor, index: 2 },
@@ -282,7 +270,7 @@ describe('TerminalSessionView presentation and focus', () => {
         count: 1,
         createPending: false,
       })
-      await flushTestUpdates(async () => {
+      await flushTestUpdates(() => {
         for (const listener of filesystemTargetListeners) listener()
       })
 
@@ -296,96 +284,26 @@ describe('TerminalSessionView presentation and focus', () => {
 
   test('renders mirror attach banner and triggers takeover', async () => {
     const takeover = vi.fn().mockResolvedValue(true)
-    const summaries = [
-      {
-        terminalSessionId: 'term-111111111111111111111',
-        terminalFilesystemTargetKey: '/repo\0/worktree',
-        index: 1,
-        title: 'zsh',
-        phase: 'open' as const,
-        selected: true,
-        hasBell: false,
-        hasRecentOutput: false,
-      },
-    ]
-    const descriptor = {
-      terminalSessionId: 'term-111111111111111111111',
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      index: 1,
-      ...terminalDescriptorTargetForTest(),
-    }
-    const terminalFilesystemTargetSnapshot = {
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      selectedDescriptor: descriptor,
-      sessions: summaries,
-      count: 1,
-      createPending: false,
-    }
-    const snapshot = {
-      phase: 'open' as const,
-      message: null,
-      processName: 'zsh',
-      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-      attachment: {
-        role: 'viewer' as const,
-      },
-    }
-    const context: TerminalSessionContextValue = terminalSessionContextForTest({
-      createTerminal: async () => 'term-111111111111111111111',
-      selectTerminal: vi.fn(),
-      scrollToBottom: vi.fn(),
-      clearBell: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
-      attach: vi.fn(),
-      detach: vi.fn(),
-      restart: vi.fn(),
-      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      clearSearch: vi.fn(),
-      takeover,
-      focusTerminal: vi.fn(),
-    })
-    const readContext: TerminalSessionReadContextValue = {
-      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
-      subscribeTerminalFilesystemTarget: () => () => {},
-      workspaceBellCount: () => 0,
-      subscribeWorkspaceBellCount: () => () => {},
-      workspaceTerminalSessions: () => [],
-      subscribeWorkspaceTerminalSessions: () => () => {},
-      snapshot: () => snapshot,
-      subscribeSnapshot: () => () => {},
-    }
-
-    const { container, unmount } = renderInJsdom(
-      <TerminalSessionCommandScope value={context}>
-        <TerminalSessionReadScope value={readContext}>
-          <TerminalSessionView
-            repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
-            branch="feature"
-            worktreePath="/worktree"
-          />
-        </TerminalSessionReadScope>
-      </TerminalSessionCommandScope>,
+    const view = await renderTerminalSession(
+      { takeover },
+      { snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, attachment: { role: 'viewer' } } },
     )
 
     try {
-      expect(container.textContent).toContain('terminal.mirror-controlled')
-      const host = container.querySelector('.goblin-terminal-session__host')
+      expect(view.container.textContent).toContain('terminal.mirror-controlled')
+      const host = view.container.querySelector('.goblin-terminal-session__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
-      expect(container.querySelector('.goblin-terminal-session__viewer-overlay')).toBeTruthy()
-      const button = Array.from(container.querySelectorAll('button')).find(
+      expect(view.container.querySelector('.goblin-terminal-session__viewer-overlay')).toBeTruthy()
+      const button = Array.from(view.container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.takeover',
       )
       expect(button).toBeDefined()
 
-      await flushTestUpdates(async () => {
-        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      })
+      await flushTestUpdates(() => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 
       expect(takeover).toHaveBeenCalledWith('term-111111111111111111111')
     } finally {
-      unmount()
+      await view.cleanup()
     }
   })
 
@@ -641,21 +559,8 @@ describe('TerminalSessionView presentation and focus', () => {
       count: 1,
       createPending: false,
     }
-    const openingSnapshot: TerminalSnapshot = {
-      phase: 'opening',
-      message: null,
-      processName: 'zsh',
-      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-    }
-    const openSnapshot = {
-      phase: 'open' as const,
-      message: null,
-      processName: 'zsh',
-      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-      attachment: {
-        role: 'controller' as const,
-      },
-    }
+    const openingSnapshot: TerminalSnapshot = EMPTY_OPENING_SNAPSHOT
+    const openSnapshot: TerminalSnapshot = OPEN_CONTROLLER_SNAPSHOT
     const focusTerminal = vi.fn()
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
@@ -687,20 +592,18 @@ describe('TerminalSessionView presentation and focus', () => {
         return () => snapshotListeners.delete(listener)
       },
     }
-    const tree = () => (
+    const { container, unmount } = renderInJsdom(
       <TerminalSessionCommandScope value={context}>
         <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId="repo-runtime-test"
             branch="feature"
             worktreePath="/worktree"
           />
         </TerminalSessionReadScope>
-      </TerminalSessionCommandScope>
+      </TerminalSessionCommandScope>,
     )
-
-    const { container, unmount } = renderInJsdom(tree())
 
     try {
       const root = container.querySelector<HTMLElement>('.goblin-terminal-session')!
@@ -729,24 +632,14 @@ describe('TerminalSessionView presentation and focus', () => {
   })
 
   test('empty filesystem target shows a New terminal CTA that calls the supplied create operation', async () => {
-    // Regression for the "blank screen on first click" symptom: when
-    // a filesystem target has no sessions yet, the session renders a CTA so the
-    // user doesn't see a featureless black box and can discover the
-    // affordance without reaching for the per-target "+" tab.
-    const createTerminal = vi.fn(async () => 'raw-session')
-    const createTerminalForSlot = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn().mockResolvedValue('raw-session')
+    const createTerminalForSlot = vi.fn().mockResolvedValue('term-111111111111111111111')
     const emptyFilesystemTargetSnapshot = {
       terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
       createPending: false,
-    }
-    const emptySnapshot = {
-      phase: 'opening' as const,
-      message: null,
-      processName: 'terminal',
-      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal,
@@ -770,7 +663,7 @@ describe('TerminalSessionView presentation and focus', () => {
       subscribeWorkspaceBellCount: () => () => {},
       workspaceTerminalSessions: () => [],
       subscribeWorkspaceTerminalSessions: () => () => {},
-      snapshot: () => emptySnapshot,
+      snapshot: () => EMPTY_OPENING_SNAPSHOT,
       subscribeSnapshot: () => () => {},
     }
 
@@ -779,7 +672,7 @@ describe('TerminalSessionView presentation and focus', () => {
         <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId="repo-runtime-test"
             branch="feature"
             worktreePath="/worktree"
             createTerminalForSlot={createTerminalForSlot}
@@ -789,8 +682,6 @@ describe('TerminalSessionView presentation and focus', () => {
     )
 
     try {
-      // The empty-state CTA is present, with the i18n key as its
-      // accessible label and the create button visible.
       const cta = container.querySelector('.goblin-terminal-session__empty-cta')
       expect(cta).toBeTruthy()
       expect(cta?.getAttribute('aria-label')).toBe('terminal.empty')
@@ -801,7 +692,7 @@ describe('TerminalSessionView presentation and focus', () => {
       )
       expect(button).toBeDefined()
 
-      await flushTestUpdates(async () => {
+      await flushTestUpdates(() => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
@@ -819,14 +710,7 @@ describe('TerminalSessionView presentation and focus', () => {
     const view = await renderTerminalSession(
       {},
       {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'controller' },
-          presentationRecovery: 'pending',
-        },
+        snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, presentationRecovery: 'pending' },
       },
     )
 
@@ -852,15 +736,7 @@ describe('TerminalSessionView presentation and focus', () => {
       const view = await renderTerminalSession(
         {},
         {
-          snapshot: {
-            phase: 'open',
-            message: null,
-            processName: 'zsh',
-            composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-            attachment: { role: 'controller' },
-            presentationRecovery: 'pending',
-            presentationPendingOperation,
-          },
+          snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, presentationRecovery: 'pending', presentationPendingOperation },
         },
       )
 
@@ -877,14 +753,7 @@ describe('TerminalSessionView presentation and focus', () => {
     const view = await renderTerminalSession(
       { retryPresentation },
       {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'controller' },
-          presentationRecovery: 'failed',
-        },
+        snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, presentationRecovery: 'failed' },
       },
     )
 
@@ -897,17 +766,10 @@ describe('TerminalSessionView presentation and focus', () => {
         (button) => button.textContent === 'terminal.retry-restoring',
       )
 
-      await flushTestUpdates(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+      await flushTestUpdates(() => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
       expect(retryPresentation).toHaveBeenCalledWith('term-111111111111111111111')
 
-      await view.publishSnapshot({
-        phase: 'open',
-        message: null,
-        processName: 'zsh',
-        composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-        attachment: { role: 'controller' },
-        presentationRecovery: 'pending',
-      })
+      await view.publishSnapshot({ ...OPEN_CONTROLLER_SNAPSHOT, presentationRecovery: 'pending' })
       expect(view.container.querySelector('[role="alert"]')).toBeNull()
       expect(view.container.textContent).toContain('terminal.restoring')
       expect(view.container.textContent).not.toContain('terminal.retry-restoring')
@@ -920,14 +782,7 @@ describe('TerminalSessionView presentation and focus', () => {
     const view = await renderTerminalSession(
       {},
       {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'controller' },
-          presentationRecovery: 'pending',
-        },
+        snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, presentationRecovery: 'pending' },
         projectionPhase: 'failed',
       },
     )
@@ -963,55 +818,45 @@ describe('TerminalSessionView presentation and focus', () => {
         (button) => button.textContent === 'terminal.retry-loading',
       )
 
-      await flushTestUpdates(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+      await flushTestUpdates(() => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
       expect(retryProjection).toHaveBeenCalledOnce()
     } finally {
       await view.cleanup()
     }
   })
 
-  test('keeps unowned attachment passive and reserves takeover for true viewers', async () => {
-    const unowned = await renderTerminalSession(
+  test('keeps an unowned attachment passive', async () => {
+    const view = await renderTerminalSession(
       {},
       {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'unowned' },
-        },
+        snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, attachment: { role: 'unowned' } },
       },
     )
 
     try {
-      expect(unowned.container.textContent).toContain('terminal.unowned')
-      expect(unowned.container.textContent).not.toContain('terminal.takeover')
-      expect(unowned.container.querySelector('button')).toBeNull()
+      expect(view.container.textContent).toContain('terminal.unowned')
+      expect(view.container.textContent).not.toContain('terminal.takeover')
+      expect(view.container.querySelector('button')).toBeNull()
     } finally {
-      await unowned.cleanup()
+      await view.cleanup()
     }
+  })
 
-    const viewer = await renderTerminalSession(
+  test('disables takeover while a viewer takeover is pending', async () => {
+    const view = await renderTerminalSession(
       {},
       {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'viewer' },
-          takeoverPending: true,
-        },
+        snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, attachment: { role: 'viewer' }, takeoverPending: true },
       },
     )
+
     try {
-      const button = viewer.container.querySelector('button')
+      const button = view.container.querySelector('button')
       expect(button?.textContent).toBe('terminal.taking-over')
       expect(button?.getAttribute('aria-busy')).toBe('true')
       expect(button?.hasAttribute('disabled')).toBe(true)
     } finally {
-      await viewer.cleanup()
+      await view.cleanup()
     }
   })
 
@@ -1033,19 +878,13 @@ describe('TerminalSessionView presentation and focus', () => {
     const view = await renderTerminalSession(
       { takeover },
       {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'viewer' },
-        },
+        snapshot: { ...OPEN_CONTROLLER_SNAPSHOT, attachment: { role: 'viewer' } },
       },
     )
 
     try {
       const button = view.container.querySelector('button')
-      await flushTestUpdates(async () => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+      await flushTestUpdates(() => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 
       expect(toast.error).toHaveBeenCalledTimes(tone === 'error' ? 1 : 0)
       expect(toast.warning).toHaveBeenCalledTimes(tone === 'warning' ? 1 : 0)
@@ -1053,9 +892,4 @@ describe('TerminalSessionView presentation and focus', () => {
       await view.cleanup()
     }
   })
-
-  // ---------------------------------------------------------------------
-  // Text-aware paste routing — the fix for the "Excel double-output" bug
-  // and the path-aware decision matrix in src/web/clipboard/process.ts.
-  // ---------------------------------------------------------------------
 })

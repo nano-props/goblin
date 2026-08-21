@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-recovery.ts'
@@ -10,7 +11,7 @@ const TARGET = {
 
 describe('WorkspacePaneTabsRecovery', () => {
   test('refreshes the query-owned projection for the active runtime scope', async () => {
-    const refresh = vi.fn(async () => {})
+    const refresh = vi.fn(() => Promise.resolve())
     const recovery = new WorkspacePaneTabsRecovery({
       refresh,
       currentRevision: () => null,
@@ -22,7 +23,7 @@ describe('WorkspacePaneTabsRecovery', () => {
   })
 
   test('skips a revision event already represented by the cache', () => {
-    const refresh = vi.fn(async () => {})
+    const refresh = vi.fn(() => Promise.resolve())
     const recovery = new WorkspacePaneTabsRecovery({
       refresh,
       currentRevision: () => 4,
@@ -42,7 +43,7 @@ describe('WorkspacePaneTabsRecovery', () => {
   })
 
   test('refreshes when an event belongs to a replaced runtime epoch', async () => {
-    const refresh = vi.fn(async () => {})
+    const refresh = vi.fn(() => Promise.resolve())
     const recovery = new WorkspacePaneTabsRecovery({
       refresh,
       currentRevision: () => 99,
@@ -65,7 +66,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     const firstRefresh = Promise.withResolvers<void>()
     const refresh = vi
       .fn()
-      .mockImplementationOnce(async () => await firstRefresh.promise)
+      .mockImplementationOnce(() => firstRefresh.promise)
       .mockResolvedValue(undefined)
     const recovery = new WorkspacePaneTabsRecovery({
       refresh,
@@ -93,7 +94,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     const error = new Error('tabs unavailable')
     const logFailure = vi.fn()
     const recovery = new WorkspacePaneTabsRecovery({
-      refresh: vi.fn(async () => await Promise.reject(error)),
+      refresh: vi.fn(() => Promise.reject(error)),
       currentRevision: () => null,
       logFailure,
     })
@@ -108,7 +109,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     let current = true
     const logFailure = vi.fn()
     const recovery = new WorkspacePaneTabsRecovery({
-      refresh: vi.fn(async () => await request.promise),
+      refresh: vi.fn(() => request.promise),
       currentRevision: () => null,
       logFailure,
     })
@@ -117,7 +118,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     recovery.request(scope, { kind: 'fresh' })
     current = false
     request.reject(new Error('stale failure'))
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await waitForNextMacrotask()
 
     expect(logFailure).not.toHaveBeenCalled()
   })

@@ -45,7 +45,10 @@ describe('repo refresh actions', () => {
     appQueryClient.clear()
   })
 
-  afterEach(() => appQueryClient.clear())
+  afterEach(() => {
+    vi.restoreAllMocks()
+    appQueryClient.clear()
+  })
 
   test('does not issue Git refreshes for a filesystem-only workspace', async () => {
     const store = repoRefreshStoreAccess('workspace-runtime-test-9', 'filesystem')
@@ -54,7 +57,6 @@ describe('repo refresh actions', () => {
     await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, domain: 'metadata' }, 'workspace-runtime-test-9')
 
     expect(invalidateSpy).not.toHaveBeenCalled()
-    invalidateSpy.mockRestore()
   })
 
   test('refreshes in-memory operations without requiring Git capability', async () => {
@@ -75,7 +77,6 @@ describe('repo refresh actions', () => {
       { cancelRefetch: false },
     )
     expect(invalidateSpy).toHaveBeenCalledOnce()
-    invalidateSpy.mockRestore()
   })
 
   test('resyncs in-memory operations when Git reads are unavailable', async () => {
@@ -92,7 +93,6 @@ describe('repo refresh actions', () => {
       { cancelRefetch: false },
     )
     expect(invalidateSpy).toHaveBeenCalledOnce()
-    invalidateSpy.mockRestore()
   })
 
   test('routes metadata invalidation through query invalidation only', async () => {
@@ -110,7 +110,6 @@ describe('repo refresh actions', () => {
       { cancelRefetch: false },
     )
     expect(invalidateSpy).toHaveBeenCalledOnce()
-    invalidateSpy.mockRestore()
   })
 
   test('routes worktree-status invalidation through its narrower query domain', async () => {
@@ -130,6 +129,5 @@ describe('repo refresh actions', () => {
       { cancelRefetch: false },
     )
     expect(invalidateSpy).toHaveBeenCalledOnce()
-    invalidateSpy.mockRestore()
   })
 })

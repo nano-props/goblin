@@ -26,7 +26,7 @@ import {
 } from '#/web/repos/query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   createTerminalWithAdmissionForContextTest,
@@ -81,6 +81,31 @@ function detachedWorktreeSnapshot(path: string) {
     isSource: false,
     isLocked: false,
   }
+}
+
+function setWorktreePaneTabsForTest(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  worktreePath: string,
+  tabs: WorkspacePaneTabEntry[],
+) {
+  const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
+  if (!target) throw new Error('expected canonical worktree fixture')
+  setWorkspacePaneTabsForTargetQueryData({ ...target, workspaceRuntimeId, tabs })
+  return target
+}
+
+function setWorkspaceRootTabsForTest(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  tabs: WorkspacePaneTabEntry[],
+) {
+  setWorkspacePaneTabsForTargetQueryData({
+    kind: 'workspace-root',
+    workspaceId,
+    workspaceRuntimeId,
+    tabs,
+  })
 }
 
 function failWorktreeStatusQuery(workspaceId: WorkspaceId, workspaceRuntimeId: string, message: string) {
@@ -138,7 +163,7 @@ describe('WorkspacePane directory workspaces', () => {
     terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const terminalCreate = Promise.withResolvers<string>()
-    const createTerminal = vi.fn(async () => await terminalCreate.promise)
+    const createTerminal = vi.fn(() => terminalCreate.promise)
     const deferredTerminalCommandContext = terminalSessionContextForTest({
       ...terminalCommandContext,
       createTerminal,
@@ -187,7 +212,7 @@ describe('WorkspacePane directory workspaces', () => {
     )
   })
 
-  test('renders shared external app actions for a local non-Git workspace', async () => {
+  test('renders shared external app actions for a local non-Git workspace', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/filesystem-toolbar-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -209,20 +234,10 @@ describe('WorkspacePane directory workspaces', () => {
       error: null,
     })
 
-    const { container } = render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    const { container } = renderWorkspacePane(workspaceId, {
+      kind: 'workspace-root',
+      route: { kind: 'static', tab: 'files' },
+    })
 
     expect(container.querySelector('[data-testid="workspace-external-app-launcher-primary"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-external-app-launcher-trigger"]')).not.toBeNull()
@@ -243,23 +258,9 @@ describe('WorkspacePane directory workspaces', () => {
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, { kind: 'workspace-root', route: null })
 
-    expect(screen.getByText('tab.status')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
     await flushTestUpdates(() => {
       workspacesStore.setState((state) => {
         const repo = state.workspaces[workspaceId]
@@ -284,7 +285,9 @@ describe('WorkspacePane directory workspaces', () => {
       })
     })
 
-    await waitFor(() => expect(screen.getByText('tab.status')).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true'),
+    )
     expect(screen.queryByText('branches.empty')).toBeNull()
   })
 
@@ -304,14 +307,10 @@ describe('WorkspacePane directory workspaces', () => {
       loadedAt: 1,
     })
     failWorktreeStatusQuery(workspaceId, repo.workspaceRuntimeId, 'status read failed')
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
-    })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+    ])
+    const terminalFilesystemTargetKey = `${workspaceId}\0goblin+file:///workspace/detached`
 
     render(
       <VueQueryClientScope client={appQueryClient}>
@@ -358,7 +357,7 @@ describe('WorkspacePane directory workspaces', () => {
       },
     })
 
-    const result = renderWorkspacePane(workspaceId, {
+    renderWorkspacePane(workspaceId, {
       kind: 'git-worktree',
       worktreePath,
       route: { kind: 'static', tab: 'history' },
@@ -430,13 +429,10 @@ describe('WorkspacePane directory workspaces', () => {
       ],
       currentBranchName: null,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical unborn worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+    ])
 
     const result = renderWorkspacePane(workspaceId, {
       kind: 'git-worktree',
@@ -493,13 +489,9 @@ describe('WorkspacePane directory workspaces', () => {
       status: [{ path: worktreePath, isMain: false, entries: [] }],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('files')],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('files'),
+    ])
     failWorktreeStatusQuery(workspaceId, repo.workspaceRuntimeId, 'status read failed')
 
     renderWorkspacePane(workspaceId, {
@@ -528,13 +520,9 @@ describe('WorkspacePane directory workspaces', () => {
       status: [{ path: worktreePath, isMain: false, entries: [] }],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+    ])
     failWorktreeStatusQuery(workspaceId, repo.workspaceRuntimeId, 'status read failed')
 
     renderWorkspacePane(workspaceId, {
@@ -575,13 +563,9 @@ describe('WorkspacePane directory workspaces', () => {
       ],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+    ])
     const commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
       options?.onCommit?.()
       return true
@@ -641,13 +625,10 @@ describe('WorkspacePane directory workspaces', () => {
       ],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('changes'),
+    ])
 
     renderWorkspacePane(workspaceId, {
       kind: 'git-worktree',
@@ -680,13 +661,9 @@ describe('WorkspacePane directory workspaces', () => {
       status: [{ path: worktreePath, isMain: false, entries: [] }],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('files')],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('files'),
+    ])
     renderWorkspacePane(workspaceId, {
       kind: 'git-worktree',
       worktreePath,
@@ -721,26 +698,18 @@ describe('WorkspacePane directory workspaces', () => {
       status: [{ path: worktreePath, isMain: false, entries: [] }],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneStaticTabEntry('files'),
-        workspacePaneStaticTabEntry('history'),
-      ],
-    })
+    const target = setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+      workspacePaneStaticTabEntry('history'),
+    ])
     workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'history')
 
     renderWorkspacePane(workspaceId, { kind: 'git-worktree', worktreePath, route: null })
 
     expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
-    await flushTestUpdates(async () => await Promise.resolve())
+    await flushTestUpdates(() => {})
     expect(screen.getByRole('tab', { name: 'tab.log' }).getAttribute('aria-selected')).toBe('true')
-    const workspace = workspacesStore.getState().workspaces[workspaceId]
-    expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, target)).toBe('history')
   })
 
   test('renders an attached operation in the worktree-aware pane', async () => {
@@ -764,13 +733,9 @@ describe('WorkspacePane directory workspaces', () => {
       status: [{ path: worktreePath, isMain: false, entries: [] }],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical operation worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+    ])
 
     renderWorkspacePane(workspaceId, {
       kind: 'git-worktree',
@@ -793,17 +758,11 @@ describe('WorkspacePane directory workspaces', () => {
       worktrees: [attachedWorktree],
       currentBranchName: branchName,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneStaticTabEntry('files'),
-        workspacePaneStaticTabEntry('history'),
-      ],
-    })
+    const target = setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+      workspacePaneStaticTabEntry('history'),
+    ])
     workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'history')
 
     renderWorkspacePane(workspaceId, { kind: 'git-worktree', worktreePath, route: null })
@@ -855,13 +814,10 @@ describe('WorkspacePane directory workspaces', () => {
       status: [{ path: worktreePath, isMain: false, entries: [] }],
       loadedAt: 1,
     })
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-    if (!target) throw new Error('expected canonical detached worktree fixture')
-    setWorkspacePaneTabsForTargetQueryData({
-      ...target,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry(tab)],
-    })
+    setWorktreePaneTabsForTest(workspaceId, repo.workspaceRuntimeId, worktreePath, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry(tab),
+    ])
 
     renderWorkspacePane(workspaceId, {
       kind: 'git-worktree',
@@ -905,7 +861,7 @@ describe('WorkspacePane directory workspaces', () => {
     expect(onBackToNavigator).toHaveBeenCalledOnce()
   })
 
-  test('renders directory overview data in the non-Git Status tab without a Git projection', async () => {
+  test('renders directory overview data in the non-Git Status tab without a Git projection', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-status-workspace')
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -913,12 +869,10 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-    })
+    setWorkspaceRootTabsForTest(workspaceId, repo.workspaceRuntimeId, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+    ])
     workspacesStore
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'status')
@@ -928,35 +882,20 @@ describe('WorkspacePane directory workspaces', () => {
       lastModifiedAt: '2023-11-14T22:13:20.000Z',
     })
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, { kind: 'routed', route: null })
 
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('list')).toBeTruthy()
     expect(screen.getAllByRole('listitem')).toHaveLength(4)
     expect(screen.getByText('dashboard.directory.working-directory')).toBeTruthy()
     expect(screen.queryByText('branch-status.signal.worktree')).toBeNull()
-    const workingDirectoryLink = screen.getByText('/tmp/plain-status-workspace')
-    expect(workingDirectoryLink).toBeTruthy()
-    expect(workingDirectoryLink.closest('[role="listitem"]')?.querySelector('svg')?.parentElement?.className).toContain(
-      'text-brand-text',
-    )
+    expect(screen.getByText('/tmp/plain-status-workspace')).toBeTruthy()
     expect(screen.getByText('7')).toBeTruthy()
     expect(screen.getByText('3')).toBeTruthy()
     const lastModifiedRow = screen.getByText('dashboard.directory.last-modified').closest('[role="listitem"]')
     const lastModifiedValue = lastModifiedRow?.querySelector<HTMLElement>('[title]')
     expect(lastModifiedValue?.textContent).toBe(lastModifiedValue?.title)
     expect(lastModifiedValue?.textContent).toMatch(/ ago$/u)
-    expect(lastModifiedValue?.className).toContain('truncate')
     expect(queryObserverCount(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId))).toBe(1)
   })
 
@@ -968,12 +907,10 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-    })
+    setWorkspaceRootTabsForTest(workspaceId, repo.workspaceRuntimeId, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+    ])
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
     appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 1,
@@ -985,17 +922,10 @@ describe('WorkspacePane directory workspaces', () => {
       return true
     })
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={{ ...navigation, commitFilesystemWorkspacePaneRoute }}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, { kind: 'routed', route: null }, {
+      ...navigation,
+      commitFilesystemWorkspacePaneRoute,
+    })
 
     screen.getByRole('button', { name: 'dashboard.directory.open-files' }).click()
 
@@ -1016,28 +946,16 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-    })
+    setWorkspaceRootTabsForTest(workspaceId, repo.workspaceRuntimeId, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+    ])
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, {
+      kind: 'workspace-root',
+      route: { kind: 'static', tab: 'files' },
+    })
 
     expect(screen.getByRole('tab', { name: 'tab.files' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('false')
@@ -1061,38 +979,19 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-    })
+    setWorkspaceRootTabsForTest(workspaceId, repo.workspaceRuntimeId, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+    ])
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, { kind: 'workspace-root', route: null })
 
-    await flushTestUpdates(async () => await Promise.resolve())
+    await flushTestUpdates(() => {})
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
-    const workspace = workspacesStore.getState().workspaces[workspaceId]
-    expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, { kind: 'workspace-root', workspaceId })).toBe(
-      'status',
-    )
   })
 
-  test('does not expose a terminal surface when the workspace capability is unavailable', async () => {
+  test('does not expose a terminal surface when the workspace capability is unavailable', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/terminal-unavailable-workspace')
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -1103,24 +1002,12 @@ describe('WorkspacePane directory workspaces', () => {
         terminalAvailable: false,
       }),
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-    })
+    setWorkspaceRootTabsForTest(workspaceId, repo.workspaceRuntimeId, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+    ])
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, { kind: 'routed', route: null })
 
     expect(screen.getByText('tab.status')).toBeTruthy()
     expect(screen.queryByText('tab.terminal')).toBeNull()

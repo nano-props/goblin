@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -16,6 +16,7 @@ import {
 } from '#/web/stores/workspaces/refresh-test-utils.ts'
 
 beforeEach(resetRefreshTest)
+afterEach(() => vi.restoreAllMocks())
 
 describe('manual workspace refresh', () => {
   test('skips fetch for a local-only repository and refreshes snapshot and status independently', async () => {

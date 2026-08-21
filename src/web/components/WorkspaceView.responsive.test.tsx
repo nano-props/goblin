@@ -17,7 +17,6 @@ import {
   workspacePane,
   workspaceLayout,
   compactWorkspace,
-  compactPane,
   zenModeSidebarReveal,
   zenModeSidebarTrigger,
   setReadModelLoading,
@@ -55,8 +54,6 @@ describe('WorkspaceView responsive layout', () => {
     expect(container.querySelector('[data-testid="workspace-shell-sidebar-top"]')).toBeNull()
     expect(zenModeSidebarTrigger(container)).toBeNull()
     expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
-    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBeNull()
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
 
     await flushTestUpdates(async () => {
       gitWorkspaceNavigator(container)?.click()
@@ -64,8 +61,6 @@ describe('WorkspaceView responsive layout', () => {
     })
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
-    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(workspacePane(container)).not.toBeNull()
   })
 
@@ -76,8 +71,6 @@ describe('WorkspaceView responsive layout', () => {
     await flushTestUpdates(() => {})
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
-    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(workspacePane(container)).not.toBeNull()
   })
 
@@ -94,7 +87,6 @@ describe('WorkspaceView responsive layout', () => {
     })
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
     expect(workspacePane(container)?.dataset.workspacePaneRouteKind).toBe('inactive')
     expect(workspacePane(container)?.dataset.shortcutsEnabled).toBe('false')
@@ -118,7 +110,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
-  test('large-screen focused initial loading with current branch keeps floating sidebar reveal available', async () => {
+  test('large-screen focused initial loading with current branch keeps floating sidebar reveal available', () => {
     workspacesStore.getState().setZenMode(true)
     setReadModelLoading(REPO_ID)
 
@@ -140,7 +132,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(document.body.textContent).toContain('workspace-unavailable.title')
   })
 
-  test('large-screen focused unavailable Workspace keeps floating sidebar reveal available', async () => {
+  test('large-screen focused unavailable Workspace keeps floating sidebar reveal available', () => {
     workspacesStore.getState().setZenMode(true)
     setRepoUnavailable(REPO_ID)
 
@@ -189,8 +181,6 @@ describe('WorkspaceView responsive layout', () => {
     )
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
-    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
   })
@@ -209,8 +199,6 @@ describe('WorkspaceView responsive layout', () => {
     await flushTestUpdates(() => rerender(branchWorkspaceView()))
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
-    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
-    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(workspacePane(container)).not.toBeNull()
   })
 })

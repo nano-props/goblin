@@ -3,7 +3,7 @@ import { compactTerminalProcessName, compactTerminalTitle } from '#/web/terminal
 
 describe('compactTerminalTitle', () => {
   test('prefers the trailing command segment from long terminal titles', () => {
-    expect(compactTerminalTitle('~/Developer/goblin — npm run dev')).toBe('goblin · npm run dev')
+    expect(compactTerminalTitle('~/projects/example-app — npm run dev')).toBe('example-app · npm run dev')
   })
 
   test('reduces host path titles to host and basename', () => {
@@ -15,7 +15,7 @@ describe('compactTerminalTitle', () => {
   })
 
   test('extracts the basename from paths that contain spaces', () => {
-    expect(compactTerminalTitle('~/Library/Application Support/Goblin')).toBe('Goblin')
+    expect(compactTerminalTitle('~/Documents/Example Workspace')).toBe('Example Workspace')
   })
 
   test('shortens long commands even when they only contain one or two tokens', () => {
@@ -29,24 +29,25 @@ describe('compactTerminalTitle', () => {
     expect(compactTerminalTitle('https://example.com/very/long/path/to/page')).toBe('page')
   })
 
-  test('strips leading labels like devin before compacting the real title', () => {
-    expect(compactTerminalTitle('devin: some real info')).toBe('some real info')
+  test('strips the supported Devin session prefix before compacting the title', () => {
+    expect(compactTerminalTitle('devin: relevant session')).toBe('relevant session')
   })
 
-  test('strips ubuntu@VM host prefix before compacting the real title', () => {
-    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu: dirname-a')).toBe('dirname-a')
-    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/goblin')).toBe('goblin')
-    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/goblin — npm run dev')).toBe('goblin · npm run dev')
-  })
-
-  test('handles nested terminal title wrappers from real remote sessions', () => {
-    expect(compactTerminalTitle('devin: ubuntu@VM-0-12-ubuntu:~/projects/goblin — npm run dev')).toBe(
-      'goblin · npm run dev',
+  test('strips the supported Ubuntu VM prefix before compacting the title', () => {
+    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu: workspace')).toBe('workspace')
+    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/example-app')).toBe('example-app')
+    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/example-app — npm run dev')).toBe(
+      'example-app · npm run dev',
     )
-    expect(compactTerminalTitle('devin: user@prod:~/services/payments/api')).toBe('user@prod · api')
   })
 
-  test('keeps readable short names for real ssh and command titles', () => {
+  test('strips nested supported terminal wrappers', () => {
+    expect(compactTerminalTitle('devin: ubuntu@VM-0-12-ubuntu:~/projects/example-app — npm run dev')).toBe(
+      'example-app · npm run dev',
+    )
+  })
+
+  test('keeps readable short names for ssh and command titles', () => {
     expect(compactTerminalTitle('user@prod:~/services/payments/api — npm run dev')).toBe(
       'user@prod · api · npm run dev',
     )

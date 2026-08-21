@@ -18,6 +18,7 @@ beforeEach(resetRefreshTest)
 describe('repository snapshot refresh', () => {
   test('replaces the runtime-scoped snapshot query without mirroring it into Zustand', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
+    const workspaceBefore = workspacesStore.getState().workspaces[REPO_ID]
     ipcHandlers['repo.snapshot'] = () =>
       repoSnapshotResponse({ branches: [branch('main'), branch('feature/a')], current: 'feature/a' })
 
@@ -27,11 +28,7 @@ describe('repository snapshot refresh', () => {
       'main',
       'feature/a',
     ])
-    const workspace = workspacesStore.getState().workspaces[REPO_ID]
-    expect(workspace?.capability.kind).toBe('git')
-    expect(workspace && workspace.capability.kind === 'git' ? Object.keys(workspace.capability.git) : []).toEqual(
-      expect.not.arrayContaining(['dataLoads', 'remote']),
-    )
+    expect(workspacesStore.getState().workspaces[REPO_ID]).toBe(workspaceBefore)
   })
 
   test('keeps accepted snapshot data mounted when a background refresh fails', async () => {

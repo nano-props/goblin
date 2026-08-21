@@ -1,17 +1,12 @@
 // @vitest-environment jsdom
 
-import {
-  workspacePaneLocationForBranchTarget,
-  workspacePaneLocationForLinkedWorktree,
-  workspacePaneLocationForRoot,
-} from '#/web/workspace-pane/workspace-pane-location.ts'
+import { workspacePaneLocationForRoot } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AcceptedTerminalRetirement } from '#/web/terminal/components/TerminalSessionProjection.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
@@ -66,9 +61,8 @@ describe('terminal retirement workspace pane presentation', () => {
     const terminalSessionId = 'term-111111111111111111111'
     const tabsBeforeRetirement = [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }]
 
-    await flushTestUpdates(async () => {
+    await flushTestUpdates(() => {
       listener({ terminalSessionId, tabsBeforeRetirement })
-      await Promise.resolve()
     })
 
     expect(mocks.runPresentation).toHaveBeenCalledWith({

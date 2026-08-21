@@ -15,8 +15,8 @@ export function workspaceDirectoryOverviewQueryOptions(
 ) {
   return {
     queryKey: workspaceDirectoryOverviewQueryKey(workspaceId, workspaceRuntimeId),
-    // The query promise owns this bounded read. A transient observer teardown (including
-    // StrictMode replay) may stop observing it, but must not cancel and restart the HTTP request.
+    // The query promise owns this bounded read. A transient observer teardown may stop
+    // observing it, but must not cancel and restart the HTTP request.
     queryFn: () => getWorkspaceDirectoryOverview(workspaceId, workspaceRuntimeId),
     staleTime: 30_000,
     enabled,

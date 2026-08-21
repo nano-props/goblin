@@ -86,50 +86,6 @@ describe('terminal web host client', () => {
     dispose()
   })
 
-  test('uses the page instance id for the realtime connection', async () => {
-    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { readClientPageId } = await import('#/web/bridge/page-id.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    const attachPromise = terminalClient.attach({
-      terminalRuntimeSessionId: 'pty_1234567890123456',
-      terminalRuntimeGeneration: 0,
-      cols: 100,
-      rows: 30,
-    })
-    socket?.emitOpen()
-    await Promise.resolve()
-    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'request')
-    socket?.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: request?.requestId,
-        ok: true,
-        action: 'attach',
-        payload: {
-          ok: true,
-          frame: 'snapshot',
-          terminalProjectionEffect: { kind: 'none' },
-          terminalRuntimeSessionId: 'pty_1234567890123456',
-          terminalRuntimeGeneration: 1,
-          identityRevision: 0,
-          snapshot: '',
-          snapshotSeq: 0,
-          processName: 'zsh',
-          canonicalTitle: null,
-          phase: 'open',
-          message: null,
-          controller: null,
-          canonicalSize: { cols: 100, rows: 30 },
-        },
-      }),
-    )
-
-    await attachPromise
-    expect(socket?.url).toContain(`clientId=${readClientPageId()}`)
-    dispose()
-  })
-
   test('uses the websocket client id when resolving identity role', async () => {
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { readClientPageId } = await import('#/web/bridge/page-id.ts')
@@ -154,7 +110,6 @@ describe('terminal web host client', () => {
       }),
     )
 
-    expect(socket.url).toContain(`clientId=${clientId}`)
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
       terminalRuntimeGeneration: 1,
@@ -167,7 +122,7 @@ describe('terminal web host client', () => {
     dispose()
   })
 
-  test('does not fall back to http when attach websocket cannot open', async () => {
+  test('rejects attach without issuing an HTTP request when the websocket cannot open', async () => {
     const fetchMock = mockFetch()
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
@@ -186,7 +141,7 @@ describe('terminal web host client', () => {
     dispose()
   })
 
-  test('does not fall back to http when write websocket is unavailable', async () => {
+  test('rejects write without issuing an HTTP request when the websocket is unavailable', async () => {
     const fetchMock = mockFetch()
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})

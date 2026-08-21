@@ -35,6 +35,7 @@ const filesystemTarget = gitWorktreePaneFilesystemTarget({
 
 beforeEach(() => {
   resetWorkspacesStore()
+  appQueryClient.clear()
 })
 
 describe('workspace pane command target', () => {
@@ -123,7 +124,7 @@ describe('workspace pane command target', () => {
     expect(workspacePaneCommandCoordinates(target).branchName).toBe('feature/example')
   })
 
-  test('rejects a branch route for a filesystem-only workspace without creating a query', async () => {
+  test('rejects a branch route for a filesystem-only workspace without creating a query', () => {
     const workspace = seedRepoShellForTest({
       id: 'goblin+file:///tmp/command-target-filesystem-workspace',
       workspaceRuntimeId: 'command-target-filesystem-runtime',
@@ -173,7 +174,7 @@ describe('workspace pane command target', () => {
     ).toBeNull()
   })
 
-  test('rejects a materialized branch route even while its accepted snapshot is stale', async () => {
+  test('rejects a materialized branch route even while its accepted snapshot is stale', () => {
     const workspace = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/example', '/tmp/command-target-branch-worktree')],
       id: 'goblin+file:///tmp/command-target-branch-workspace',
@@ -207,7 +208,7 @@ describe('workspace pane command target', () => {
     expect(query.getObserversCount()).toBe(0)
   })
 
-  test('admits only a branch that exists and has no materialized worktree', async () => {
+  test('admits only a branch that exists and has no materialized worktree', () => {
     const workspace = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/command-target-unmaterialized-branch-workspace',
       workspaceRuntimeId: 'command-target-unmaterialized-branch-runtime',
@@ -233,7 +234,7 @@ describe('workspace pane command target', () => {
     })
   })
 
-  test('admits a worktree target from the accepted repository snapshot while a refresh is stale', async () => {
+  test('admits a worktree target from the accepted repository snapshot while a refresh is stale', () => {
     const worktreePath = '/tmp/command-target-status-worktree'
     const workspace = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/command-target-status-workspace',

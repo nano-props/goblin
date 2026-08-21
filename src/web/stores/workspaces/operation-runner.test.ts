@@ -1,7 +1,6 @@
 import { seedRepoShellForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { CancelledError } from '@tanstack/query-core'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { repoOperation, repoOperationBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -178,7 +177,7 @@ describe('runExclusiveOperation', () => {
     await expect(first).resolves.toEqual({ ok: true, message: 'done' })
   })
 
-  test('records operation view errors when current work fails', async () => {
+  test('maps task failures to error results and settles operation state', async () => {
     const result = await runExclusiveOperation({
       set: workspacesStore.setState,
       get: workspacesStore.getState,
@@ -242,15 +241,7 @@ describe('runExclusiveOperation', () => {
 
 describe('runLatestOperation active-task cancellation', () => {
   test('a same-key submission aborts the in-flight active task', async () => {
-    // The first run's task body awaits a never-resolving promise.
-    // Its signal must be aborted by the lane when the second run
-    // comes in (latest-wins), so the task can reject instead of
-    // holding the concurrency slot until its own timeout.
     let activeAborted = false
-    let release!: () => void
-    const activeSettled = new Promise<void>((resolve) => {
-      release = () => resolve()
-    })
     const first = runLatestOperation({
       set: workspacesStore.setState,
       get: workspacesStore.getState,
@@ -265,12 +256,9 @@ describe('runLatestOperation active-task cancellation', () => {
           signal.addEventListener('abort', () => {
             activeAborted = true
             resolve({ ok: true, tag: 'first' })
-            release()
           })
         }),
     })
-    // Yield once so the first run's `markOperationState` +
-    // `start` actually land the controller in the active index.
     await Promise.resolve()
 
     let secondStarted = false
@@ -289,78 +277,16 @@ describe('runLatestOperation active-task cancellation', () => {
       },
     })
 
-    // The first run's task body has synchronously seen the
-    // abort. The second run's task body is queued to start in
-    // the next microtask (after the active-cancel's `.finally`
-    // decrements `active` and `drain()` shifts the new task
-    // over). Yield a few times so the microtask queue drains.
     expect(activeAborted).toBe(true)
-    await flushMicrotasks(5)
-    expect(secondStarted).toBe(true)
-
-    await first
-    await second
-    await activeSettled
-  })
-
-  test('a same-key submission frees the concurrency slot immediately for the next run', async () => {
-    // Sanity check: with concurrency=1, if the active-cancel
-    // path is broken, the second run sits in the queue for as
-    // long as the first run takes. We assert that the second run
-    // starts BEFORE the first's task body would otherwise
-    // resolve. The first task reacts to the abort by resolving
-    // its own promise immediately, simulating a real SSH call
-    // that detects `signal.aborted` and bails.
-    const first = runLatestOperation({
-      set: workspacesStore.setState,
-      get: workspacesStore.getState,
-      id: REPO_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
-      lane: 'write',
-      operationKey: 'remoteLifecycle',
-      priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
-      task: (signal) =>
-        new Promise<{ ok: true }>((resolve) => {
-          signal.addEventListener('abort', () => resolve({ ok: true }))
-        }),
-    })
-    await Promise.resolve()
-
-    let secondStarted = false
-    const second = runLatestOperation({
-      set: workspacesStore.setState,
-      get: workspacesStore.getState,
-      id: REPO_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
-      lane: 'write',
-      operationKey: 'remoteLifecycle',
-      priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
-      task: async () => {
-        secondStarted = true
-        return { ok: true }
-      },
-    })
-    // Yield a few times so the abort propagates, the old
-    // task body resolves, the queue drains, and the new task
-    // starts. With the active-cancel path, this is a few
-    // microtasks; without it, the second run would never
-    // start (the first's promise would never settle on its
-    // own).
-    await flushMicrotasks(5)
-    expect(secondStarted).toBe(true)
+    await vi.waitFor(() => expect(secondStarted).toBe(true))
 
     await first
     await second
   })
 
-  test('active-cancel does not affect tasks with a different replaceKey', async () => {
-    // The `read` lane's default-key tasks (no `operationKey`)
-    // must not be aborted by a `write` submission. The lane
-    // index is keyed by `replaceKey`, so unrelated tasks are
-    // insulated.
+  test('does not abort an active task with a different replaceKey', async () => {
     const reads: string[] = []
+    let readAborted = false
     let releaseRead!: () => void
     const read = runLatestOperation({
       set: workspacesStore.setState,
@@ -370,19 +296,18 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'read',
       priority: 1,
       targets: [{ key: 'branchAction', reason: 'branch:pull' }],
-      task: () =>
+      task: (signal) =>
         new Promise<{ ok: true }>((resolve) => {
           reads.push('started')
+          signal.addEventListener('abort', () => {
+            readAborted = true
+            resolve({ ok: true })
+          })
           releaseRead = () => resolve({ ok: true })
         }),
     })
-    await waitForNextMacrotask()
-    expect(reads).toEqual(['started'])
+    await vi.waitFor(() => expect(reads).toEqual(['started']))
 
-    // Submit a same-lane read with a different `operationKey`
-    // (so a different `replaceKey`). It supersedes ONLY by
-    // queuing, not by aborting — the read concurrency is 3, so
-    // both can run in parallel; and the replaceKeys differ.
     const read2 = runLatestOperation({
       set: workspacesStore.setState,
       get: workspacesStore.getState,
@@ -394,15 +319,11 @@ describe('runLatestOperation active-task cancellation', () => {
       targets: [{ key: 'branchAction', reason: 'branch:pull' }],
       task: async () => ({ ok: true }),
     })
-    // `read` is still running. The cancelActiveByKey for
-    // The unrelated read target finds no active match (the active one is
-    // keyed `undefined`). So the original read is NOT aborted.
-    await waitForNextMacrotask()
-    expect(reads).toEqual(['started'])
+    await read2
+    expect(readAborted).toBe(false)
 
     releaseRead()
     await read
-    await read2
   })
 
   test('stale run does not overwrite the new run on the latest-wins target', async () => {

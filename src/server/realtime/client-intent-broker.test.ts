@@ -34,6 +34,20 @@ describe('client intent broker', () => {
     expect(second.send).toHaveBeenCalledWith(expected)
   })
 
+  test('removes a subscriber after delivery fails', () => {
+    const subscriber = {
+      send: vi.fn(() => {
+        throw new Error('socket closed')
+      }),
+      close: vi.fn(),
+    }
+    registerClientIntentSocket(subscriber)
+
+    expect(publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(true)
+    expect(publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(false)
+    expect(subscriber.send).toHaveBeenCalledOnce()
+  })
+
   test('disconnects every subscriber during shutdown', () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }

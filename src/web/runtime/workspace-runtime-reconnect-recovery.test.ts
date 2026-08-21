@@ -45,7 +45,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     const resyncRepoReads = vi.fn(async () => {})
     const recovery = new WorkspaceRuntimeReconnectRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
-      reconcileMemberships: async () => await membership.promise,
+      reconcileMemberships: () => membership.promise,
       currentWorkspaceRuntimeId: () => TARGET.workspaceRuntimeId,
       terminalRecovery,
       workspaceTabsRecovery,

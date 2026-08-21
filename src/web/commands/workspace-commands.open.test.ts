@@ -8,6 +8,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-commands.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -424,7 +425,11 @@ describe('workspace commands open', () => {
       },
     })
     const createTerminal = vi.fn(async (_base: TerminalSessionBase, _options?: TerminalCreateOptions) => {
-      throw new Error('Terminal socket open timed out')
+      throw new ClientRealtimeRequestError('connection timed out', {
+        kind: 'open-timeout',
+        delivery: 'not-sent',
+        outageId: 1,
+      })
     })
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),

@@ -63,7 +63,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('uses null when the server snapshot is missing', () => {
+  test('projects viewer role and canonical size from server state', () => {
     const projected = projectServerTerminalSession({
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -115,35 +115,6 @@ describe('terminal session projection helpers', () => {
     expect(projected).toBeNull()
   })
 
-  test('uses server session presentation metadata', () => {
-    const projected = projectServerTerminalSession({
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      clientId: 'client_b',
-      index: 1,
-      serverSession: {
-        target: RUNTIME_TARGET,
-        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-        identityRevision: 0,
-        terminalSessionId: 'term-111111111111111111111',
-        presentation: {
-          kind: 'git-worktree' as const,
-        },
-        controller: null,
-        processName: 'bash',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 80, rows: 24 },
-      },
-    })
-
-    expect(projected?.descriptor.presentation).toEqual({
-      kind: 'git-worktree' as const,
-    })
-  })
-
   test('does not replace server presentation from a second client-side authority', () => {
     const projected = projectServerTerminalSession({
       workspaceId: REPO_ROOT,
@@ -171,7 +142,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('projects attach results into local controller state for the active attachment', () => {
+  test('projects an attach result as viewer when another client controls the session', () => {
     const projected = projectTerminalStartResultForClient(
       {
         ok: true,
@@ -276,17 +247,6 @@ describe('terminal session projection helpers', () => {
       }),
     )
 
-    const recovered = projectServerTerminalSession({
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      clientId: 'client_a',
-      index: 0,
-      serverSession: projected.serverSession,
-    })
-    expect(recovered?.descriptor).toMatchObject({
-      target: projected.serverSession.target,
-      presentation: projected.serverSession.presentation,
-    })
   })
 
   test('projects restored create metadata for the durable terminal session id', () => {

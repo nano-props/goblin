@@ -19,7 +19,7 @@ describe('filetree-session-state', () => {
     resetFiletreeInteractionStore()
   })
 
-  test('maps file tree interaction state into session view state for open worktrees', () => {
+  test('persists only file tree state belonging to open, known worktrees', () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/worktree')
     const staleScopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/stale-worktree')
     const closedRepoScopeKey = filetreeInteractionScopeKey(CLOSED_WORKSPACE_ID, '/tmp/worktree')
@@ -61,7 +61,7 @@ describe('filetree-session-state', () => {
     })
   })
 
-  test('restores session view state into the file tree interaction store', async () => {
+  test('restores session view state into the file tree interaction store', () => {
     restoreFiletreeViewStateFromSession({
       [WORKSPACE_ID]: {
         'goblin+file:///tmp/worktree': {

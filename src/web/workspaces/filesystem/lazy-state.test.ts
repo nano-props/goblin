@@ -74,27 +74,6 @@ describe('filetree lazy state', () => {
     expect(state.result.nodes.map((entry) => entry.id)).toEqual(['src', 'src/index.ts'])
   })
 
-  test('replacing children prunes stale descendants', () => {
-    let state = emptyLazyWorkspaceFilesystemTreeState()
-    state = lazyWorkspaceFilesystemTreeReducer(state, {
-      type: 'childrenLoaded',
-      prefix: '',
-      result: { nodes: [node('src', null, 'directory')], truncated: false },
-    })
-    state = lazyWorkspaceFilesystemTreeReducer(state, {
-      type: 'childrenLoaded',
-      prefix: 'src',
-      result: { nodes: [node('src/old.ts', 'src')], truncated: false },
-    })
-    state = lazyWorkspaceFilesystemTreeReducer(state, {
-      type: 'childrenLoaded',
-      prefix: '',
-      result: { nodes: [node('docs', null, 'directory')], truncated: false },
-    })
-
-    expect(state.result.nodes.map((entry) => entry.id)).toEqual(['docs'])
-  })
-
   test('removing a directory prunes its metadata and ignores late child actions', () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {

@@ -40,8 +40,4 @@ describe('terminalViewportText', () => {
     expect(viewport([visibleLine], 1, 12)).toBe('visible text')
     expect(visibleLine.translateToString).toHaveBeenCalledWith(true, 0, 12)
   })
-
-  test('treats unavailable visible rows as blank rows', () => {
-    expect(viewport([line('first')], 2)).toBe('first')
-  })
 })

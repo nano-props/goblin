@@ -26,25 +26,21 @@ function scrollGesture(element: HTMLElement, identifier: number) {
 
 beforeEach(resetTerminalSessionHarness)
 
-test('supports vertical touch scrolling only in the normal buffer without mouse tracking', async () => {
+test.each([
+  ['normal buffer without mouse tracking', 'normal', true],
+  ['alternate buffer', 'alternate', false],
+  ['mouse tracking', 'mouse-tracking', false],
+] as const)('handles vertical touch scrolling in %s', async (_scenario, configuration, handled) => {
   const { session, term } = await startOpenControllerSession()
-  const element = term.element!
+  try {
+    if (configuration === 'alternate') term.buffer.active.type = 'alternate'
+    if (configuration === 'mouse-tracking') term.modes.mouseTrackingMode = 'x10'
 
-  const normalMove = scrollGesture(element, 1)
-  expect(normalMove.defaultPrevented).toBe(true)
-  expect(term.scrollLines).toHaveBeenCalled()
+    const move = scrollGesture(term.element!, 1)
 
-  term.scrollLines.mockClear()
-  term.buffer.active.type = 'alternate'
-  const alternateMove = scrollGesture(element, 2)
-  expect(alternateMove.defaultPrevented).toBe(false)
-  expect(term.scrollLines).not.toHaveBeenCalled()
-
-  term.buffer.active.type = 'normal'
-  term.modes.mouseTrackingMode = 'x10'
-  const mouseTrackingMove = scrollGesture(element, 3)
-  expect(mouseTrackingMove.defaultPrevented).toBe(false)
-  expect(term.scrollLines).not.toHaveBeenCalled()
-
-  session.dispose()
+    expect(move.defaultPrevented).toBe(handled)
+    expect(term.scrollLines).toHaveBeenCalledTimes(handled ? 1 : 0)
+  } finally {
+    session.dispose()
+  }
 })

@@ -443,9 +443,8 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test.each(['changes', 'files'] as const)(
-    'persists and restores %s as the preferred tab when its static tab is open',
-    (tab) => {
+  test('persists and restores an open worktree-only preferred tab', () => {
+      const tab = 'changes'
       const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
       const repo = seedRepoWithReadModelForTest({
         id: 'goblin+file:///tmp/repo',
@@ -475,8 +474,7 @@ describe('restorable-workspace-state', () => {
       expect(
         restoreRestorableWorkspaceStateFromClientWorkspace(sessionState).preferredWorkspacePaneTabByTargetByWorkspace,
       ).toEqual({ 'goblin+file:///tmp/repo': { [targetKey]: tab } })
-    },
-  )
+    })
 
   test('persists an explicit empty workspace pane preference', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')

@@ -108,7 +108,7 @@ describe('workspace pane destination navigation', () => {
     expect(routeNavigation.commitFilesystem).toHaveBeenCalledOnce()
   })
 
-  test('uses a app presentation generation so the latest destination wins', async () => {
+  test('uses an app presentation generation so the latest destination wins', async () => {
     seedDestinationRepo()
     const first = beginPresentation('feature/current')
     const firstCommit = Promise.withResolvers<boolean>()
@@ -150,7 +150,10 @@ describe('workspace pane destination navigation', () => {
     await expect(committed).resolves.toEqual({ kind: 'superseded' })
   })
 
-  test('Settings supersedes pending destination navigation', async () => {
+  test.each([
+    ['settings', (actions: ReturnType<typeof primaryNavigationActions>['actions']) => actions.openSettings('general')],
+    ['workspace', (actions: ReturnType<typeof primaryNavigationActions>['actions']) => actions.activateWorkspace(REPO_ID)],
+  ])('%s primary navigation supersedes pending destination navigation', async (_name, navigate) => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
@@ -162,25 +165,8 @@ describe('workspace pane destination navigation', () => {
     )
     await routeNavigation.started
 
-    primaryNavigationActions().actions.openSettings('general')
-    routeCommit.resolve(true)
-
-    await expect(committed).resolves.toEqual({ kind: 'superseded' })
-  })
-
-  test('another primary route supersedes pending destination navigation', async () => {
-    seedDestinationRepo()
-    const presentation = beginPresentation('feature/destination')
-    const routeCommit = Promise.withResolvers<boolean>()
-    const routeNavigation = deferredRouteCommit(routeCommit.promise)
-    const committed = commitWorkspacePaneDestinationRoute(
-      presentation,
-      DESTINATION_ROUTE,
-      testNavigation(routeNavigation.commit, routeNavigation.commitFilesystem),
-    )
-    await routeNavigation.started
-
-    primaryNavigationActions().actions.activateWorkspace(workspaceIdForTest('goblin+file:///tmp/another-repo'))
+    const { actions } = primaryNavigationActions()
+    navigate(actions)
     routeCommit.resolve(true)
 
     await expect(committed).resolves.toEqual({ kind: 'superseded' })

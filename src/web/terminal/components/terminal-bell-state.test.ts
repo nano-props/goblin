@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTerminalBellState } from '#/web/terminal/components/terminal-bell-state.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { terminalSessionBase } from '#/shared/terminal-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
-import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
+import { terminalClient } from '#/web/terminal/client-facade.ts'
 
 const descriptor = terminalDescriptorForTest({
   terminalSessionId: 'term-111111111111111111111',
@@ -25,28 +24,10 @@ beforeEach(() => {
     settingsSnapshotQueryKey(),
     defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
   )
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: currentNativeBridge({
-      terminal: {
-        notifyBell: vi.fn(async () => true),
-        sendTestNotification: vi.fn(async () => true),
-        setBadge: vi.fn(),
-      },
-    }),
-  })
-  Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
-    configurable: true,
-    value: {
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: ELECTRON_CLIENT_CAPABILITIES,
-      },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-    },
-  })
+  vi.spyOn(terminalClient, 'notifyBell').mockResolvedValue(true)
 })
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('terminal bell state', () => {
   test('publishes the initial unread count from the source of truth', () => {
@@ -59,7 +40,7 @@ describe('terminal bell state', () => {
 
   test('marks background bells unread and requests a system notification when enabled', async () => {
     const notify = vi.fn()
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
@@ -71,19 +52,18 @@ describe('terminal bell state', () => {
 
     expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
-    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
+    expect(terminalClient.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: 'zsh',
       terminalSessionId: 'term-111111111111111111111',
       session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })
 
-    hasFocus.mockRestore()
   })
 
   test('prefers the server terminal title over process name in system notifications', async () => {
     const notify = vi.fn()
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
@@ -97,21 +77,20 @@ describe('terminal bell state', () => {
     })
     await Promise.resolve()
 
-    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
+    expect(terminalClient.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: '~/Developer/goblin — npm run dev',
       terminalSessionId: 'term-111111111111111111111',
       session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })
 
-    hasFocus.mockRestore()
   })
 
   test.each([
     ['/tmp/My Workspace', 'My Workspace'],
     ['goblin+file:///C:/', 'C:\\'],
   ])('derives the system notification title from canonical workspace identity', async (repoRoot, title) => {
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
@@ -129,13 +108,12 @@ describe('terminal bell state', () => {
     controller.handleBell(workspaceDescriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
 
-    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith(expect.objectContaining({ title }))
-    hasFocus.mockRestore()
+    expect(terminalClient.notifyBell).toHaveBeenCalledWith(expect.objectContaining({ title }))
   })
 
   test('marks bells unread without requesting a system notification when disabled', async () => {
     const notify = vi.fn()
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
@@ -147,14 +125,13 @@ describe('terminal bell state', () => {
 
     expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
-    expect(window.goblinNative.terminal.notifyBell).not.toHaveBeenCalled()
+    expect(terminalClient.notifyBell).not.toHaveBeenCalled()
 
-    hasFocus.mockRestore()
   })
 
   test('ignores bells from the visible focused terminal', async () => {
     const notify = vi.fn()
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
@@ -166,14 +143,13 @@ describe('terminal bell state', () => {
 
     expect(controller.hasBell(descriptor.terminalSessionId)).toBe(false)
     expect(notify).not.toHaveBeenCalled()
-    expect(window.goblinNative.terminal.notifyBell).not.toHaveBeenCalled()
+    expect(terminalClient.notifyBell).not.toHaveBeenCalled()
 
-    hasFocus.mockRestore()
   })
 
   test('throttles repeated system notifications for the same terminal', async () => {
     const notify = vi.fn()
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const now = vi.spyOn(Date, 'now')
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
@@ -194,10 +170,8 @@ describe('terminal bell state', () => {
     await Promise.resolve()
 
     expect(notify).toHaveBeenCalledTimes(1)
-    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledTimes(2)
+    expect(terminalClient.notifyBell).toHaveBeenCalledTimes(2)
 
-    now.mockRestore()
-    hasFocus.mockRestore()
   })
 
   test('supports clearing and removing tracked bell state', () => {
@@ -215,7 +189,7 @@ describe('terminal bell state', () => {
   })
 
   test('reset clears unread and notification debounce state', async () => {
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const now = vi.spyOn(Date, 'now')
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
@@ -234,9 +208,7 @@ describe('terminal bell state', () => {
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
 
-    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledTimes(2)
+    expect(terminalClient.notifyBell).toHaveBeenCalledTimes(2)
 
-    now.mockRestore()
-    hasFocus.mockRestore()
   })
 })

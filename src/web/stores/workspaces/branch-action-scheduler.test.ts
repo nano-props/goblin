@@ -40,4 +40,14 @@ describe('evaluateBranchActionSchedule', () => {
       blockedMessage: 'error.network-op-in-progress',
     })
   })
+
+  test.each(['pull', 'push'] as const)('allows %s to replace a queued network action', (actionKind) => {
+    expect(
+      decision({
+        actionKind,
+        fetchBusy: true,
+        branchOperationPhase: 'queued',
+      }),
+    ).toEqual({})
+  })
 })

@@ -70,7 +70,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
     return false
   }
   const navigationGeneration = beginAppNavigation()
-  return await runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
+  return runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
     selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, navigationGeneration),
   )
 }
@@ -88,7 +88,7 @@ async function selectWorkspacePaneTabByIndexAction(
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   if (tab.kind === 'pending') return false
-  return await selectWorkspacePaneControllerTab(target, tab, navigation, { navigationGeneration })
+  return selectWorkspacePaneControllerTab(target, tab, navigation, { navigationGeneration })
 }
 
 export async function dispatchSelectWorkspacePaneTabByIdentityAction(
@@ -114,7 +114,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
     return false
   }
   const navigationGeneration = beginAppNavigation()
-  return await runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
+  return runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
     selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, navigationGeneration),
   )
 }
@@ -151,7 +151,7 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
     resolveSelectableWorkspacePaneTarget(options, options.workspacePaneRoute),
   )
   if (!coordinatorTarget) return false
-  return await runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
+  return runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
     moveWorkspacePaneTabAction(options, coordinatorTarget),
   )
 }
@@ -169,7 +169,7 @@ async function moveWorkspacePaneTabAction(
   const tab = target ? adjacentWorkspacePaneTab(target.tabs, target.selectedIdentity, direction) : null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
-  return await selectWorkspacePaneControllerTab(target, tab, navigation)
+  return selectWorkspacePaneControllerTab(target, tab, navigation)
 }
 
 function queuedWorkspacePaneTargetMatches(queued: WorkspacePaneTabModel, current: WorkspacePaneTabModel): boolean {

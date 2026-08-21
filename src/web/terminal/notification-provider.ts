@@ -11,53 +11,18 @@ export interface TerminalNotificationProvider {
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
 }
 
-type MaybeTerminalNotificationProvider = {
-  notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult> | undefined
-  sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean> | undefined
-}
-
 export function createTerminalNotificationProvider(): TerminalNotificationProvider {
-  return createFallbackTerminalNotificationProvider([
-    createNativeTerminalNotificationProvider(),
-    createBrowserTerminalNotificationProvider(),
-  ])
-}
-
-function createFallbackTerminalNotificationProvider(
-  providers: MaybeTerminalNotificationProvider[],
-): TerminalNotificationProvider {
-  return {
-    notifyBell(input) {
-      for (const provider of providers) {
-        const result = provider.notifyBell(input)
-        if (result !== undefined) return result
-      }
-      return Promise.resolve(false)
-    },
-    sendTestNotification(input) {
-      for (const provider of providers) {
-        const result = provider.sendTestNotification(input)
-        if (result !== undefined) return result
-      }
-      return Promise.resolve(false)
-    },
+  const bridge = readNativeBridge()
+  if (bridge) {
+    return {
+      notifyBell: (input) => bridge.terminal.notifyBell(input),
+      sendTestNotification: (input) => bridge.terminal.sendTestNotification(input),
+    }
   }
+  return createBrowserTerminalNotificationProvider()
 }
 
-function createNativeTerminalNotificationProvider(): MaybeTerminalNotificationProvider {
-  return {
-    notifyBell(input) {
-      const bridge = readNativeBridge()
-      return bridge ? bridge.terminal.notifyBell(input) : undefined
-    },
-    sendTestNotification(input) {
-      const bridge = readNativeBridge()
-      return bridge ? bridge.terminal.sendTestNotification(input) : undefined
-    },
-  }
-}
-
-function createBrowserTerminalNotificationProvider(): MaybeTerminalNotificationProvider {
+function createBrowserTerminalNotificationProvider(): TerminalNotificationProvider {
   return {
     notifyBell(input) {
       return showBrowserNotification(input.title, input.body, () => {

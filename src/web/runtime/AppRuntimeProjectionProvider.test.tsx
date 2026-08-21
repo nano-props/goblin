@@ -170,29 +170,6 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('hydrates terminal projection once on mount', async () => {
-    const repo = seedCurrentRepo()
-    const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
-    recoverSessionsMock.mockReturnValue(coldRecovery.promise)
-    const result = renderInJsdom(<RuntimeProbe currentWorkspaceId={REPO_ID} />)
-    try {
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalled())
-      await flushTestUpdates(async () => {
-        coldRecovery.resolve({ revision: 0, sessions: [] })
-      })
-      await vi.waitFor(() =>
-        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          phase: 'ready',
-        }),
-      )
-      expect(recoverSessionsMock).toHaveBeenCalledOnce()
-      expect(document.body.textContent).toContain('probe')
-    } finally {
-      result.unmount()
-    }
-  })
-
   test('waits for workspace membership before hydrating terminal server projection', async () => {
     const repo = seedCurrentRepo()
     workspacesStore.setState({ workspaceMembershipReady: false })

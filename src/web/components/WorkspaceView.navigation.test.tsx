@@ -214,7 +214,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(invalidateStatus).not.toHaveBeenCalled()
   })
 
-  test('does not mount an existing repo before its runtime membership is restored', async () => {
+  test('does not mount an existing repo before its runtime membership is restored', () => {
     workspacesStore.setState({ workspaceMembershipReady: false })
 
     const { container } = render(
@@ -341,7 +341,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.textContent).not.toContain('workspace-route.not-found-title')
   })
 
-  test('shows an explicit not-found state after membership restore settles without the routed repo', async () => {
+  test('shows an explicit not-found state after membership restore settles without the routed repo', () => {
     resetWorkspacesStore()
     workspacesStore.setState({ workspaceMembershipReady: true })
 
@@ -372,7 +372,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(result.container.textContent).toContain('workspace-route.not-found-title')
   })
 
-  test('keeps a restore stub on the skeleton without mounting repo data surfaces', async () => {
+  test('keeps a restore stub on the skeleton without mounting repo data surfaces', () => {
     workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
@@ -395,7 +395,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(restoreOptions?.workspaceId()).toBe(REPO_ID)
   })
 
-  test('promotes a probing restore stub without treating its root route as missing', async () => {
+  test('promotes a probing restore stub without treating its root route as missing', () => {
     workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
@@ -423,7 +423,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(restoreWorkspaceTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
-  test('replaces the stub skeleton with a stable promotion failure view', async () => {
+  test('replaces the stub skeleton with a stable promotion failure view', () => {
     restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({
       state: { value: { phase: 'failed', message: 'server request failed' } },
       retry: vi.fn(),

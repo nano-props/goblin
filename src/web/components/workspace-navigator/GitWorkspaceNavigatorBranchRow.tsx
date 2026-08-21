@@ -1,5 +1,4 @@
-// Git workspace navigator branch-row wrapper. Resolves `terminalBellCount` from the
-// terminal session projection and delegates rendering to BranchRow.
+// Adapts repository, operation, and terminal projections into BranchRow props.
 
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'

@@ -12,7 +12,7 @@ vi.mock('#/web/workspaces/client.ts', () => ({
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/directory-overview-workspace')
 
 describe('workspace directory overview query', () => {
-  test('shares its bounded HTTP read across a StrictMode-style observer replacement', async () => {
+  test('shares its bounded HTTP read across a transient observer replacement', async () => {
     const overview = Promise.withResolvers<WorkspaceDirectoryOverview>()
     vi.mocked(getWorkspaceDirectoryOverview).mockReturnValue(overview.promise)
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })

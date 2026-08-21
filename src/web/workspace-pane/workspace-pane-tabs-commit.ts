@@ -138,7 +138,7 @@ export function reportWorkspacePaneTabsFailure(input: {
 export async function updateWorkspacePaneTabs(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return await workspacePaneTabsInteractionBlocker.run(
+  return workspacePaneTabsInteractionBlocker.run(
     input,
     workspacePaneTabsUpdateBlocksInteraction(input.operation),
     () => updateWorkspacePaneTabsNow(input),
@@ -223,7 +223,7 @@ export async function updateWorkspacePaneTabsOnServer(
 ): Promise<WorkspacePaneTabsWriteResult> {
   const target = runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)
   if (!target) throw new Error('error.workspace-tabs-target-invalid')
-  return await workspacePaneTabsClient.update({
+  return workspacePaneTabsClient.update({
     workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,
     target,

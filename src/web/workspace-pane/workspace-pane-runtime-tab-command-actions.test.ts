@@ -94,7 +94,7 @@ describe('workspace pane runtime tab command actions', () => {
     document.body.replaceChildren()
   })
 
-  test('preserves the ordinary workspace root opener while pane tabs are still pending', async () => {
+  test('preserves the ordinary workspace root opener while pane tabs are still pending', () => {
     const repo = seedRepoWithReadModelForTest({
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,

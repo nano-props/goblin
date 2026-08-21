@@ -38,8 +38,8 @@ export function workspacePaneTabsQueryOptions(workspaceId: WorkspaceId, workspac
   const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
   return {
     queryKey,
-    queryFn: async ({ client }: { client: QueryClient }) =>
-      await fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client),
+    queryFn: ({ client }: { client: QueryClient }) =>
+      fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client),
     structuralSharing: (oldData: unknown, newData: unknown) =>
       acceptedWorkspacePaneTabsSnapshot(
         oldData as WorkspacePaneTabsSnapshot | undefined,

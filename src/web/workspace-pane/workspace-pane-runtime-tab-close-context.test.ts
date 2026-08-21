@@ -17,6 +17,7 @@ const terminalBase: TerminalSessionBase = {
   },
   presentation: { kind: 'git-worktree' as const },
 }
+
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
 })
@@ -39,7 +40,7 @@ describe('workspace pane runtime tab close context', () => {
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
   })
 
-  test('rejects confirmed close when terminal capability is unavailable', () => {
+  test('returns no close context when the terminal command bridge is unavailable', () => {
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
     expect(context).toBeNull()
@@ -51,10 +52,9 @@ function terminalCommandBridge({
 }: {
   closeTerminalByDescriptor: TerminalSessionCommandBridge['closeTerminalByDescriptor']
 }): TerminalSessionCommandBridge {
-  const createTerminal = vi.fn(async () => 'term-111111111111111111111')
   return {
     terminalFilesystemTargetSnapshot: () => ({
-      terminalFilesystemTargetKey: 'repo\0worktree',
+      terminalFilesystemTargetKey: 'terminal-target-test',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -62,7 +62,7 @@ function terminalCommandBridge({
       outputActiveCount: 0,
       createPending: false,
     }),
-    createTerminal,
+    createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     createTerminalWithAdmission: vi.fn(async (base) => ({
       terminalSessionId: 'term-111111111111111111111',
       presentation: base.presentation,

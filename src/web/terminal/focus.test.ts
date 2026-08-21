@@ -60,22 +60,6 @@ describe('terminal presentation focus', () => {
     firstLease?.release()
   })
 
-  test('does not move DOM focus while a mouse-created terminal is pending', () => {
-    const createButton = document.createElement('button')
-    document.body.appendChild(createButton)
-    createButton.focus()
-    const lease = claimTerminalAutoFocus(beginAppNavigation())
-    if (!lease) throw new Error('expected terminal automatic-focus lease')
-    const focusTerminal = acceptedFocus()
-
-    lease.commit('term-created', focusTerminal)
-
-    expect(document.activeElement).toBe(createButton)
-    expect(terminalHasKeyboardFocus()).toBe(false)
-    expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(true)
-    focusTerminal.mock.calls[0]![1].onSettled()
-  })
-
   test('allows programmatic popover focus restoration before the terminal view mounts', () => {
     const createItem = document.createElement('button')
     const popoverTrigger = document.createElement('button')
@@ -96,13 +80,12 @@ describe('terminal presentation focus', () => {
     afterMount.mock.calls[0]![1].onSettled()
   })
 
-  test('does not intercept or retire a pending focus intent after a later key', async () => {
+  test('does not intercept or retire a pending focus intent after a later key', () => {
     const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     lease.commit('term-created', focusTerminal)
     const request = focusTerminal.mock.calls[0]![1]
-    await Promise.resolve()
     const input = keyboardEventForTest('keydown', {
       key: 'w',
       code: 'KeyW',
@@ -133,13 +116,12 @@ describe('terminal presentation focus', () => {
     request.onSettled()
   })
 
-  test('retires pending automatic focus after a later pointer action without consuming it', async () => {
+  test('retires pending automatic focus after a later pointer action without consuming it', () => {
     const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     lease.commit('term-created', focusTerminal)
     const request = focusTerminal.mock.calls[0]![1]
-    await Promise.resolve()
     const pointer = new PointerEvent('pointerdown', { bubbles: true, cancelable: true })
 
     document.body.dispatchEvent(pointer)

@@ -245,7 +245,7 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     await expect(close).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-    expect(requiredTerminalSession(projection, terminalSessionId)?.currentTerminalRuntimeSessionId()).toBe(
+    expect(requiredTerminalSession(projection, terminalSessionId).currentTerminalRuntimeSessionId()).toBe(
       'pty_session_2_aaaaaaaaa',
     )
   })
@@ -544,10 +544,9 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
-  test('preserves current selection and falls back to controller when current is lost', () => {
+  test('preserves current selection and selects the controller when the current session is lost', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
 
-    // First reconcile: term-111111111111111111111 becomes current
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
@@ -557,7 +556,6 @@ describe('TerminalSessionProjection reconciliation', () => {
       'term-111111111111111111111',
     )
 
-    // Second reconcile: term-111111111111111111111 removed, term-222222222222222222222 is controller
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       [

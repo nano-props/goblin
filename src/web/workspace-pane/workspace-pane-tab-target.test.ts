@@ -20,7 +20,6 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -251,7 +250,6 @@ describe('workspace pane tab target read model', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
 
-    const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/renamed', WORKTREE_PATH)
     const target = workspacePaneTabTargetForPaneTarget({
       location: workspacePaneLocationForLinkedWorktree(
         { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
@@ -292,7 +290,7 @@ describe('workspace pane tab target read model', () => {
     expect(target?.renderedTab).toBeNull()
   })
 
-  test('records tab openers from the TanStack Query snapshot when store branches are stale', async () => {
+  test('records tab openers from the TanStack Query snapshot when store branches are stale', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -311,9 +309,11 @@ describe('workspace pane tab target read model', () => {
     )
 
     expect(
-      workspacesStore.getState().tabOpenerIdentityByScope[
-        `${tabOpenerScopeKey({ kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/query' })}\0${repo.workspaceRuntimeId}`
-      ]?.['workspace-pane:changes'],
+      workspacePaneTabOpener(
+        { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/query' },
+        repo.workspaceRuntimeId,
+        'workspace-pane:changes',
+      ),
     ).toBe('workspace-pane:status')
   })
 
@@ -356,7 +356,7 @@ describe('workspace pane tab target read model', () => {
     ).toBe('workspace-pane:status')
   })
 
-  test('keeps detached worktree openers isolated from workspace-root and branch targets', async () => {
+  test('keeps detached worktree openers isolated from workspace-root and branch targets', () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-detached-opener')
     workspacesStore.setState((state) => ({
       workspaces: { ...state.workspaces, [REPO_ID]: repo },
@@ -390,7 +390,7 @@ describe('workspace pane tab target read model', () => {
     ).toBeNull()
   })
 
-  test('records against a canonical branch target without requiring a branch read model', async () => {
+  test('records against a canonical branch target without requiring a branch read model', () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-query')
     workspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },

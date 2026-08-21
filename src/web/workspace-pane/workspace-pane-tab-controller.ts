@@ -123,7 +123,7 @@ export async function selectWorkspacePaneControllerTab(
     route?.kind === 'terminal'
       ? (providedFocusEffects ?? claimTerminalPresentationFocus(navigationGeneration, route.terminalSessionId))
       : null
-  return await commitWorkspacePaneControllerTargetRoute(
+  return commitWorkspacePaneControllerTargetRoute(
     target,
     route,
     navigation,
@@ -141,14 +141,14 @@ export async function selectWorkspacePaneControllerTabEntry(
 ): Promise<boolean> {
   const materialized = target.tabs.find((tab) => tab.identity === workspacePaneTabEntryIdentity(entry))
   if (materialized) {
-    return await selectWorkspacePaneControllerTab(target, materialized, navigation, { navigationGeneration })
+    return selectWorkspacePaneControllerTab(target, materialized, navigation, { navigationGeneration })
   }
   if (!isWorkspacePaneRuntimeTabEntry(entry) || entry.type !== 'terminal') return false
   if (!workspacePaneControllerTargetIsCurrent(target)) return false
   const admittedNavigationGeneration = navigationGeneration ?? beginAppNavigation()
   if (!appNavigationIsCurrent(admittedNavigationGeneration)) return false
   const focusEffects = claimTerminalPresentationFocus(admittedNavigationGeneration, entry.runtimeSessionId)
-  return await commitWorkspacePaneControllerTargetRoute(
+  return commitWorkspacePaneControllerTargetRoute(
     target,
     { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
     navigation,
@@ -204,8 +204,8 @@ async function commitWorkspacePaneControllerTargetRoute(
       return false
     }
     return fromRoute === undefined
-      ? await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, options, navigationGeneration)
-      : await commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, options, navigationGeneration)
+      ? commitWorkspacePaneCurrentTargetRoute(target, route, navigation, options, navigationGeneration)
+      : commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, options, navigationGeneration)
   }
   if (!appNavigationIsCurrent(navigationGeneration)) {
     options?.onAbandon?.()
@@ -215,7 +215,7 @@ async function commitWorkspacePaneControllerTargetRoute(
     options?.onAbandon?.()
     return false
   }
-  return await navigation.commitFilesystemWorkspacePaneRoute(location, route, {
+  return navigation.commitFilesystemWorkspacePaneRoute(location, route, {
     replace: options?.replace,
     navigationGeneration,
     onCommit: options?.onCommit,
@@ -236,7 +236,7 @@ export async function commitWorkspacePaneControllerRoute(
       { kind: 'exact-route'; route: ParsedBranchWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
   },
 ): Promise<boolean> {
-  return await navigation.commitWorkspacePaneRoute(workspaceId, branchName, route, {
+  return navigation.commitWorkspacePaneRoute(workspaceId, branchName, route, {
     replace: options?.replace,
     navigationGeneration: options?.navigationGeneration,
     routePrecondition: options?.routePrecondition,
@@ -254,7 +254,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
     options?.onAbandon?.()
     return false
   }
-  return await commitWorkspacePaneValidatedTargetRoute(
+  return commitWorkspacePaneValidatedTargetRoute(
     target,
     route,
     navigation,
@@ -333,7 +333,7 @@ export async function commitWorkspacePaneExactTargetRoute(
     options?.onAbandon?.()
     return false
   }
-  return await commitWorkspacePaneValidatedTargetRoute(
+  return commitWorkspacePaneValidatedTargetRoute(
     target,
     route,
     navigation,

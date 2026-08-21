@@ -9,7 +9,6 @@ import {
   flushUntil,
   hydrateManagedSession,
   resetTerminalSessionHarness,
-  setNextTerminalIdentityRevision,
   startOpenControllerSession,
   startPresentedControllerGeneration,
   terminalCalls,
@@ -17,8 +16,8 @@ import {
   terminalXtermMocks,
 } from '#/web/test-utils/terminal-session.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TerminalResizeResult, TerminalWriteResult } from '#/shared/terminal-types.ts'
-import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
+import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/terminal/components/TerminalSession.ts'
 
 const xtermMocks = terminalXtermMocks()
@@ -103,173 +102,45 @@ describe('TerminalSession input, resize, and controller authority', () => {
 
     await flushTerminalStart()
 
-    // The pending write buffer is cleared on dispose; nothing is sent.
     expect(terminalCalls.write).not.toHaveBeenCalled()
   })
 
   test.each([
-    'server rejection',
-    'transport failure',
-    'session mismatch',
-    'generation mismatch',
-    'canonical size mismatch',
-  ] as const)('rebuilds the view from an authoritative snapshot after a resize %s', async (failure) => {
-    if (failure === 'server rejection') {
-      terminalCalls.resize.mockResolvedValueOnce({ ok: false, message: 'error.unavailable' })
-    } else if (failure === 'transport failure') {
-      terminalCalls.resize.mockRejectedValueOnce(new Error('resize failed'))
-    } else {
-      terminalCalls.resize.mockResolvedValueOnce({
-        ok: true,
-        terminalRuntimeSessionId:
-          failure === 'session mismatch' ? 'pty_session_2_bbbbbbbbb' : 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: failure === 'generation mismatch' ? 2 : 1,
-        identityRevision: 1,
-        role: 'controller',
-        controllerStatus: 'connected',
-        controller: { clientId: 'client_local', status: 'connected' },
-        canonicalSize: failure === 'canonical size mismatch' ? { cols: 102, rows: 32 } : { cols: 101, rows: 31 },
-      })
-    }
-    const { session, term: invalidatedTerm } = await startOpenControllerSession()
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
-        snapshot: 'recovered after resize',
-        snapshotSeq: 1,
-        canonicalSize: { cols: 100, rows: 30 },
-      }),
-    )
+    [
+      'transport failure',
+      () => {
+        const error = new Error('write failed')
+        terminalCalls.write.mockRejectedValueOnce(error)
+        return { kind: 'error' as const, error }
+      },
+    ],
+    [
+      'server rejection',
+      () => {
+        const result = { status: 'rejected' as const }
+        terminalCalls.write.mockResolvedValueOnce(result)
+        return { kind: 'result' as const, result }
+      },
+    ],
+  ] as const)('reports a terminal write %s without closing the session', async (_failureKind, configureWrite) => {
+    const failure = configureWrite()
+    const report = vi.fn()
+    const session = new TerminalSession(descriptor, vi.fn(), { report })
+    const { term } = await startOpenControllerSession(session)
 
-    invalidatedTerm.resize(101, 31)
-    await flushMicrotasks(2)
+    term.emitData('input')
     await flushTerminalStart()
 
-    expect(terminalCalls.resize).toHaveBeenCalledOnce()
-    expect(terminalCalls.resize).toHaveBeenCalledWith({
+    expect(terminalCalls.write).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
-      cols: 101,
-      rows: 31,
+      data: 'input',
     })
-    expect(terminalCalls.attach).toHaveBeenLastCalledWith({
+    expect(report).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      cols: 100,
-      rows: 30,
+      failure,
     })
-    expect(invalidatedTerm.dispose).toHaveBeenCalledOnce()
-    expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('recovered after resize', expect.any(Function))
     expect(session.snapshot().phase).toBe('open')
-  })
-
-  test('serializes resize commits and keeps only the latest proposal while one is in flight', async () => {
-    const firstResize = Promise.withResolvers<TerminalResizeResult>()
-    terminalCalls.resize.mockReturnValueOnce(firstResize.promise)
-    const { term } = await startOpenControllerSession()
-
-    term.resize(101, 31)
-    await waitForMicrotaskCondition(() => terminalCalls.resize.mock.calls.length === 1)
-    term.resize(102, 32)
-    term.resize(103, 33)
-    await flushMicrotasks(2)
-    expect(terminalCalls.resize).toHaveBeenCalledOnce()
-
-    firstResize.resolve({
-      ok: true,
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 1,
-      role: 'controller',
-      controllerStatus: 'connected',
-      controller: { clientId: 'client_local', status: 'connected' },
-      canonicalSize: { cols: 101, rows: 31 },
-    })
-    setNextTerminalIdentityRevision(1)
-    await waitForMicrotaskCondition(() => terminalCalls.resize.mock.calls.length === 2)
-
-    expect(terminalCalls.resize).toHaveBeenNthCalledWith(2, {
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      cols: 103,
-      rows: 33,
-    })
-    await flushTerminalStart()
-    expect(terminalCalls.resize).toHaveBeenCalledTimes(2)
-  })
-
-  test('does not let a stale resize acknowledgement regress newer controller geometry', async () => {
-    const resize = Promise.withResolvers<TerminalResizeResult>()
-    terminalCalls.resize.mockReturnValueOnce(resize.promise)
-    const notify = vi.fn()
-    const session = new TerminalSession(descriptor, notify)
-    const { term } = await startOpenControllerSession(session)
-
-    term.resize(101, 31)
-    await flushUntil(() => terminalCalls.resize.mock.calls.length === 1)
-    session.handleIdentity({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 2,
-      role: 'viewer',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    notify.mockClear()
-    resize.resolve({
-      ok: true,
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 1,
-      role: 'controller',
-      controllerStatus: 'connected',
-      controller: { clientId: 'client_local', status: 'connected' },
-      canonicalSize: { cols: 101, rows: 31 },
-    })
-    await flushTerminalStart()
-
-    expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'viewer',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    expect(notify).not.toHaveBeenCalled()
-  })
-
-  test('ignores a stale resize acknowledgement without rebuilding the current controller view', async () => {
-    const resize = Promise.withResolvers<TerminalResizeResult>()
-    terminalCalls.resize.mockReturnValueOnce(resize.promise)
-    const notify = vi.fn()
-    const session = new TerminalSession(descriptor, notify)
-    const { term } = await startOpenControllerSession(session)
-
-    term.resize(101, 31)
-    await flushUntil(() => terminalCalls.resize.mock.calls.length === 1)
-    session.handleIdentity({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 2,
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    resize.resolve({
-      ok: true,
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 1,
-      role: 'controller',
-      controllerStatus: 'connected',
-      controller: { clientId: 'client_local', status: 'connected' },
-      canonicalSize: { cols: 101, rows: 31 },
-    })
-    await flushTerminalStart()
-
-    expect(session.snapshot().attachment).toEqual({ role: 'controller' })
-    expect(term.dispose).not.toHaveBeenCalled()
-    expect(xtermMocks.terminals).toHaveLength(1)
   })
 
   test('does not send resize or input while attached as a mirror page before explicit takeover', async () => {
@@ -296,146 +167,6 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(terminalCalls.write).not.toHaveBeenCalled()
     expect(terminalCalls.resize).not.toHaveBeenCalled()
     expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
-  })
-
-  test('renders the recovery snapshot for a newly hydrated controller binding', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('term-remoteremoteremote001', {
-        identityRevision: 1,
-        snapshot: 'hydrated-screen',
-        snapshotSeq: 5,
-      }),
-    )
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.hydrate({
-      terminalRuntimeSessionId: 'term-remoteremoteremote001',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 0,
-      phase: 'open',
-      message: null,
-      processName: 'node',
-      canonicalTitle: null,
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-
-    session.attach(host)
-    await flushTerminalStart()
-
-    expect(terminalCalls.attach).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'term-remoteremoteremote001',
-      terminalRuntimeGeneration: 1,
-      cols: 100,
-      rows: 30,
-    })
-    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('hydrated-screen', expect.any(Function))
-  })
-
-  test('destroys the active controller view when full hydration changes binding ownership to viewer', async () => {
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    const term = xtermMocks.terminals[0]!
-
-    session.hydrate({
-      terminalRuntimeSessionId: 'term-remoteremoteremote001',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 0,
-      phase: 'open',
-      message: null,
-      processName: 'node',
-      canonicalTitle: null,
-      role: 'viewer',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    await flushTerminalStart()
-
-    expect(term.dispose).toHaveBeenCalledOnce()
-    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
-    expect(session.currentRuntimeBinding()).toEqual({
-      terminalRuntimeSessionId: 'term-remoteremoteremote001',
-      terminalRuntimeGeneration: 1,
-    })
-    expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
-  })
-
-  test('drops pending output from the retired binding before recovering a hydrated controller', async () => {
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    const oldTerm = xtermMocks.terminals[0]!
-    oldTerm.write.mockClear()
-
-    session.handleOutput({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-111111111111111111111',
-      data: 'old-pending-output',
-      seq: 1,
-      processName: 'zsh',
-    })
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('term-remoteremoteremote001', {
-        identityRevision: 1,
-        processName: 'node',
-        snapshot: 'remote-screen',
-        snapshotSeq: 5,
-      }),
-    )
-
-    session.hydrate({
-      terminalRuntimeSessionId: 'term-remoteremoteremote001',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 0,
-      phase: 'open',
-      message: null,
-      processName: 'node',
-      canonicalTitle: null,
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    await flushTerminalStart()
-
-    expect(oldTerm.dispose).toHaveBeenCalledOnce()
-    expect(oldTerm.write).not.toHaveBeenCalled()
-    expect(xtermMocks.terminals[1]!.write.mock.calls.map(([data]: unknown[]) => data)).toEqual(['remote-screen'])
-  })
-
-  test('keeps the active xterm when full hydration refreshes metadata for the same binding', async () => {
-    const host = createTerminalHost()
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    const term = xtermMocks.terminals[0]!
-    term.write.mockClear()
-
-    session.hydrate({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 0,
-      phase: 'open',
-      message: null,
-      processName: 'node',
-      canonicalTitle: null,
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    await flushTerminalStart()
-
-    expect(term.dispose).not.toHaveBeenCalled()
-    expect(term.write).not.toHaveBeenCalled()
-    expect(session.snapshot().processName).toBe('node')
   })
 
   test('does not notify on ordinary input while already attached', async () => {

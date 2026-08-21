@@ -8,7 +8,7 @@ import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/termina
 
 function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
   return terminalDescriptorForTest({
-    terminalSessionId: `/repo\0/repo\0${terminalSessionId}`,
+    terminalSessionId,
     index,
     repoRoot: '/repo',
     workspaceRuntimeId: 'repo-runtime-test',

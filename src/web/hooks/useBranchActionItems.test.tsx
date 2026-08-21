@@ -3,20 +3,14 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useBranchActionItems, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.tsx'
-import type { BranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
+import type { BranchActionCapabilities, BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { idleOperation } from '#/web/stores/workspaces/operations.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
-  setDetailCollapsed: vi.fn(),
-  useBranchActions: vi.fn(),
   dispatchShowWorkspacePaneStaticTabAction: vi.fn(),
-}))
-
-vi.mock('#/web/hooks/useBranchActions.tsx', () => ({
-  useBranchActions: mocks.useBranchActions,
 }))
 
 vi.mock('#/web/app/navigation/context.tsx', () => ({
@@ -29,40 +23,12 @@ vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
   dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
 }))
 
-vi.mock('#/web/settings/runtime-external-apps.ts', () => ({
-  useExternalAppSettings: () => ({
-    terminalAvailable: true,
-    editorAvailable: true,
-  }),
-}))
-
-vi.mock('#/web/stores/workspaces/store.ts', () => ({
-  workspacesStore: (selector: (state: { setDetailCollapsed: typeof mocks.setDetailCollapsed }) => unknown) =>
-    selector({ setDetailCollapsed: mocks.setDetailCollapsed }),
-}))
-
 describe('useBranchActionItems', () => {
   beforeEach(() => {
-    mocks.setDetailCollapsed.mockClear()
     mocks.dispatchShowWorkspacePaneStaticTabAction.mockClear()
-    mocks.useBranchActions.mockReturnValue({
-      blocked: false,
-      busyAction: null,
-      capabilities: allVisibleCapabilities(),
-      actions: {
-        pull: vi.fn(),
-        push: vi.fn(),
-        copyPatch: vi.fn(),
-        openTerminal: vi.fn(),
-        openEditor: vi.fn(),
-        openFinder: vi.fn(),
-        requestDeleteBranch: vi.fn(),
-        requestRemoveWorktree: vi.fn(),
-      },
-    })
   })
 
-  test('orders visible branch actions by high-frequency workflow before destructive actions', async () => {
+  test('orders visible branch actions by high-frequency workflow before destructive actions', () => {
     const { result } = renderBranchActionItems()
     const actionIds = visibleBranchActionItems(result.value.value).map((item) => item.id)
 
@@ -78,14 +44,14 @@ describe('useBranchActionItems', () => {
     ])
   })
 
-  test('exposes copy patch as a changes-tab action instead of a menu item', async () => {
+  test('exposes copy patch as a changes-tab action instead of a menu item', () => {
     const { result } = renderBranchActionItems()
 
     expect(result.value.value.copyPatchAction.visible).toBe(true)
     expect(visibleBranchActionItems(result.value.value).map((item) => item.id)).not.toContain('copyPatch')
   })
 
-  test('keeps branch-static tabs visible for a branch without a worktree but hides changes and files', async () => {
+  test('keeps branch-static tabs visible for a branch without a worktree but hides changes and files', () => {
     const { result } = renderBranchActionItems({ withWorktree: false })
     const actionIds = visibleBranchActionItems(result.value.value).map((item) => item.id)
 
@@ -98,7 +64,7 @@ describe('useBranchActionItems', () => {
     expect(actionIds).not.toContain('files')
   })
 
-  test('opens tab actions through destination navigation', async () => {
+  test('opens tab actions through destination navigation', () => {
     const { result } = renderBranchActionItems()
     const historyAction = result.value.value.mainItems.find((item) => item.id === 'history')
     if (!historyAction) throw new Error('history action not rendered')
@@ -107,6 +73,7 @@ describe('useBranchActionItems', () => {
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: 'goblin+file:///tmp/goblin-action-items',
+        workspaceRuntimeId: 'repo-runtime-test',
         branchName: 'feature/action-order',
         type: 'history',
       }),
@@ -115,14 +82,34 @@ describe('useBranchActionItems', () => {
 
   function renderBranchActionItems(options: { withWorktree?: boolean } = {}) {
     return renderComposableInJsdom(() => {
-      const branchActions = mocks.useBranchActions()
       const selectedBranch = branch()
-      return useBranchActionItems(repo(selectedBranch, options.withWorktree ?? true), selectedBranch, branchActions, {
-        workspacePaneRoute: undefined,
-      })
+      return useBranchActionItems(
+        repo(selectedBranch, options.withWorktree ?? true),
+        selectedBranch,
+        branchActions(),
+        { workspacePaneRoute: undefined },
+      )
     })
   }
 })
+
+function branchActions(): BranchActions {
+  return {
+    blocked: false,
+    busyAction: null,
+    capabilities: allVisibleCapabilities(),
+    actions: {
+      pull: vi.fn(),
+      push: vi.fn(),
+      copyPatch: vi.fn(),
+      openTerminal: vi.fn(),
+      openEditor: vi.fn(),
+      openFinder: vi.fn(),
+      requestDeleteBranch: vi.fn(),
+      requestRemoveWorktree: vi.fn(),
+    },
+  }
+}
 
 function allVisibleCapabilities(): BranchActionCapabilities {
   // Ordering is cross-state UI policy, so this intentionally enables every

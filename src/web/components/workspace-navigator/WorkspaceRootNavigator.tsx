@@ -6,15 +6,12 @@ import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
-import {
-  NAVIGATOR_ROW_ACTION_BOX_CLASS,
-  NAVIGATOR_ROW_LIST_CLASS,
-} from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
+import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
+import { NavigatorRowActionSlot } from '#/web/components/workspace-navigator/NavigatorRowActionSlot.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { cn } from '#/web/lib/cn.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -89,15 +86,11 @@ export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProp
                 </>
               }
               actions={
-                <div class={NAVIGATOR_ROW_ACTION_BOX_CLASS}>
-                  <div
-                    class={cn(
-                      'relative',
-                      actionVisible && 'pointer-events-auto opacity-100',
-                      !actionVisible &&
-                        'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
-                    )}
-                  >
+                <NavigatorRowActionSlot
+                  actionHidden={!actionVisible}
+                  terminalBellCount={0}
+                  terminalOutputActive={false}
+                  action={
                     <ActionPopover
                       label={t('action.menu')}
                       open={menuOpen.value}
@@ -137,8 +130,8 @@ export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProp
                         </div>
                       )}
                     </ActionPopover>
-                  </div>
-                </div>
+                  }
+                />
               }
             />
           </ul>

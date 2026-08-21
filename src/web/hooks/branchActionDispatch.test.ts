@@ -100,7 +100,26 @@ describe('branch action dispatch', () => {
     expect(runBranchAction).toHaveBeenCalled()
   })
 
-  test('returns a cancelled result when it carries confirmed recovery guidance', async () => {
+  test.each([
+    {
+      name: 'suppresses a bare cancellation',
+      result: { ok: false as const, message: 'cancelled' },
+      expected: null,
+    },
+    {
+      name: 'returns a cancellation carrying confirmed recovery guidance',
+      result: {
+        ok: false as const,
+        message: 'cancelled',
+        recoveryMessageKeys: ['error.worktree-removed-followup-failed'] as const,
+      },
+      expected: {
+        ok: false as const,
+        message: 'cancelled',
+        recoveryMessageKeys: ['error.worktree-removed-followup-failed'] as const,
+      },
+    },
+  ])('$name', async ({ result, expected }) => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree')],
@@ -109,11 +128,6 @@ describe('branch action dispatch', () => {
       ],
       currentBranchName: 'feature/worktree',
     })
-    const result = {
-      ok: false,
-      message: 'cancelled',
-      recoveryMessageKeys: ['error.worktree-removed-followup-failed'] as const,
-    }
     workspacesStore.setState({ runBranchAction: vi.fn(async () => result) })
 
     await expect(
@@ -124,6 +138,6 @@ describe('branch action dispatch', () => {
         forceDeleteBranch: false,
         deleteUpstream: false,
       }),
-    ).resolves.toEqual(result)
+    ).resolves.toEqual(expected)
   })
 })

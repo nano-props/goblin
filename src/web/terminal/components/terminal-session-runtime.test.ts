@@ -322,10 +322,6 @@ describe('TerminalSessionRuntime', () => {
   })
 
   test('drainReplay discards the replay buffer without surfacing captured events', () => {
-    // The error / cancellation path in `TerminalSession` calls
-    // `drainReplay` to clear the preload's replay window when the
-    // attach fails partway through. drainReplay must not surface
-    // captured events to the term.
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ok: true,
@@ -354,19 +350,10 @@ describe('TerminalSessionRuntime', () => {
       processName: 'bash',
     })
     runtime.drainReplay()
-    // Subsequent finishReplay returns nothing — the buffer was cleared.
     expect(runtime.finishReplay()).toEqual([])
   })
 
-  test('a preload window followed by a post-attach window keeps events newer than the new snapshot seq', () => {
-    // This is the contract that `TerminalSession.preloadHydratedSnapshot`
-    // and `replayActiveView` rely on: the preload's beginReplay starts
-    // a window that the post-attach's beginReplay extends with a
-    // higher boundary, and the post-attach's finishReplay returns
-    // events captured during *both* writes — filtered by the new
-    // boundary. Events older than the new snapshot are dropped (they
-    // are in the new snapshot), events newer than the new snapshot
-    // are kept (they are live output since the snapshot).
+  test('updates the replay boundary while preserving newer buffered output', () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ok: true,
@@ -385,8 +372,6 @@ describe('TerminalSessionRuntime', () => {
       canonicalSize: { cols: 120, rows: 40 },
     })
 
-    // Preload window: events arrive during the server-snapshot write.
-    // The boundary is the server snapshot's seq.
     runtime.beginReplay({ seq: 2 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -405,8 +390,6 @@ describe('TerminalSessionRuntime', () => {
       processName: 'bash',
     })
 
-    // Post-attach window: the new snapshot is at seq=5. Update the
-    // boundary; the buffer is preserved across the call.
     runtime.beginReplay({ seq: 5 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -418,9 +401,6 @@ describe('TerminalSessionRuntime', () => {
     })
 
     const events = runtime.finishReplay()
-    // preload-old (seq 3) is older than the new snapshot (seq=5) → dropped
-    // preload-new (seq 6) is newer than the new snapshot → kept
-    // post-attach (seq 7) is newer than the new snapshot → kept
     expect(events.map((e) => e.data)).toEqual(['preload-new', 'post-attach'])
   })
 
@@ -695,7 +675,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     })
   })
 
-  test('falls back to the latest authoritative snapshot when the restart attempt fails', () => {
+  test('commits the latest authoritative snapshot after the restart attempt fails', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = requireRestartAttempt(runtime)
@@ -784,7 +764,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     })
   })
 
-  test('does not use a retiring snapshot as restart failure fallback', () => {
+  test('does not restore a retiring snapshot after restart failure', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = requireRestartAttempt(runtime)

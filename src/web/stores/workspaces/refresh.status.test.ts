@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { refreshStatusLog } from '#/web/logger.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
@@ -7,6 +7,7 @@ import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/
 import { createRepoWorktreeSnapshotForTest } from '#/web/test-utils/repo-store.ts'
 
 beforeEach(resetRefreshTest)
+afterEach(() => vi.restoreAllMocks())
 
 describe('independent worktree status refresh', () => {
   test('updates status without replacing the accepted repository snapshot', async () => {
