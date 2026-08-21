@@ -102,13 +102,16 @@ describe('terminal command application', () => {
     const sessions = [
       session(CURRENT_ID, 'terminal-runtime-current'),
       session(ORPHAN_ID, 'terminal-runtime-orphan', '/repo/orphan%20%20worktree'),
-      session(VALID_ID, 'terminal-runtime-valid', '/repo/my%20%20valid'),
+      {
+        ...session(VALID_ID, 'terminal-runtime-valid', '/repo/my%20%20valid%20%20'),
+        canonicalTitle: 'shell\t功能\nname',
+      },
     ]
     const manager = managerFor(sessions)
     const application = createTerminalCommandApplication({
       manager,
       workspaceProbe: vi.fn(() => gitProbe()),
-      readMembership: vi.fn(async () => gitMembership('/repo', [worktreeIdentity('/repo/my  valid', 'valid')])),
+      readMembership: vi.fn(async () => gitMembership('/repo', [worktreeIdentity('/repo/my  valid  ', '功能')])),
     })
 
     const result = await application.execute(USER_ID, CURRENT_ID, ['list'])
@@ -121,8 +124,17 @@ describe('terminal command application', () => {
     expect(outputLine(result.value.output, ORPHAN_ID)).toContain('orphan  worktree')
     expect(outputLine(result.value.output, ORPHAN_ID)).toContain('/repo/orphan  worktree')
     expect(outputLine(result.value.output, VALID_ID)).toContain('available')
-    expect(outputLine(result.value.output, VALID_ID)).toContain('valid')
-    expect(outputLine(result.value.output, VALID_ID)).toContain('/repo/my  valid')
+    expect(outputLine(result.value.output, VALID_ID)).toContain('功能')
+    expect(result.value.output.split('\n')[0]).toBe('CURRENT\tID\tTITLE\tPHASE\tAVAILABILITY\tTARGET\tPATH')
+    expect(outputLine(result.value.output, VALID_ID).split('\t')).toEqual([
+      '',
+      VALID_ID,
+      'shell 功能 name',
+      'open',
+      'available',
+      '功能',
+      '/repo/my  valid  ',
+    ])
   })
 
   test('prunes only definitively orphaned worktree terminals', async () => {

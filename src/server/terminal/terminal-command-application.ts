@@ -231,16 +231,7 @@ function formatList(sessions: readonly TerminalCommandSession[]): string {
     terminalSafeLine(session.path),
   ])
   const headings = ['CURRENT', 'ID', 'TITLE', 'PHASE', 'AVAILABILITY', 'TARGET', 'PATH']
-  const widths = headings.map((heading, index) =>
-    Math.max(heading.length, ...rows.map((row) => row[index]?.length ?? 0)),
-  )
-  return [headings, ...rows]
-    .map((row) =>
-      row
-        .map((value, index) => (index === row.length - 1 ? value : value.padEnd(widths[index] ?? value.length)))
-        .join('  '),
-    )
-    .join('\n')
+  return [headings, ...rows].map((row) => row.join('\t')).join('\n')
 }
 
 function terminalSafeLine(value: string): string {
