@@ -1,6 +1,9 @@
+import stringWidth from 'string-width'
 import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/context.ts'
+import { padTerminalTextEnd } from '#/server/common/terminal-text.ts'
 import { INIT_COMMAND } from '#/server/g-command/commands/init.ts'
 import { VIEW_COMMANDS } from '#/server/g-command/commands/view.ts'
+import { TERM_COMMAND } from '#/server/g-command/commands/term.ts'
 
 // Registry of every `g` subcommand. To add a new command:
 //   1) Implement it (own file under `commands/` or inline here).
@@ -18,7 +21,7 @@ const HELP_COMMAND: GoblinCommand = {
   },
 }
 
-export const COMMANDS: readonly GoblinCommand[] = [HELP_COMMAND, INIT_COMMAND, ...VIEW_COMMANDS]
+export const COMMANDS: readonly GoblinCommand[] = [HELP_COMMAND, INIT_COMMAND, TERM_COMMAND, ...VIEW_COMMANDS]
 
 export function findCommand(name: string): GoblinCommand | null {
   return COMMANDS.find((command) => command.name === name) ?? null
@@ -31,7 +34,7 @@ export function formatUsage(commands: readonly GoblinCommand[]): string {
   // the default rendering (e.g. `g log <ref>`) without forcing every
   // command to spell it out.
   const usages = commands.map((command) => `  ${command.usage ?? `g ${command.name}`}`)
-  const columnWidth = Math.max(...usages.map((line) => line.length)) + 2
-  const rows = commands.map((command, index) => `${usages[index]!.padEnd(columnWidth)}${command.summary}`)
+  const columnWidth = Math.max(...usages.map((usage) => stringWidth(usage))) + 2
+  const rows = commands.map((command, index) => `${padTerminalTextEnd(usages[index]!, columnWidth)}${command.summary}`)
   return ['Goblin terminal command', '', 'Usage:', ...rows].join('\n')
 }

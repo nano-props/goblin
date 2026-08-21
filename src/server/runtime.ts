@@ -8,6 +8,7 @@ import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktr
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { formatServerUrl } from '#/shared/server-url.ts'
+import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 
 interface ServerRuntimeBaseOptions extends Omit<
   ServerAppOptions,
@@ -15,6 +16,7 @@ interface ServerRuntimeBaseOptions extends Omit<
   | 'workspacePaneTabsHost'
   | 'worktreeRemovalApplication'
   | 'workspaceCapabilityTransitionHost'
+  | 'terminalCommandHost'
   | 'serverHost'
   | 'serverPort'
 > {
@@ -30,6 +32,7 @@ interface ServerRuntimeInjectedHosts {
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
+  terminalCommandHost: ServerTerminalCommandHost
 }
 
 interface ServerRuntimeManagedHosts extends Partial<Record<keyof ServerRuntimeInjectedHosts, never>> {
@@ -56,7 +59,8 @@ function isServerRuntimeInjectedHosts(
     options.appRealtimeHost !== undefined &&
     options.workspacePaneTabsHost !== undefined &&
     options.worktreeRemovalApplication !== undefined &&
-    options.workspaceCapabilityTransitionHost !== undefined
+    options.workspaceCapabilityTransitionHost !== undefined &&
+    options.terminalCommandHost !== undefined
   )
 }
 
@@ -65,7 +69,8 @@ function hasAnyServerRuntimeInjectedHost(options: ServerRuntimeOptions): boolean
     options.appRealtimeHost !== undefined ||
     options.workspacePaneTabsHost !== undefined ||
     options.worktreeRemovalApplication !== undefined ||
-    options.workspaceCapabilityTransitionHost !== undefined
+    options.workspaceCapabilityTransitionHost !== undefined ||
+    options.terminalCommandHost !== undefined
   )
 }
 
@@ -78,6 +83,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       workspacePaneTabsHost: options.workspacePaneTabsHost,
       worktreeRemovalApplication: options.worktreeRemovalApplication,
       workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+      terminalCommandHost: options.terminalCommandHost,
     }
   } else {
     if (hasAnyServerRuntimeInjectedHost(options)) {
@@ -100,6 +106,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
       worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
       workspaceCapabilityTransitionHost: terminalRuntime.workspaceCapabilityTransitionHost,
+      terminalCommandHost: terminalRuntime.terminalCommandHost,
     }
   }
 

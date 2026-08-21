@@ -37,7 +37,7 @@ const realtimeRoutesLogger = serverNodeLog.child({ module: 'realtime-routes' })
 // `/ws/invalidation` and `/ws/app` remain data-plane — they push server-
 // owned state changes (repo invalidations, runtime stream events) to
 // subscribers. `/ws/client-intent` is a control-plane relay: the server
-// receives the repo-view intent over HTTP (e.g. from `g delta`), wraps it
+// receives a view intent over the terminal-command HTTP endpoint (e.g. from `g delta`), wraps it
 // in a JSON envelope, and fans it out to subscribed clients. The server
 // forwards only that narrow protocol. Interpretation
 // happens in the client's existing `useClientEffectIntentRouter`,

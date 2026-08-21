@@ -20,6 +20,15 @@ describe('g command HTTP transport', () => {
     await expect(transport.postJson('/api/test', {}, decodeResult)).resolves.toEqual({ ok: true })
   })
 
+  test('reports request failures at the transport boundary', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new Error('connection refused'))
+    const transport = createHttpTransport(env(), fetchImpl)
+
+    await expect(transport.postJson('/api/test', {}, decodeResult)).rejects.toEqual(
+      new TransportError('connection refused'),
+    )
+  })
+
   test.each([
     ['a malformed response', { ok: 'yes' }],
     ['a response with unknown fields', { ok: true, legacy: true }],

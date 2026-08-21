@@ -1,41 +1,29 @@
 import * as v from 'valibot'
 import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/context.ts'
-import { RepoViewResultSchema } from '#/shared/repo-view.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { GOBLIN_SERVER_COMMAND_RESULT_SCHEMA } from '#/shared/g-command.ts'
 
-// Build a `g <name>` command that opens a workspace pane tab. All
-// three commands share the same shape: validate args, POST
-// `{ tab }` to the server, map the response to a process exit code.
-//
-// Idempotency ("open or switch") is delegated to the server's
-// `show-workspace-pane-tab-requested` intent — the client's plan
-// (`#/web/hooks/client-effect-intent-plans.ts`) treats this as a
-// pure active-tab assignment, so calling it twice with the same
-// `tab` is a no-op the second time.
-//
-// The response shape lives in `#/shared/repo-view.ts` so the server
-// route and the CLI consume the same type — see that file for why
-// the contract must live in `shared/`.
-function createViewCommand(name: string, tab: WorkspacePaneStaticTabType): GoblinCommand {
+type ViewCommandName = 'delta' | 'info' | 'log'
+
+const VIEW_COMMAND_SUMMARIES: Record<ViewCommandName, string> = {
+  delta: 'Open the changes tab in the Goblin window',
+  info: 'Open the status tab in the Goblin window',
+  log: 'Open the history tab in the Goblin window',
+}
+
+function createViewCommand(name: ViewCommandName): GoblinCommand {
   return {
     name,
-    summary: `Open the ${tab} tab in the Goblin window`,
+    summary: VIEW_COMMAND_SUMMARIES[name],
     async run(ctx: GoblinCommandContext): Promise<number> {
-      if (ctx.args.length > 1) {
-        ctx.io.stderr(`g: '${name}' does not take arguments\n\nUsage: g ${name}`)
-        return 2
-      }
       try {
-        const result = await ctx.transport.postJson('/api/repo/view', { tab }, (value) =>
-          v.parse(RepoViewResultSchema, value),
+        await ctx.transport.postJson(
+          '/api/terminal-command',
+          { command: name, payload: { args: ctx.args.slice(1) } },
+          (value) => v.parse(GOBLIN_SERVER_COMMAND_RESULT_SCHEMA, value),
         )
-        if (!result.ok) {
-          ctx.io.stderr(`g: ${result.message}`)
-          return 1
-        }
         return 0
-      } catch (err) {
-        ctx.io.stderr(`g: ${err instanceof Error ? err.message : String(err)}`)
+      } catch (error) {
+        ctx.io.stderr(`g: ${error instanceof Error ? error.message : String(error)}`)
         return 1
       }
     },
@@ -43,7 +31,7 @@ function createViewCommand(name: string, tab: WorkspacePaneStaticTabType): Gobli
 }
 
 export const VIEW_COMMANDS: readonly GoblinCommand[] = [
-  createViewCommand('delta', 'changes'),
-  createViewCommand('info', 'status'),
-  createViewCommand('log', 'history'),
+  createViewCommand('delta'),
+  createViewCommand('info'),
+  createViewCommand('log'),
 ]

@@ -2,7 +2,8 @@
 // after the registry refactor — `g <subcommand>` resolution is now
 // data-driven via `#/server/g-command/registry.ts`. The CLI itself
 // owns the I/O envelope (stdout/stderr shape, exit codes) but does
-// not know about any specific subcommand's semantics.
+// not know about any specific subcommand's semantics. Server-backed
+// subcommands forward their raw payload to `/api/terminal-command`.
 //
 // The transport layer (`#/server/g-command/transport.ts` in this
 // directory, used by `#/server/entrypoints/g-command.ts`) provides

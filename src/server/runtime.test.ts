@@ -20,6 +20,10 @@ const mocks = vi.hoisted(() => ({
       updateTabs: vi.fn(),
     },
     worktreeRemovalApplication: { removeWorktree: vi.fn() },
+    workspaceCapabilityTransitionHost: {
+      commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+    },
+    terminalCommandHost: { execute: vi.fn() },
     shutdown: vi.fn(),
   })),
 }))
@@ -88,6 +92,7 @@ describe('server runtime', () => {
     const appRealtimeHost = makeAppRealtimeHost()
     const workspacePaneTabsHost = makeWorkspacePaneTabsHost()
     const worktreeRemovalApplication = { removeWorktree: vi.fn() }
+    const terminalCommandHost = { execute: vi.fn() }
 
     const runtime = createServerRuntime({
       version: '0.1.0',
@@ -99,6 +104,7 @@ describe('server runtime', () => {
       workspacePaneTabsHost,
       worktreeRemovalApplication,
       workspaceCapabilityTransitionHost,
+      terminalCommandHost,
     })
 
     expect(runtime.appRealtimeHost).toBe(appRealtimeHost)
@@ -112,6 +118,7 @@ describe('server runtime', () => {
       workspacePaneTabsHost,
       worktreeRemovalApplication,
       workspaceCapabilityTransitionHost,
+      terminalCommandHost,
     })
   })
 
@@ -161,6 +168,9 @@ describe('server runtime', () => {
       appRealtimeHost: runtime.appRealtimeHost,
       workspacePaneTabsHost: mocks.createServerTerminalRuntime.mock.results[0]?.value.workspacePaneTabsHost,
       worktreeRemovalApplication: mocks.createServerTerminalRuntime.mock.results[0]?.value.worktreeRemovalApplication,
+      workspaceCapabilityTransitionHost:
+        mocks.createServerTerminalRuntime.mock.results[0]?.value.workspaceCapabilityTransitionHost,
+      terminalCommandHost: mocks.createServerTerminalRuntime.mock.results[0]?.value.terminalCommandHost,
     })
   })
 
@@ -174,6 +184,7 @@ describe('server runtime', () => {
     })
     const workspacePaneTabsHost = makeWorkspacePaneTabsHost()
     const worktreeRemovalApplication = { removeWorktree: vi.fn() }
+    const terminalCommandHost = { execute: vi.fn() }
     mocks.stopBackgroundSync.mockImplementation(() => {
       events.push('background-sync')
     })
@@ -188,6 +199,7 @@ describe('server runtime', () => {
       workspacePaneTabsHost,
       worktreeRemovalApplication,
       workspaceCapabilityTransitionHost,
+      terminalCommandHost,
     })
 
     runtime.shutdown()

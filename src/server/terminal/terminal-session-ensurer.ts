@@ -132,6 +132,7 @@ class TerminalSessionEnsurer {
     const env = this.options.gCommand
       ? (buildGoblinTerminalCommandEnvironment({
           ...this.options.gCommand,
+          terminalSessionId: context.terminalSessionId,
         }) ?? undefined)
       : undefined
     const result = await this.options.manager.prepareSession({

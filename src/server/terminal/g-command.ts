@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { GOBLIN_TERMINAL_SESSION_ID_ENV } from '#/shared/g-command.ts'
 
 export interface GoblinTerminalCommandRuntime {
   serverUrl: string
@@ -10,6 +11,7 @@ export interface GoblinTerminalCommandRuntime {
 }
 
 export interface GoblinTerminalCommandEnvironmentInput extends GoblinTerminalCommandRuntime {
+  terminalSessionId: string
   currentPath?: string
   fileExists?: typeof existsSync
 }
@@ -24,6 +26,7 @@ export function buildGoblinTerminalCommandEnvironment(
   return {
     PATH: prependPath(binDir, input.currentPath ?? process.env.PATH ?? ''),
     GOBLIN_TERMINAL: '1',
+    [GOBLIN_TERMINAL_SESSION_ID_ENV]: input.terminalSessionId,
     GOBLIN_SERVER_URL: input.serverUrl,
     GOBLIN_SERVER_ACCESS_TOKEN: input.accessToken,
     GOBLIN_NODE: input.nodePath ?? process.execPath,

@@ -147,6 +147,34 @@ describe('terminal session ensurer', () => {
     })
   })
 
+  test('injects the durable terminal session id into the prepared local PTY environment', async () => {
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId))
+    const ensurer = createTerminalSessionEnsurer({
+      manager: { prepareSession },
+      gCommand: {
+        serverUrl: 'http://127.0.0.1:32100',
+        accessToken: 'secret',
+        entryPath: import.meta.filename,
+        binDir: path.resolve('resources/terminal-bin'),
+        nodePath: process.execPath,
+      },
+    })
+    const context = ensureContext({
+      terminalSessionId: 'term-environmentidentity01',
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+    })
+
+    await ensurer.ensure(USER_ID, { target: LOCAL_TARGET }, context)
+
+    expect(prepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({
+          GOBLIN_TERMINAL_SESSION_ID: 'term-environmentidentity01',
+        }),
+      }),
+    )
+  })
+
   test('stores the logical workspace path while executing in its physical realpath', async () => {
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId))
     const ensurer = createTerminalSessionEnsurer({ manager: { prepareSession } })

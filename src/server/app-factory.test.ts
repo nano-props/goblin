@@ -80,6 +80,10 @@ const worktreeRemovalApplicationStub = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
 }
 
+const terminalCommandHostStub = {
+  execute: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
+}
+
 vi.mock('node:fs/promises', () => ({
   access: mocks.access,
   readFile: mocks.readFile,
@@ -112,18 +116,23 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 
+async function createTestApp() {
+  const { createApp } = await import('#/server/app-factory.ts')
+  return createApp({
+    version: '0.1.0',
+    startedAt: Date.now(),
+    accessToken: 'secret',
+    workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+    appRealtimeHost: appRealtimeHostStub,
+    workspacePaneTabsHost: workspacePaneTabsHostStub,
+    worktreeRemovalApplication: worktreeRemovalApplicationStub,
+    terminalCommandHost: terminalCommandHostStub,
+  })
+}
+
 describe('server app body limit', () => {
   test('rejects POST bodies over 1 MiB with a 413 JSON response', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/settings/prefs', {
@@ -141,16 +150,7 @@ describe('server app body limit', () => {
   })
 
   test('accepts POST bodies under the limit and surfaces route errors normally', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     // A small, well-formed body: validation will run after the body
     // limit middleware, so we expect 400 (BAD_REQUEST) — not 413.
     const response = await app.request(
@@ -167,16 +167,7 @@ describe('server app body limit', () => {
   })
 
   test('requires JSON media type after authenticating data POST requests', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const request = (authenticated: boolean) =>
       app.request(
         new Request('http://127.0.0.1:32100/api/settings/external-apps/refresh', {
@@ -202,16 +193,7 @@ describe('server app body limit', () => {
   })
 
   test('enforces login media type before the auth route handler', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const response = await app.request('http://127.0.0.1:32100/api/login', {
       method: 'POST',
       headers: { 'content-type': 'text/plain' },
@@ -221,16 +203,7 @@ describe('server app body limit', () => {
   })
 
   test('enforces the login body limit before the auth route handler', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const response = await app.request('http://127.0.0.1:32100/api/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -268,16 +241,7 @@ describe('server app html static', () => {
   })
 
   test('does not immutable-cache SPA fallback responses for missing asset paths', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
 
     const response = await app.request(new Request('http://127.0.0.1:32100/assets/missing-old-build.js'))
     const html = await response.text()
@@ -289,16 +253,7 @@ describe('server app html static', () => {
   })
 
   test('serves the index html as plain static (no bootstrap injection, no token)', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
 
     const response = await app.request(
       new Request('http://127.0.0.1:32100/', {
@@ -323,16 +278,7 @@ describe('server app html static', () => {
   })
 
   test('serves static html for frontend route refreshes', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     for (const path of ['/repos/abc123', '/repos/abc123/changes', '/settings', '/settings/general']) {
       const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
       const html = await response.text()
@@ -348,16 +294,7 @@ describe('server app html static', () => {
     // and is needed by the client's settings page on first paint,
     // before the user clears the token gate. The endpoint therefore
     // must not require `x-goblin-access-token` or a session cookie.
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const response = await app.request(new Request('http://127.0.0.1:32100/api/host'))
     expect(response.status).toBe(200)
     const json = (await response.json()) as { homeDir: string; platform: string; hostname: string; pid: number }
@@ -368,16 +305,7 @@ describe('server app html static', () => {
   })
 
   test('returns JSON 404 (not the SPA shell) for unknown /api paths', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const response = await app.request(new Request('http://127.0.0.1:32100/api/unknown'))
     expect(response.status).toBe(404)
     const json = (await response.json()) as { ok: false; code: string }
@@ -396,16 +324,7 @@ describe('per-sub-path body limits and auth ordering', () => {
   })
 
   test('mounts workspace path suggestions behind authentication', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const request = (accessToken?: string) =>
       app.request(
         new Request('http://127.0.0.1:32100/api/workspace/path-suggestions', {
@@ -425,16 +344,7 @@ describe('per-sub-path body limits and auth ordering', () => {
   })
 
   test('applies the standard API body limit to workspace routes', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/workspace/path-suggestions', {
@@ -451,16 +361,7 @@ describe('per-sub-path body limits and auth ordering', () => {
   })
 
   test('unauth probe to /api/settings/* with oversized body sees 401, not 413', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     // 5 MiB body — well over the 1 MiB cap; Content-Length is set.
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/settings/prefs', {
@@ -476,16 +377,7 @@ describe('per-sub-path body limits and auth ordering', () => {
   })
 
   test('authed oversized body to /api/settings/* sees 413', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/settings/prefs', {
         method: 'POST',
@@ -504,16 +396,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     // Exercise real FormData encoding and route parsing. Persistence has
     // its own integration tests and stays behind the mocked module boundary.
     mocks.saveClipboardFiles.mockResolvedValueOnce({ paths: ['/tmp/a.bin', '/tmp/b.bin'] })
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const form = new FormData()
     form.append('files', new File([new Uint8Array([1])], 'a.bin'))
     form.append('files', new File([new Uint8Array([2])], 'b.bin'))
@@ -540,16 +423,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     // that strips the multipart boundary to claim a smaller
     // Content-Length and then streams the body in a different
     // Content-Type. The route is the second line of defence.
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
         method: 'POST',
@@ -569,16 +443,7 @@ describe('per-sub-path body limits and auth ordering', () => {
   })
 
   test('/api/clipboard/* rejects encoded bodies larger than the 34 MiB transport cap with 413', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
         method: 'POST',
@@ -594,16 +459,7 @@ describe('per-sub-path body limits and auth ordering', () => {
   })
 
   test('/api/health/* enforces a tight (1 KiB) body cap', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      appRealtimeHost: appRealtimeHostStub,
-      workspacePaneTabsHost: workspacePaneTabsHostStub,
-      worktreeRemovalApplication: worktreeRemovalApplicationStub,
-    })
+    const app = await createTestApp()
     // Two-kilobyte body to a hypothetical /api/health endpoint —
     // 1 KiB is plenty for the JSON requests health probes actually
     // send, so anything bigger should 413 (regardless of whether

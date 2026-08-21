@@ -43,7 +43,7 @@ export function disconnectAllClientIntentSockets(): void {
 
 // Broadcast a client effect intent to every subscriber. Returns
 // `false` when no client is currently subscribed — callers
-// (notably `POST /api/repo/view`) translate that into a 503 so the
+// (notably `POST /api/terminal-command`) translate that into a 503 so the
 // CLI prints a clear error instead of silently doing nothing.
 //
 // The only server-originated intent is a non-sensitive view switch, so it is
