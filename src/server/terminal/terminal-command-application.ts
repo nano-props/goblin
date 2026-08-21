@@ -12,6 +12,7 @@ import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspa
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTargetMembership, WorkspacePaneWorktreeTargetIdentity } from '#/shared/git-types.ts'
 import { CodedError } from '#/shared/coded-error.ts'
+import { padTerminalTextEnd } from '#/server/common/terminal-text.ts'
 import { getWorkspacePaneTargetMembership } from '#/server/repos/read-paths.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { workspaceProbeStateForRuntime } from '#/server/workspaces/runtime/authority.ts'
@@ -241,7 +242,7 @@ function formatList(sessions: readonly TerminalCommandSession[]): string {
         .map((value, index) => {
           if (index === row.length - 1) return value
           const width = widths[index] ?? stringWidth(value)
-          return value.padEnd(value.length + width - stringWidth(value))
+          return padTerminalTextEnd(value, width)
         })
         .join('  '),
     )

@@ -1,4 +1,6 @@
+import stringWidth from 'string-width'
 import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/context.ts'
+import { padTerminalTextEnd } from '#/server/common/terminal-text.ts'
 import { INIT_COMMAND } from '#/server/g-command/commands/init.ts'
 import { VIEW_COMMANDS } from '#/server/g-command/commands/view.ts'
 import { TERM_COMMAND } from '#/server/g-command/commands/term.ts'
@@ -32,7 +34,7 @@ export function formatUsage(commands: readonly GoblinCommand[]): string {
   // the default rendering (e.g. `g log <ref>`) without forcing every
   // command to spell it out.
   const usages = commands.map((command) => `  ${command.usage ?? `g ${command.name}`}`)
-  const columnWidth = Math.max(...usages.map((line) => line.length)) + 2
-  const rows = commands.map((command, index) => `${usages[index]!.padEnd(columnWidth)}${command.summary}`)
+  const columnWidth = Math.max(...usages.map((usage) => stringWidth(usage))) + 2
+  const rows = commands.map((command, index) => `${padTerminalTextEnd(usages[index]!, columnWidth)}${command.summary}`)
   return ['Goblin terminal command', '', 'Usage:', ...rows].join('\n')
 }
