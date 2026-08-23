@@ -169,7 +169,7 @@ export async function refreshRepoSnapshotReadModel(
   bump(metadataVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
   options.signal?.throwIfAborted()
-  const sharedRead = client.fetchQuery({
+  const sharedRead = client.query({
     queryKey,
     staleTime: 0,
     retry: (_count, error) => isStaleRepoRuntimeReadError(error),
@@ -186,7 +186,7 @@ export async function ensureRepoSnapshotReadModel(
 ): Promise<RepoSnapshotResponse> {
   options.signal?.throwIfAborted()
   const client: QueryClient = options.queryClient ?? appQueryClient
-  const sharedRead = client.fetchQuery({
+  const sharedRead = client.query({
     queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
     staleTime: Number.POSITIVE_INFINITY,
     retry: (_count, error) => isStaleRepoRuntimeReadError(error),
@@ -223,7 +223,7 @@ export async function refreshRepoWorktreeStatusReadModel(
   bump(statusVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
   options.signal?.throwIfAborted()
-  const sharedRead = client.fetchQuery({
+  const sharedRead = client.query({
     queryKey,
     staleTime: 0,
     retry: (_count, error) => isStaleRepoRuntimeReadError(error),

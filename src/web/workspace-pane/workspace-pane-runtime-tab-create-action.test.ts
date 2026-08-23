@@ -128,7 +128,7 @@ describe('workspace pane runtime tab create action', () => {
       })
       if (projectionPhase === 'failed') {
         await expect(
-          appQueryClient.fetchQuery({
+          appQueryClient.query({
             queryKey: workspacePaneTabsQueryKey(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID),
             queryFn: async () => {
               throw new Error('workspace tabs unavailable')

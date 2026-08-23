@@ -85,8 +85,8 @@ function startAuthenticatedWorkspaceRestoreRun(
   )
   // QueryClient owns the settings and external-app reads. Mounted consumers
   // join these in-flight queries and observe the same cached snapshot.
-  const settingsSnapshot = appQueryClient.fetchQuery(settingsSnapshotQueryOptions())
-  void waitForPromiseWithSignal(appQueryClient.fetchQuery(externalAppsQueryOptions()), timeout.signal).catch((err) => {
+  const settingsSnapshot = appQueryClient.query(settingsSnapshotQueryOptions())
+  void waitForPromiseWithSignal(appQueryClient.query(externalAppsQueryOptions()), timeout.signal).catch((err) => {
     if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
   })
   void hydrateNonCriticalAuthenticatedState(timeout.signal)

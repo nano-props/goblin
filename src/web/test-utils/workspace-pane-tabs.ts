@@ -71,7 +71,7 @@ export async function failWorkspacePaneTabsQueryForTest(
 ): Promise<void> {
   const workspaceId = workspaceIdForTest(workspaceIdInput)
   const failed = await queryClient
-    .fetchQuery({
+    .query({
       queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
       queryFn: async () => await Promise.reject(new Error('workspace pane tabs unavailable')),
       staleTime: 0,

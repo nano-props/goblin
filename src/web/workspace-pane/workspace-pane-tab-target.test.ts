@@ -186,7 +186,7 @@ describe('workspace pane tab target read model', () => {
     expect(gitWorktreePaneRouteLeaseIsCurrent(lease)).toBe(true)
 
     await expect(
-      appQueryClient.fetchQuery({
+      appQueryClient.query({
         queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
         queryFn: async () => {
           throw new Error('status unavailable')
@@ -216,7 +216,7 @@ describe('workspace pane tab target read model', () => {
     expect(gitWorktreePaneRouteLeaseIsCurrent(lease)).toBe(true)
 
     await expect(
-      appQueryClient.fetchQuery({
+      appQueryClient.query({
         queryKey,
         queryFn: async () => {
           throw new Error('snapshot unavailable')

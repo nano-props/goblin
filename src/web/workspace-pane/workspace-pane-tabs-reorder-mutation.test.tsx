@@ -183,7 +183,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))
     await expect(
-      queryClient.fetchQuery({
+      queryClient.query({
         queryKey: workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
         queryFn: () => Promise.reject(new Error('tabs unavailable')),
         staleTime: 0,

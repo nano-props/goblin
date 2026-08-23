@@ -420,7 +420,7 @@ describe('workspace pane tabs query', () => {
       exact: true,
     })
 
-    await queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, WORKSPACE_RUNTIME_ID))
+    await queryClient.query(workspacePaneTabsQueryOptions(REPO_ROOT, WORKSPACE_RUNTIME_ID))
 
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
   })

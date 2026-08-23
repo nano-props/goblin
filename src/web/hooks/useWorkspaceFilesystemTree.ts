@@ -117,7 +117,7 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
 
     dispatchTreeState({ type: 'childrenLoading', prefix: normalizedPrefix })
     try {
-      const result = await queryClient.fetchQuery({
+      const result = await queryClient.query({
         queryKey: workspaceFilesystemTreeChildrenQueryKey(target, normalizedPrefix),
         queryFn: ({ signal }) =>
           readCurrentWorkspaceFilesystemTree(queryClient, target, {

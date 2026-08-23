@@ -361,7 +361,7 @@ async function loadBootstrap(
   workspaceRuntimeId: string,
   signal: AbortSignal,
 ): Promise<BootstrapLoad> {
-  const previewRead = appQueryClient.fetchQuery({
+  const previewRead = appQueryClient.query({
     queryKey: repoWorktreeBootstrapPreviewQueryKey(repoId, workspaceRuntimeId),
     queryFn: () =>
       getRepoWorktreeBootstrapPreview(repoId, workspaceRuntimeId).catch((): WorktreeBootstrapPreviewResult => ({
@@ -392,7 +392,7 @@ async function loadBootstrapSettings(signal: AbortSignal): Promise<{
   try {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
     const settingsSnapshot = await waitForPromiseWithSignal(
-      appQueryClient.fetchQuery(settingsSnapshotQueryOptions()),
+      appQueryClient.query(settingsSnapshotQueryOptions()),
       signal,
     )
     return { settingsSnapshot, settingsError: false }

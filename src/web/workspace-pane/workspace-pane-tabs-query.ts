@@ -151,7 +151,7 @@ export async function refreshWorkspacePaneTabsQueryData(
   const joinedExistingRequest =
     queryClient.getQueryState<WorkspacePaneTabsQueryData>(queryOptions.queryKey)?.fetchStatus === 'fetching'
   const joinedError = await queryClient
-    .fetchQuery({
+    .query({
       ...queryOptions,
       staleTime: 0,
     })
@@ -175,7 +175,7 @@ export async function refreshWorkspacePaneTabsQueryData(
   // request settles, perform one post-trigger read. A revision watermark also
   // gets one fresh read when the joined snapshot cannot satisfy it. Failure at
   // this boundary is final; callers surface it instead of polling.
-  await queryClient.fetchQuery({
+  await queryClient.query({
     ...queryOptions,
     queryFn:
       requirement.kind === 'minimum-revision'

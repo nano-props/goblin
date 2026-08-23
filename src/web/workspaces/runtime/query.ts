@@ -59,7 +59,7 @@ async function requestWorkspaceRuntimeRefresh(
       state.trailing = false
       await queryClient.invalidateQueries({ queryKey: workspaceRuntimesQueryKey(), exact: true, refetchType: 'none' })
       try {
-        snapshot = await queryClient.fetchQuery(workspaceRuntimesQueryOptions())
+        snapshot = await queryClient.query(workspaceRuntimesQueryOptions())
       } catch (error) {
         if (!state.trailing) throw error
         continue

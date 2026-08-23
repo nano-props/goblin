@@ -756,7 +756,7 @@ describe('createAppNavigationActions presentation', () => {
     })
     appQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     await appQueryClient
-      .fetchQuery({
+      .query({
         queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId),
         queryFn: async () => {
           throw new Error('tabs unavailable')
