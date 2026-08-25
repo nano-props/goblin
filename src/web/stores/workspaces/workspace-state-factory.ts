@@ -53,10 +53,6 @@ export function errorEvent(message: string): RepoEvent {
   return { id: nextEventId++, kind: 'error', message }
 }
 
-export function uncertainBranchActionEvent(): RepoEvent {
-  return { id: nextEventId++, kind: 'uncertain', message: 'error.operation-outcome-uncertain' }
-}
-
 export function appendRepoEvent(events: RepoEvent[], event: RepoEvent): RepoEvent[] {
   return [...events, event].slice(-MAX_REPO_EVENTS)
 }

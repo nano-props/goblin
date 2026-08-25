@@ -100,7 +100,7 @@ describe('workspace runtime recovery Refresh boundary', () => {
     })
   })
 
-  test('keeps the new membership authoritative but omits a stale Refresh target without retrying', async () => {
+  test('keeps the new membership authoritative but fails recovery for a stale Refresh target', async () => {
     const refresh = vi.fn(async (): Promise<WorkspaceRefreshResult> => ({ kind: 'stale-runtime' }))
     installGoblinTestBridge({
       'workspace.runtimeReconcile': async () => ({
@@ -117,10 +117,7 @@ describe('workspace runtime recovery Refresh boundary', () => {
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toMatchObject({
-      kind: 'settled',
-      targets: [],
-    })
+    ).rejects.toThrow('error.workspace-runtime-stale')
     expect(refresh).toHaveBeenCalledOnce()
     expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
       workspaceRuntimeId: NEXT_RUNTIME_ID,
@@ -152,7 +149,7 @@ describe('workspace runtime recovery Refresh boundary', () => {
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toMatchObject({ kind: 'settled', targets: [] })
+    ).rejects.toThrow('error.operation-outcome-uncertain')
     expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
       workspaceRuntimeId: NEXT_RUNTIME_ID,
       capability: { kind: 'probing' },

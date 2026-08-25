@@ -3,7 +3,6 @@ import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspaces/runtime/cap
 import { reconcileWorkspaceRuntimeMemberships } from '#/web/workspaces/client.ts'
 import { invalidateWorkspaceRuntimes } from '#/web/workspaces/runtime/query.ts'
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { workspacesLog } from '#/web/logger.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { disposeRepoRuntimeReadState } from '#/web/repos/query-runtime.ts'
@@ -64,27 +63,11 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
     reconcileOpenWorkspaceRuntimeMembershipsNow(set, get),
   )
   if (recovery.kind === 'superseded') return recovery
-  const changedRemoteWorkspaceIds = new Set(
-    recovery.changedTargets
-      .filter((target) => isRemoteWorkspaceId(target.workspaceId))
-      .map((target) => target.workspaceId),
-  )
-  void Promise.all(
-    recovery.remoteEnsureTargets
-      .filter((target) => !changedRemoteWorkspaceIds.has(target.workspaceId))
-      .map(async (target) => {
-        await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          mode: 'ensure',
-        })
-      }),
-  ).catch((err) => {
-    workspacesLog.warn('failed to ensure remote lifecycle after runtime membership recovery', { err })
-  })
   const remoteEnsureWorkspaceIds = new Set(recovery.remoteEnsureTargets.map((target) => target.workspaceId))
   const changedWorkspaceIds = new Set(recovery.changedTargets.map((target) => target.workspaceId))
   const settlementTargets = recovery.targets.filter((target) => {
     if (changedWorkspaceIds.has(target.workspaceId)) return true
+    if (remoteEnsureWorkspaceIds.has(target.workspaceId)) return true
     const workspace = get().workspaces[target.workspaceId]
     return (
       !isRemoteWorkspaceId(target.workspaceId) &&
@@ -94,7 +77,7 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   })
   // Settle one batch before projection recovery. #359 accepts cross-workspace
   // delay instead of adding per-target generation coordination.
-  const settlementEligibility = await Promise.all(
+  const settlements = await Promise.allSettled(
     settlementTargets.map(async (target) => ({
       workspaceId: target.workspaceId,
       eligible: await settleWorkspaceRuntimeForProjection(
@@ -105,9 +88,11 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
       ),
     })),
   )
-  const ineligibleWorkspaceIds = new Set(
-    settlementEligibility.filter((target) => !target.eligible).map((target) => target.workspaceId),
-  )
+  const ineligibleWorkspaceIds = new Set<WorkspaceId>()
+  for (const settlement of settlements) {
+    if (settlement.status === 'rejected') throw settlement.reason
+    if (!settlement.value.eligible) ineligibleWorkspaceIds.add(settlement.value.workspaceId)
+  }
   return {
     kind: 'settled',
     targets: recovery.targets.filter((target) => !ineligibleWorkspaceIds.has(target.workspaceId)),
@@ -126,36 +111,24 @@ async function settleWorkspaceRuntimeForProjection(
         workspaceRuntimeId: target.workspaceRuntimeId,
         mode: 'ensure',
       })
-      return outcome?.kind === 'ready'
+      if (outcome?.kind === 'ready') return true
     }
     const workspace = get().workspaces[target.workspaceId]
-    return (
-      workspace?.workspaceRuntimeId === target.workspaceRuntimeId &&
-      workspace.admission.kind === 'remote' &&
-      workspace.admission.lifecycle?.kind === 'ready'
-    )
+    if (!workspace || workspace.workspaceRuntimeId !== target.workspaceRuntimeId) return false
+    if (workspace.admission.kind !== 'remote') return false
+    if (workspace.admission.lifecycle?.kind === 'ready') return true
+    if (workspace.admission.lifecycle?.kind === 'failed') return false
+    throw new Error(`remote runtime recovery did not settle for ${target.workspaceId}`)
   }
 
-  try {
-    const outcome = await runWorkspaceRefresh({ set, get }, target.workspaceId, {
-      workspaceRuntimeId: target.workspaceRuntimeId,
-    })
-    if (outcome.ok) return true
-    if (outcome.kind === 'cancelled') return false
-    workspacesLog.warn('workspace refresh did not settle the local runtime for projection recovery', {
-      workspaceId: target.workspaceId,
-      workspaceRuntimeId: target.workspaceRuntimeId,
-      message: outcome.message,
-    })
-    return false
-  } catch (err) {
-    workspacesLog.warn('workspace refresh failed while settling the local runtime for projection recovery', {
-      workspaceId: target.workspaceId,
-      workspaceRuntimeId: target.workspaceRuntimeId,
-      err,
-    })
-    return false
-  }
+  const outcome = await runWorkspaceRefresh({ set, get }, target.workspaceId, {
+    workspaceRuntimeId: target.workspaceRuntimeId,
+  })
+  if (outcome.ok) return true
+  const workspace = get().workspaces[target.workspaceId]
+  if (!workspace || workspace.workspaceRuntimeId !== target.workspaceRuntimeId) return false
+  const detail = outcome.kind === 'cancelled' ? 'cancelled' : outcome.message
+  throw new Error(`local runtime recovery did not settle for ${target.workspaceId}: ${detail}`)
 }
 
 async function reconcileOpenWorkspaceRuntimeMembershipsNow(
@@ -244,12 +217,8 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
     const runtime = runtimeByWorkspaceId.get(changed.workspaceId)
     if (runtime) acceptRemoteWorkspaceRuntimeProjection(set, get, runtime)
   }
-  try {
-    const runtimeSnapshot = await invalidateWorkspaceRuntimes()
-    acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
-  } catch (err) {
-    workspacesLog.warn('failed to refresh the complete runtime snapshot after membership recovery', { err })
-  }
+  const runtimeSnapshot = await invalidateWorkspaceRuntimes()
+  acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
 
   const currentWorkspaces = get().workspaces
   const targets: SettledWorkspaceRuntimeMembershipRecovery['targets'] = []

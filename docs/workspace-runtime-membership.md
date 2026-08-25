@@ -99,6 +99,10 @@ Realtime recovery:
 6. The client atomically removes rejected entries and commits changed runtime ids,
    resets transient epoch-owned state, and only then recovers remote lifecycle,
    terminals and workspace tabs with the new scopes.
+7. Membership changes already accepted from the server remain authoritative if
+   later capability or snapshot projection fails. The recovery remains incomplete
+   and exposes an explicit retry instead of rolling those facts back or reporting
+   the partial projection as settled.
 
 ## Rules
 

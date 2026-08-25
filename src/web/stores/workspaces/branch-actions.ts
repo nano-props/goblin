@@ -1,3 +1,4 @@
+import { toast } from 'vue-sonner'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
@@ -36,6 +37,8 @@ import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
+import { translate } from '#/web/stores/i18n-vue.ts'
+
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -226,9 +229,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       return result
     }
     const handleResult = async (outcome: { kind: 'settled'; result: Result } | { kind: 'uncertain' }) => {
-      if (outcome.kind === 'uncertain') {
-        get().setBranchActionUncertain(id, workspaceRuntimeId)
-      } else if (!shouldSuppressBranchActionResultMessage(outcome.result, options)) {
+      if (outcome.kind === 'settled' && !shouldSuppressBranchActionResultMessage(outcome.result, options)) {
         get().setLastResult(id, outcome.result, workspaceRuntimeId, { action: branchActionEventAction(action) })
       }
     }
@@ -243,8 +244,16 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       try {
         return { kind: 'settled' as const, result: await execute(workspaceRuntimeId, signal) }
       } catch (error) {
-        // Settle scheduling, but keep transport uncertainty out of the server result contract.
-        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return { kind: 'uncertain' as const }
+        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+          // This describes the user's command, not an epoch-owned repo
+          // projection, so publish it before stale settlement can discard it.
+          const messageKey = 'error.operation-outcome-uncertain'
+          toast.warning(translate(messageKey), {
+            id: `branch-action-outcome-uncertain:${id}`,
+            duration: 10_000,
+          })
+          return { kind: 'uncertain' as const }
+        }
         throw error
       }
     }

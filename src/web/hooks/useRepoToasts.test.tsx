@@ -15,7 +15,6 @@ import { defineComponent, isVNode } from 'vue'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
-  warning: vi.fn(),
   error: vi.fn(),
 }))
 const i18nMocks = vi.hoisted(() => ({
@@ -41,7 +40,6 @@ beforeEach(() => {
   appI18n.global.locale.value = 'en'
   resetWorkspacesStore()
   toastMocks.success.mockClear()
-  toastMocks.warning.mockClear()
   toastMocks.error.mockClear()
 })
 
@@ -107,22 +105,6 @@ describe('useRepoToasts', () => {
     expect(toastDescriptionText(options.description)).toBe(
       'setup exited with status 1\nThe worktree was created, but saving trust failed.\nCopied 1 path: .env.local',
     )
-  })
-
-  test('presents an uncertain branch action as a warning instead of a failure', async () => {
-    const workspaceRuntimeId = seedRepoShellForTest({
-      id: REPO_ID,
-      workspaceProbe: createGitWorkspaceProbeForTest(),
-    }).workspaceRuntimeId
-    workspacesStore.getState().setBranchActionUncertain(REPO_ID, workspaceRuntimeId)
-
-    renderInJsdom(<Harness repoId={REPO_ID} />)
-
-    expect(toastMocks.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
-      id: expect.stringContaining(`${REPO_ID}:uncertain:`),
-      duration: 10_000,
-    })
-    expect(toastMocks.error).not.toHaveBeenCalled()
   })
 })
 
