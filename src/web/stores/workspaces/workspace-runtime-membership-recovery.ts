@@ -107,11 +107,10 @@ async function settleWorkspaceRuntimeForProjection(
 ): Promise<boolean> {
   if (isRemoteWorkspaceId(target.workspaceId)) {
     if (remoteEnsureRequired) {
-      const outcome = await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
+      await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
         workspaceRuntimeId: target.workspaceRuntimeId,
         mode: 'ensure',
       })
-      if (outcome?.kind === 'ready') return true
     }
     const workspace = get().workspaces[target.workspaceId]
     if (!workspace || workspace.workspaceRuntimeId !== target.workspaceRuntimeId) return false

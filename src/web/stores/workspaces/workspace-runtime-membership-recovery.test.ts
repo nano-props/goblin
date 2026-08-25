@@ -19,7 +19,10 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { normalizeRemoteTarget, type RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { CodedError } from '#/shared/coded-error.ts'
-import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
+import {
+  acceptRemoteWorkspaceLifecycleProjection,
+  acceptRemoteWorkspaceRuntimeProjection,
+} from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 
 vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
   runWorkspaceRefresh: vi.fn(async () => ({ ok: true })),
@@ -775,6 +778,53 @@ describe('workspace runtime membership recovery', () => {
     await expect(recovery).resolves.toEqual({
       kind: 'settled',
       targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: workspace.workspaceRuntimeId }],
+    })
+  })
+
+  test('uses a newer failed projection after a remote ensure returns ready', async () => {
+    resetWorkspacesStore()
+    const remoteEnsure = Promise.withResolvers<RemoteWorkspaceLifecycleCommandResult>()
+    const remoteLifecycle = vi.fn(() => remoteEnsure.promise)
+    const workspace = seedRepoShellForTest({
+      id: REMOTE_REPO_ROOT,
+      remoteLifecycle: { kind: 'connecting' },
+    })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REMOTE_REPO_ROOT,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            workspaceProbe: { status: 'probing' as const },
+            remoteLifecycle: { kind: 'connecting', attemptId: 1 },
+          },
+        ],
+      }),
+      'remote.lifecycle': remoteLifecycle,
+    })
+
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
+    await vi.waitFor(() => expect(remoteLifecycle).toHaveBeenCalledOnce())
+    remoteEnsure.resolve({
+      kind: 'settled',
+      workspaceId: REMOTE_REPO_ROOT,
+      lifecycle: { kind: 'ready', attemptId: 1, target: REMOTE_TARGET },
+      workspaceProbe: createGitWorkspaceProbeForTest(),
+    })
+    queueMicrotask(() => {
+      expect(
+        acceptRemoteWorkspaceLifecycleProjection(workspacesStore.setState, workspacesStore.getState, {
+          workspaceId: REMOTE_REPO_ROOT,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
+          remoteLifecycle: { kind: 'failed', attemptId: 2, reason: 'unreachable', target: REMOTE_TARGET },
+        }),
+      ).toBe(true)
+    })
+
+    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [] })
+    expect(workspacesStore.getState().workspaces[REMOTE_REPO_ROOT]?.admission).toMatchObject({
+      kind: 'remote',
+      lifecycle: { kind: 'failed', reason: 'unreachable', target: REMOTE_TARGET },
     })
   })
 
