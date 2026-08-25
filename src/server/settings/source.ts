@@ -339,7 +339,10 @@ export async function reconcileWorkspaceRuntimeMemberships(input: {
     // either ordering converges to the committed open-workspace set.
     const openWorkspaceIds = new Set(data.workspace.openWorkspaceEntries.map(workspaceSessionEntryId))
     const workspaceIds = input.workspaceIds.filter((workspaceId) => openWorkspaceIds.has(workspaceId))
-    return replaceWorkspaceRuntimeMembershipsForClient(input.userId, input.clientId, workspaceIds)
+    const admittedWorkspaceIds = new Set(workspaceIds)
+    return replaceWorkspaceRuntimeMembershipsForClient(input.userId, input.clientId, workspaceIds).filter((runtime) =>
+      admittedWorkspaceIds.has(runtime.workspaceId),
+    )
   })
 }
 

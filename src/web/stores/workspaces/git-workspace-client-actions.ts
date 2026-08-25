@@ -1,4 +1,9 @@
-import { appendRepoEvent, replaceWorkspaceState, resultEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import {
+  appendRepoEvent,
+  replaceWorkspaceState,
+  resultEvent,
+  uncertainBranchActionEvent,
+} from '#/web/stores/workspaces/workspace-state-factory.ts'
 import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import type { RepoResultEventOptions, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
@@ -19,6 +24,19 @@ export function createGitWorkspaceClientActions(set: WorkspacesSet) {
           if (!isGitWorkspace(nextWorkspace)) return
           const git = gitWorkspaceClientState(nextWorkspace)
           git.events = appendRepoEvent(git.events, resultEvent(result, options))
+        })
+      })
+    },
+
+    setBranchActionUncertain(id: string, workspaceRuntimeId: string) {
+      set((state) => {
+        const workspace = state.workspaces[id]
+        if (!workspace || workspace.workspaceRuntimeId !== workspaceRuntimeId || !isGitWorkspace(workspace))
+          return state
+        return replaceWorkspaceState(state, workspace, (nextWorkspace) => {
+          if (!isGitWorkspace(nextWorkspace)) return
+          const git = gitWorkspaceClientState(nextWorkspace)
+          git.events = appendRepoEvent(git.events, uncertainBranchActionEvent())
         })
       })
     },

@@ -57,15 +57,11 @@ export function createRefreshSyncHelpers(
       if (!repo || !workspaceCanExecute(repo)) return null
       if (!canStartRemoteFetch(repo)) return null
     }
-    try {
-      return await runNetworkTask(id, (signal) => fetchRepo(id, workspaceRuntimeId, signal), {
-        workspaceRuntimeId,
-        reason: 'user-fetch',
-        priority: 100,
-      })
-    } catch (err) {
-      return { ok: false, message: err instanceof Error ? err.message : String(err) }
-    }
+    return runNetworkTask(id, (signal) => fetchRepo(id, workspaceRuntimeId, signal), {
+      workspaceRuntimeId,
+      reason: 'user-fetch',
+      priority: 100,
+    })
   }
 
   function finalizeSyncFetchResult(

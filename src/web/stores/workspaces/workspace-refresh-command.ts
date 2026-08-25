@@ -6,12 +6,12 @@ import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-stat
 import { createRefreshSyncHelpers } from '#/web/stores/workspaces/refresh-sync.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
 import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
-import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
+import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { runExclusiveOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { refreshActiveRepoPullRequestQueries } from '#/web/repos/query-runtime.ts'
 import { goblinLog } from '#/web/logger.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export interface WorkspaceRefreshStoreAccess {
   set: WorkspacesSet
@@ -86,22 +86,23 @@ async function runWorkspaceRefreshOnce(
       ])
     },
   })
-  await runExclusiveOperation({
-    set: store.set,
-    get: store.get,
-    id: workspaceId,
-    workspaceRuntimeId,
-    lane: 'read',
-    priority: 100,
-    targets: [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }],
-    task: (signal) => runRefreshSyncPipeline(workspaceId, workspaceRuntimeId, signal),
-    onError: (message) => {
-      updateIfFresh(store.set, workspaceId, workspaceRuntimeId, (workspace) => {
-        if (!isGitWorkspace(workspace)) return
-        const git = gitWorkspaceClientState(workspace)
-        git.events = appendRepoEvent(git.events, errorEvent(message))
-      })
-    },
-  })
+  try {
+    await runExclusiveOperation({
+      set: store.set,
+      get: store.get,
+      id: workspaceId,
+      workspaceRuntimeId,
+      lane: 'read',
+      priority: 100,
+      targets: [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }],
+      task: (signal) => runRefreshSyncPipeline(workspaceId, workspaceRuntimeId, signal),
+      rethrow: true,
+    })
+  } catch (error) {
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+      return { ok: false, kind: 'uncertain', message: 'error.operation-outcome-uncertain' }
+    }
+    return { ok: false, kind: 'failed', message: error instanceof Error ? error.message : String(error) }
+  }
   return { ok: true }
 }

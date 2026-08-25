@@ -113,12 +113,19 @@ export async function openWorkspaceRuntimeWithCache(
   workspaceId: WorkspaceId,
   onOpened?: (workspaceRuntimeId: string) => void | Promise<void>,
 ): Promise<string> {
-  return runWorkspaceRuntimeMembershipCommand(workspaceId, async () => {
-    const workspaceRuntimeId = await openWorkspaceRuntime(workspaceId)
-    await updateWorkspaceRuntimeCache({ workspaceId, workspaceRuntimeId })
-    await onOpened?.(workspaceRuntimeId)
-    return workspaceRuntimeId
-  })
+  return runWorkspaceRuntimeMembershipCommand(workspaceId, () =>
+    openWorkspaceRuntimeWithCacheNow(workspaceId, onOpened),
+  )
+}
+
+async function openWorkspaceRuntimeWithCacheNow(
+  workspaceId: WorkspaceId,
+  onOpened?: (workspaceRuntimeId: string) => void | Promise<void>,
+): Promise<string> {
+  const workspaceRuntimeId = await openWorkspaceRuntime(workspaceId)
+  await updateWorkspaceRuntimeCache({ workspaceId, workspaceRuntimeId })
+  await onOpened?.(workspaceRuntimeId)
+  return workspaceRuntimeId
 }
 
 export async function closeWorkspaceRuntimeWithCache(
@@ -174,7 +181,7 @@ async function discardRejectedRemoteWorkspaceOpen(
       : state,
   )
   try {
-    await closeWorkspaceRuntimeWithCache(workspaceId, workspaceRuntimeId)
+    await closeWorkspaceRuntimeWithCacheNow(workspaceId, workspaceRuntimeId)
   } catch (err) {
     workspacesLog.warn('failed to release workspace runtime after rejected workspace membership write', {
       workspaceId,
@@ -337,50 +344,52 @@ async function openRemoteWorkspace(
   get: WorkspacesGet,
   entry: WorkspaceSessionEntry,
 ): Promise<OpenWorkspaceResult> {
-  const prepared = await runWorkspaceCommand(entry.id, async () => {
-    let openedWorkspaceRuntimeId: string | null = null
-    if (!get().workspaces[entry.id]) {
-      try {
-        await openWorkspaceRuntimeWithCache(entry.id, (workspaceRuntimeId) => {
-          openedWorkspaceRuntimeId = workspaceRuntimeId
-          set((state) => {
-            const result = insertPlaceholderWorkspace(
-              {
-                workspaces: state.workspaces,
-                workspaceOrder: state.workspaceOrder,
-              },
-              entry,
-              workspaceRuntimeId,
-            )
-            return { ...state, workspaces: result.workspaces, workspaceOrder: result.workspaceOrder }
+  const prepared = await runWorkspaceCommand(entry.id, () =>
+    runWorkspaceRuntimeMembershipCommand(entry.id, async () => {
+      let openedWorkspaceRuntimeId: string | null = null
+      if (!get().workspaces[entry.id]) {
+        try {
+          await openWorkspaceRuntimeWithCacheNow(entry.id, (workspaceRuntimeId) => {
+            openedWorkspaceRuntimeId = workspaceRuntimeId
+            set((state) => {
+              const result = insertPlaceholderWorkspace(
+                {
+                  workspaces: state.workspaces,
+                  workspaceOrder: state.workspaceOrder,
+                },
+                entry,
+                workspaceRuntimeId,
+              )
+              return { ...state, workspaces: result.workspaces, workspaceOrder: result.workspaceOrder }
+            })
           })
-        })
-      } catch (error) {
-        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
-          return { kind: 'uncertain' as const }
+        } catch (error) {
+          if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+            return { kind: 'uncertain' as const }
+          }
+          throw error
         }
-        throw error
       }
-    }
-    const workspaceRuntimeId = get().workspaces[entry.id]?.workspaceRuntimeId ?? null
-    if (!workspaceRuntimeId) return null
-    let membershipOutcome: WorkspaceMembershipWriteOutcome
-    try {
-      membershipOutcome = await addWorkspaceMembership(entry)
-    } catch (error) {
-      if (openedWorkspaceRuntimeId) {
-        await discardRejectedRemoteWorkspaceOpen(set, get, entry.id, openedWorkspaceRuntimeId)
+      const workspaceRuntimeId = get().workspaces[entry.id]?.workspaceRuntimeId ?? null
+      if (!workspaceRuntimeId) return null
+      let membershipOutcome: WorkspaceMembershipWriteOutcome
+      try {
+        membershipOutcome = await addWorkspaceMembership(entry)
+      } catch (error) {
+        if (openedWorkspaceRuntimeId) {
+          await discardRejectedRemoteWorkspaceOpen(set, get, entry.id, openedWorkspaceRuntimeId)
+        }
+        workspacesLog.warn('failed to add remote workspace to server workspace', {
+          workspaceId: entry.id,
+          err: error,
+        })
+        return null
       }
-      workspacesLog.warn('failed to add remote workspace to server workspace', {
-        workspaceId: entry.id,
-        err: error,
-      })
-      return null
-    }
-    return membershipOutcome === 'uncertain'
-      ? { kind: 'uncertain' as const }
-      : { kind: 'prepared' as const, workspaceRuntimeId }
-  })
+      return membershipOutcome === 'uncertain'
+        ? { kind: 'uncertain' as const }
+        : { kind: 'prepared' as const, workspaceRuntimeId }
+    }),
+  )
   if (!prepared) return { ok: false, kind: 'failed', message: 'error.workspace-open-failed' }
   if (prepared.kind === 'uncertain') {
     return {

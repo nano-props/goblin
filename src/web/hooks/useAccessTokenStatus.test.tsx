@@ -155,10 +155,11 @@ describe('useAccessTokenStatus', () => {
     expect(window.location.search).toBe('')
   })
 
-  test('does not classify an uncertain URL token login outcome as unauthenticated', async () => {
+  test('verifies current auth authority after an uncertain URL token login outcome', async () => {
     vi.mocked(postServerCommandJson).mockRejectedValueOnce(
       new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'login outcome is uncertain' }),
     )
+    vi.mocked(fetchServerJson).mockResolvedValueOnce({ ok: true })
     window.history.replaceState({}, '', '/?accessToken=url-token')
 
     renderInJsdom(<Harness />)
@@ -166,8 +167,10 @@ describe('useAccessTokenStatus', () => {
       await Promise.resolve()
     })
 
-    expect(screen.getByRole('button', { name: 'unavailable' })).toBeTruthy()
-    expect(fetchServerJson).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'authenticated' })).toBeTruthy()
+    expect(fetchServerJson).toHaveBeenCalledWith('/api/whoami', expect.any(Function), {
+      signal: expect.any(AbortSignal),
+    })
     expect(window.location.search).toBe('')
   })
 })

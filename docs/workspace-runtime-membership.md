@@ -95,10 +95,10 @@ Realtime recovery:
 5. After reconnect, the window submits its complete current workspace set through
    one batch reconcile command. The server admits only entries still present in
    durable workspace membership, replaces only that client's runtime leases, and
-   returns canonical runtime ids.
-6. The client commits changed runtime ids atomically, resets transient
-   epoch-owned state, and only then recovers remote lifecycle, terminals and
-   workspace tabs with the new scopes.
+   returns canonical runtimes for the admitted declaration.
+6. The client atomically removes rejected entries and commits changed runtime ids,
+   resets transient epoch-owned state, and only then recovers remote lifecycle,
+   terminals and workspace tabs with the new scopes.
 
 ## Rules
 

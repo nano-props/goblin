@@ -15,7 +15,10 @@ import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authent
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
-import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
+import {
+  advanceServerCommandGeneration,
+  composeServerCommandGenerationSignal,
+} from '#/web/lib/server-command-generation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
@@ -242,6 +245,34 @@ describe('Layout shell providers', () => {
 
     expect(clientIntentIngress.subscriptionStarts).toBe(1)
     expect(clientWorkspacePersistence).toHaveBeenCalledOnce()
+  })
+
+  test('advances command generation before authentication and retains business intents for the authenticated router', async () => {
+    authMock.status.state = 'unauthenticated'
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    renderLayout(router)
+
+    const staleCommandSignal = composeServerCommandGenerationSignal()
+    await flushTestUpdates(() => {
+      for (const listener of clientIntentIngress.listeners) {
+        listener({ type: 'server-command-reset-requested' })
+        listener({ type: 'open-workspace-path-requested' })
+      }
+    })
+
+    expect(staleCommandSignal.aborted).toBe(true)
+    expect(document.querySelector('[data-testid="workspace-open-dialog"]')).toBeNull()
+
+    await flushTestUpdates(() => {
+      authMock.status.state = 'authenticated'
+    })
+    await waitFor(() => expect(document.querySelector('[data-testid="workspace-open-dialog"]')).not.toBeNull())
+    expect(clientIntentIngress.subscriptionStarts).toBe(1)
   })
 
   test('keeps terminal read context above the settings shell outlet while workspace restore is pending', async () => {

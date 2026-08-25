@@ -590,6 +590,29 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
+  test('keeps a retry entry visible when app-level runtime recovery fails without an active Git workspace', async () => {
+    workspacesStore.setState({ workspaceMembershipReady: true })
+    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockRejectedValueOnce(new Error('recovery unavailable'))
+    const result = renderRuntimeProvider(null)
+    try {
+      await flushTestUpdates(() => projectionMocks.repoInvalidationConnectionOpen?.())
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-testid="workspace-runtime-recovery-failure"]')).not.toBeNull(),
+      )
+
+      await flushTestUpdates(() =>
+        document.querySelector<HTMLElement>('[data-testid="workspace-runtime-recovery-failure"] button')?.click(),
+      )
+
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-testid="workspace-runtime-recovery-failure"]')).toBeNull(),
+      )
+    } finally {
+      result.unmount()
+    }
+  })
+
   test('restarts an in-flight projection recovery after the command generation advances', async () => {
     const repo = seedCurrentRepo()
     const interruptedRecovery = Promise.withResolvers<WorkspaceRuntimeMembershipRecoveryResult>()

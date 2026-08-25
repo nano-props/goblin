@@ -56,7 +56,12 @@ export function useRepoToasts(repoId: MaybeRefOrGetter<WorkspaceId>) {
       if (!currentEvents?.length) return
       const currentRepoId = toValue(repoId)
       for (const event of currentEvents) {
-        if (event.kind === 'result') {
+        if (event.kind === 'uncertain') {
+          toast.warning(t(event.message), {
+            id: `${currentRepoId}:uncertain:${event.id}`,
+            duration: 10_000,
+          })
+        } else if (event.kind === 'result') {
           const result = event.result
           const hasMessage = !!result.message
           const actionLabel = repoEventActionSuccessLabel(event.action)

@@ -13,6 +13,7 @@ export interface WorkspaceRuntimeProjectionRecoveryDependencies {
   terminalRecovery: TerminalProjectionRecoveryActions
   workspaceTabsRecovery: WorkspacePaneTabsRecoveryActions
   resyncRepoReads: () => Promise<void>
+  setRecoveryFailed: (failed: boolean) => void
   logFailure: (error: unknown) => void
 }
 
@@ -26,18 +27,24 @@ export class WorkspaceRuntimeProjectionRecovery {
 
   request(): void {
     const requestGeneration = ++this.requestGeneration
+    this.dependencies.setRecoveryFailed(false)
     void this.run(requestGeneration)
   }
 
   invalidate(): void {
     this.requestGeneration += 1
+    this.dependencies.setRecoveryFailed(false)
   }
 
   private async run(requestGeneration: number): Promise<void> {
     try {
       const recovery = await this.dependencies.reconcileMemberships()
       // Only the latest recovery may publish recovered projections.
-      if (requestGeneration !== this.requestGeneration || recovery.kind === 'superseded') return
+      if (requestGeneration !== this.requestGeneration) return
+      if (recovery.kind === 'superseded') {
+        this.dependencies.setRecoveryFailed(false)
+        return
+      }
       this.dependencies.scopeRegistry.disposeScopes()
       for (const target of recovery.targets) {
         if (this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId) continue
@@ -46,8 +53,11 @@ export class WorkspaceRuntimeProjectionRecovery {
         this.dependencies.workspaceTabsRecovery.request(scope, { kind: 'fresh' })
       }
       await this.dependencies.resyncRepoReads()
+      if (requestGeneration === this.requestGeneration) this.dependencies.setRecoveryFailed(false)
     } catch (error) {
-      if (requestGeneration === this.requestGeneration) this.dependencies.logFailure(error)
+      if (requestGeneration !== this.requestGeneration) return
+      this.dependencies.setRecoveryFailed(true)
+      this.dependencies.logFailure(error)
     }
   }
 }

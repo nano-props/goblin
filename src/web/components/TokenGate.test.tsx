@@ -9,6 +9,11 @@ import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { CodedError } from '#/shared/coded-error.ts'
+
+const toastMocks = vi.hoisted(() => ({ warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: toastMocks }))
 
 const authMock = vi.hoisted(() => ({
   status: null as unknown as {
@@ -31,6 +36,7 @@ beforeEach(() => {
     refresh: vi.fn(),
   })
   vi.mocked(postServerCommandJson).mockReset()
+  toastMocks.warning.mockReset()
 })
 
 describe('TokenGate', () => {
@@ -150,6 +156,23 @@ describe('TokenGate', () => {
       })
       expect(authMock.status.refresh).toHaveBeenCalledTimes(1)
     })
+  })
+
+  test('warns and verifies authoritative auth state when the login outcome is uncertain', async () => {
+    const user = userEvent.setup()
+    vi.mocked(postServerCommandJson).mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' }),
+    )
+    renderLoginForm()
+
+    await user.type(screen.getByRole('textbox', { name: 'auth.gate.token-label' }), 'candidate-token')
+    await user.click(screen.getByRole('button', { name: 'auth.gate.sign-in' }))
+
+    await waitFor(() => {
+      expect(toastMocks.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain')
+      expect(authMock.status.refresh).toHaveBeenCalledOnce()
+    })
+    expect(screen.queryByText('response lost')).toBeNull()
   })
 })
 

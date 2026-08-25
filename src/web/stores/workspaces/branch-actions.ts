@@ -225,9 +225,11 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       get().setLastResult(id, result, workspaceRuntimeId)
       return result
     }
-    const handleResult = async (result: Result) => {
-      if (!shouldSuppressBranchActionResultMessage(result, options)) {
-        get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
+    const handleResult = async (outcome: { kind: 'settled'; result: Result } | { kind: 'uncertain' }) => {
+      if (outcome.kind === 'uncertain') {
+        get().setBranchActionUncertain(id, workspaceRuntimeId)
+      } else if (!shouldSuppressBranchActionResultMessage(outcome.result, options)) {
+        get().setLastResult(id, outcome.result, workspaceRuntimeId, { action: branchActionEventAction(action) })
       }
     }
     const handleError = (message: string) => {
@@ -239,49 +241,51 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       throwIfStale(get, id, workspaceRuntimeId)
       ctx.setPhase('running')
       try {
-        return await execute(workspaceRuntimeId, signal)
+        return { kind: 'settled' as const, result: await execute(workspaceRuntimeId, signal) }
       } catch (error) {
-        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return failureResult('error.operation-outcome-uncertain')
+        // Settle scheduling, but keep transport uncertainty out of the server result contract.
+        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return { kind: 'uncertain' as const }
         throw error
       }
     }
 
-    if (network) {
-      return runLatestOperation({
-        set,
-        get,
-        id,
-        workspaceRuntimeId,
-        lane: 'network',
-        operationKey: BRANCH_NETWORK_OPERATION_KEY,
-        priority: 100,
-        targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
-        task: runActionTask,
-        queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
-        queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
-        errorFromResult: branchActionErrorFromResult,
-        errorResult: failureResult,
-        onResult: handleResult,
-        onError: handleError,
-        onStale: handleStale,
-      })
-    }
-
-    return runExclusiveOperation({
-      set,
-      get,
-      id,
-      workspaceRuntimeId,
-      lane: 'write',
-      priority: 100,
-      targets: [branchActionTarget(action)],
-      busyResult: failureResult('cancelled'),
-      task: runActionTask,
-      errorFromResult: branchActionErrorFromResult,
-      errorResult: failureResult,
-      onResult: handleResult,
-      onError: handleError,
-    })
+    const outcome = network
+      ? await runLatestOperation({
+          set,
+          get,
+          id,
+          workspaceRuntimeId,
+          lane: 'network',
+          operationKey: BRANCH_NETWORK_OPERATION_KEY,
+          priority: 100,
+          targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
+          task: runActionTask,
+          queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
+          queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
+          errorFromResult: (outcome) =>
+            outcome.kind === 'settled' ? branchActionErrorFromResult(outcome.result) : null,
+          errorResult: (message) => ({ kind: 'settled' as const, result: failureResult(message) }),
+          onResult: handleResult,
+          onError: handleError,
+          onStale: handleStale,
+        })
+      : await runExclusiveOperation({
+          set,
+          get,
+          id,
+          workspaceRuntimeId,
+          lane: 'write',
+          priority: 100,
+          targets: [branchActionTarget(action)],
+          busyResult: { kind: 'settled', result: failureResult('cancelled') },
+          task: runActionTask,
+          errorFromResult: (currentOutcome) =>
+            currentOutcome.kind === 'settled' ? branchActionErrorFromResult(currentOutcome.result) : null,
+          errorResult: (message) => ({ kind: 'settled' as const, result: failureResult(message) }),
+          onResult: handleResult,
+          onError: handleError,
+        })
+    return outcome?.kind === 'settled' ? outcome.result : null
   }
 
   return {

@@ -27,6 +27,7 @@ describe('WorkspaceRuntimeProjectionRecovery', () => {
       terminalRecovery,
       workspaceTabsRecovery,
       resyncRepoReads,
+      setRecoveryFailed: vi.fn(),
       logFailure: vi.fn(),
     })
 
@@ -50,6 +51,7 @@ describe('WorkspaceRuntimeProjectionRecovery', () => {
       terminalRecovery,
       workspaceTabsRecovery,
       resyncRepoReads,
+      setRecoveryFailed: vi.fn(),
       logFailure: vi.fn(),
     })
 
@@ -74,6 +76,7 @@ describe('WorkspaceRuntimeProjectionRecovery', () => {
       terminalRecovery,
       workspaceTabsRecovery,
       resyncRepoReads,
+      setRecoveryFailed: vi.fn(),
       logFailure: vi.fn(),
     })
 
@@ -100,6 +103,7 @@ describe('WorkspaceRuntimeProjectionRecovery', () => {
       terminalRecovery,
       workspaceTabsRecovery: { request: vi.fn() },
       resyncRepoReads,
+      setRecoveryFailed: vi.fn(),
       logFailure: vi.fn(),
     })
 
@@ -118,6 +122,7 @@ describe('WorkspaceRuntimeProjectionRecovery', () => {
   test('stops projection recovery when membership reconciliation fails', async () => {
     const failure = new Error('membership recovery failed')
     const logFailure = vi.fn()
+    const setRecoveryFailed = vi.fn()
     const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
     const resyncRepoReads = vi.fn(async () => {})
     const recovery = new WorkspaceRuntimeProjectionRecovery({
@@ -129,11 +134,13 @@ describe('WorkspaceRuntimeProjectionRecovery', () => {
       terminalRecovery,
       workspaceTabsRecovery: { request: vi.fn() },
       resyncRepoReads,
+      setRecoveryFailed,
       logFailure,
     })
 
     recovery.request()
     await vi.waitFor(() => expect(logFailure).toHaveBeenCalledWith(failure))
+    expect(setRecoveryFailed.mock.calls.map(([failed]) => failed)).toEqual([false, true])
     expect(terminalRecovery.begin).not.toHaveBeenCalled()
     expect(resyncRepoReads).not.toHaveBeenCalled()
   })

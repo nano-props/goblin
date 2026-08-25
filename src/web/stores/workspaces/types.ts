@@ -35,6 +35,11 @@ export interface RepoResultEventOptions {
 
 export type RepoEvent =
   | { id: number; kind: 'result'; result: RepoMutationExecResult; action?: RepoEventAction }
+  | {
+      id: number
+      kind: 'uncertain'
+      message: 'error.operation-outcome-uncertain'
+    }
   | { id: number; kind: 'error'; message: string }
 
 /** A successful open carries the confirmed identity needed for activation.
@@ -294,6 +299,7 @@ export interface GitWorkspaceClientActions extends GitWorkspacePreferenceActions
     workspaceRuntimeId: string,
     options?: RepoResultEventOptions,
   ) => void
+  setBranchActionUncertain: (id: WorkspaceId, workspaceRuntimeId: string) => void
   clearEvents: (id: WorkspaceId, eventIds: number[]) => void
 }
 

@@ -901,4 +901,7 @@ export const ko: Record<DictKey, string> = {
     'Goblin에서 인증 상태를 확인할 수 없습니다. 서버와 네트워크 연결을 확인한 후 Goblin을 다시 여세요.',
   'lazy-restore.failed': '작업 공간을 열 수 없습니다',
   'workspace-restore.failed': '작업 공간을 복원할 수 없습니다',
+  'runtime-recovery.failed-title': '작업 공간 런타임을 복구할 수 없습니다',
+  'runtime-recovery.failed-description':
+    '일부 작업 공간 보기가 오래된 상태일 수 있습니다. 현재 상태를 확인하거나 다시 시도하세요.',
 }

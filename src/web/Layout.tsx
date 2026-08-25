@@ -39,6 +39,7 @@ import type { WorkspaceNavigationRouteContext } from '#/web/app/navigation/works
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
+import { provideDocumentClientEffectIntentIngress } from '#/web/hooks/client-effect-intent-ingress.ts'
 
 const INACTIVE_REPO_QUERY_WORKSPACE_ID = requiredWorkspaceId('goblin+file:///inactive-repo-query')
 
@@ -64,6 +65,7 @@ export const Layout = defineComponent({
     const route = useRoute()
     const bootstrapLoading = useBootstrapLoadingPresentation()
     useAppHistoryPresentationObserver()
+    provideDocumentClientEffectIntentIngress()
 
     return () => (
       <ErrorBoundary resetKey={route.fullPath} onError={bootstrapLoading.hide}>

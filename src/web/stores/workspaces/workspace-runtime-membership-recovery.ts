@@ -16,7 +16,10 @@ import {
 } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import { workspaceShellForReconciledRuntimeEpoch } from '#/web/stores/workspaces/workspace-session-state.ts'
+import {
+  removeWorkspaceFromSessionState,
+  workspaceShellForReconciledRuntimeEpoch,
+} from '#/web/stores/workspaces/workspace-session-state.ts'
 import { runExclusiveWorkspaceRuntimeMembershipCommand } from '#/web/stores/workspaces/workspace-runtime-membership-scheduler.ts'
 
 export type WorkspaceRuntimeMembershipRecoveryResult =
@@ -30,6 +33,10 @@ type SettledWorkspaceRuntimeMembershipRecovery = Extract<WorkspaceRuntimeMembers
 type ChangedWorkspaceRuntimeTarget = {
   workspaceId: WorkspaceId
   previousWorkspaceRuntimeId: string
+  workspaceRuntimeId: string
+}
+type RetiredWorkspaceRuntimeTarget = {
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 type CapturedWorkspaceRuntimeMembershipRecovery = SettledWorkspaceRuntimeMembershipRecovery & {
@@ -179,7 +186,6 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   }))
   const response = await reconcileWorkspaceRuntimeMemberships(captured.map((entry) => entry.workspaceId))
   const runtimeByWorkspaceId = new Map(response.runtimes.map((entry) => [entry.workspaceId, entry]))
-  const runtimeSnapshot = await invalidateWorkspaceRuntimes()
   const currentWorkspaceIds = Object.values(get().workspaces).map((workspace) => workspace.id)
   if (
     !sameWorkspaceIdSet(
@@ -189,44 +195,61 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   )
     return null
   const changedTargets: ChangedWorkspaceRuntimeTarget[] = []
+  const retiredTargets: RetiredWorkspaceRuntimeTarget[] = []
 
   set((state) => {
-    let workspaces = state.workspaces
+    let nextState = state
     for (const previous of captured) {
-      const current = workspaces[previous.workspaceId]
+      const current = nextState.workspaces[previous.workspaceId]
       const runtime = runtimeByWorkspaceId.get(previous.workspaceId)
-      if (!current || current.workspaceRuntimeId !== previous.workspaceRuntimeId || !runtime) continue
+      if (!current || current.workspaceRuntimeId !== previous.workspaceRuntimeId) continue
+      if (!runtime) {
+        nextState = { ...nextState, ...removeWorkspaceFromSessionState(nextState, previous.workspaceId) }
+        retiredTargets.push(previous)
+        continue
+      }
       if (runtime.workspaceRuntimeId === previous.workspaceRuntimeId) continue
-      if (workspaces === state.workspaces) workspaces = { ...state.workspaces }
-      workspaces[previous.workspaceId] = workspaceShellForReconciledRuntimeEpoch(
-        current,
-        runtime.workspaceRuntimeId,
-        runtime.workspaceProbe,
-      )
+      nextState = {
+        ...nextState,
+        workspaces: {
+          ...nextState.workspaces,
+          [previous.workspaceId]: workspaceShellForReconciledRuntimeEpoch(
+            current,
+            runtime.workspaceRuntimeId,
+            runtime.workspaceProbe,
+          ),
+        },
+      }
+      retiredTargets.push(previous)
       changedTargets.push({
         workspaceId: previous.workspaceId,
         previousWorkspaceRuntimeId: previous.workspaceRuntimeId,
         workspaceRuntimeId: runtime.workspaceRuntimeId,
       })
     }
-    return workspaces === state.workspaces ? state : { ...state, workspaces }
+    return nextState
   })
 
-  for (const changed of changedTargets) {
-    cancelWorkspaceCapabilityRefreshes(changed.workspaceId, changed.previousWorkspaceRuntimeId)
-    disposeRepoOperationScheduler(changed.workspaceId)
-    clearWorkspacePaneTabsProjectionState(changed.workspaceId, changed.previousWorkspaceRuntimeId)
+  for (const retired of retiredTargets) {
+    cancelWorkspaceCapabilityRefreshes(retired.workspaceId, retired.workspaceRuntimeId)
+    disposeRepoOperationScheduler(retired.workspaceId)
+    clearWorkspacePaneTabsProjectionState(retired.workspaceId, retired.workspaceRuntimeId)
     appQueryClient.removeQueries({
-      queryKey: repoDataQueryKey(changed.workspaceId, changed.previousWorkspaceRuntimeId),
+      queryKey: repoDataQueryKey(retired.workspaceId, retired.workspaceRuntimeId),
     })
-    disposeRepoRuntimeReadState(changed.workspaceId, changed.previousWorkspaceRuntimeId)
+    disposeRepoRuntimeReadState(retired.workspaceId, retired.workspaceRuntimeId)
   }
   for (const changed of changedTargets) {
     if (!isRemoteWorkspaceId(changed.workspaceId)) continue
     const runtime = runtimeByWorkspaceId.get(changed.workspaceId)
     if (runtime) acceptRemoteWorkspaceRuntimeProjection(set, get, runtime)
   }
-  acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
+  try {
+    const runtimeSnapshot = await invalidateWorkspaceRuntimes()
+    acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
+  } catch (err) {
+    workspacesLog.warn('failed to refresh the complete runtime snapshot after membership recovery', { err })
+  }
 
   const currentWorkspaces = get().workspaces
   const targets: SettledWorkspaceRuntimeMembershipRecovery['targets'] = []

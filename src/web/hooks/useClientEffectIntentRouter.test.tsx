@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'vue-sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
+import { provideDocumentClientEffectIntentIngress } from '#/web/hooks/client-effect-intent-ingress.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { themeStore } from '#/web/stores/theme.ts'
@@ -306,7 +307,7 @@ describe('useClientEffectIntentRouter', () => {
       currentBranchName: 'main',
     })
     currentWorkspaceId = repo.id
-    await flushTestUpdates(() => host.rerender(<HookHost />))
+    await flushTestUpdates(() => host.rerender(<IntentIngressTestHost />))
 
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
@@ -328,7 +329,7 @@ describe('useClientEffectIntentRouter', () => {
 
     currentWorkspaceId = repo.id
     await flushTestUpdates(async () => {
-      await host.rerender(<HookHost />)
+      await host.rerender(<IntentIngressTestHost />)
     })
 
     expect(nativeIntentSubscriptionStarts).toBe(1)
@@ -718,7 +719,7 @@ describe('useClientEffectIntentRouter', () => {
       focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor: vi.fn(() => Promise.resolve({ kind: 'not-committed' as const, message: null })),
     })
-    renderInJsdom(<HookHost />)
+    renderInJsdom(<IntentIngressTestHost />)
     seedInitialObservedWorkspacePaneRouteForTest({
       workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -870,8 +871,16 @@ function preferredWorkspacePaneTab(repoId: string) {
 }
 
 async function renderHookHost() {
-  return renderInJsdom(<HookHost />)
+  return renderInJsdom(<IntentIngressTestHost />)
 }
+
+const IntentIngressTestHost = defineComponent({
+  name: 'ClientEffectIntentIngressTestHost',
+  setup() {
+    provideDocumentClientEffectIntentIngress()
+    return () => <HookHost />
+  },
+})
 
 const HookHost = defineComponent({
   name: 'ClientEffectIntentRouterTestHost',

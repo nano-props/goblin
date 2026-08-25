@@ -1,4 +1,5 @@
-import { computed, defineComponent, onScopeDispose, watch } from 'vue'
+import { computed, defineComponent, onScopeDispose, ref, Teleport, watch } from 'vue'
+import { RefreshCw, TriangleAlert } from '@lucide/vue'
 import { appRealtimeClient } from '#/web/app/realtime/index.ts'
 import { readClientPageId } from '#/web/bridge/page-id.ts'
 import { terminalClient } from '#/web/terminal/client-facade.ts'
@@ -26,12 +27,19 @@ import { provideWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { resyncActiveRepoReadQueries } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import { subscribeServerCommandGenerationAdvance } from '#/web/lib/server-command-generation.ts'
+import { Button } from '#/web/components/ui/button.tsx'
+import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 
 export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
   name: 'AppRuntimeProjectionProvider',
   props: ['currentWorkspaceId'],
 
   setup(props, { slots }) {
+    const t = useT()
+    // This is presentation state for the document-local recovery workflow,
+    // never workspace or runtime authority.
+    const recoveryFailed = ref(false)
     const workspaceState = useStoreSelector(workspacesStore, (state) => state)
     const currentWorkspaceRuntimeId = computed(() =>
       props.currentWorkspaceId
@@ -81,6 +89,9 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         resyncActiveRepoReadQueries({
           get: workspacesStore.getState,
         }),
+      setRecoveryFailed: (failed) => {
+        recoveryFailed.value = failed
+      },
       logFailure: (error) => {
         appRuntimeProjectionLog.warn('failed to recover runtime projections', { error })
       },
@@ -185,7 +196,43 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
       window.removeEventListener('pageshow', onPageShow)
     })
 
-    return () => slots.default?.()
+    return () => (
+      <>
+        {slots.default?.()}
+        {recoveryFailed.value ? (
+          <Teleport to="body">
+            <div
+              data-testid="workspace-runtime-recovery-failure"
+              role="alert"
+              class="fixed left-4 right-4 top-12 z-40 rounded-md border border-warning-border bg-popover p-3 text-popover-foreground shadow-md min-[601px]:left-auto min-[601px]:w-[420px]"
+            >
+              <div class="flex items-start gap-3">
+                <div
+                  class={[
+                    'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border',
+                    STATUS_TONE_CHIP_CLASS.warning,
+                  ]}
+                >
+                  <TriangleAlert class="size-4" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-semibold leading-5">{t('runtime-recovery.failed-title')}</div>
+                  <div class="mt-0.5 break-words text-xs leading-5 text-muted-foreground">
+                    {t('runtime-recovery.failed-description')}
+                  </div>
+                  <div class="mt-2.5">
+                    <Button type="button" size="sm" variant="outline" onClick={() => projectionRecovery.request()}>
+                      <RefreshCw />
+                      {t('error.try-again')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Teleport>
+        ) : null}
+      </>
+    )
   },
 })
 

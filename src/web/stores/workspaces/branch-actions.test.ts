@@ -480,13 +480,13 @@ describe('runBranchAction', () => {
 
     const result = await workspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
 
-    expect(result).toEqual({ ok: false, message: 'error.operation-outcome-uncertain' })
+    expect(result).toBeNull()
     expect(
       requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction,
     ).toMatchObject({ phase: 'idle', target: null })
     expect(
       requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1),
-    ).toMatchObject({ result: { ok: false, message: 'error.operation-outcome-uncertain' } })
+    ).toMatchObject({ kind: 'uncertain', message: 'error.operation-outcome-uncertain' })
   })
 
   test('runs branch network actions independently of snapshot reads', async () => {

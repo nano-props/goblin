@@ -381,6 +381,39 @@ describe('settings source', () => {
     }
   })
 
+  test('returns only runtimes admitted from the requested durable membership', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+    previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+    process.env.GOBLIN_SERVER_DATA_DIR = tmp
+    const source = await import('#/server/settings/source.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
+    const recoveringClientId = 'client-recovering-membership'
+    runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+    try {
+      await source.addServerWorkspaceEntry({ id: REPO_A })
+      runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_B, 'client-opening-non-durable-workspace')
+
+      await expect(
+        source.reconcileWorkspaceRuntimeMemberships({
+          userId: RUNTIME_USER_ID,
+          clientId: recoveringClientId,
+          workspaceIds: [REPO_A, REPO_B],
+        }),
+      ).resolves.toEqual([expect.objectContaining({ workspaceId: REPO_A })])
+      expect(runtimes.captureWorkspaceRuntimeMembershipLease(RUNTIME_USER_ID, recoveringClientId).entries).toEqual([
+        expect.objectContaining({ workspaceId: REPO_A }),
+      ])
+      expect(runtimes.listWorkspaceRuntimes(RUNTIME_USER_ID)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ workspaceId: REPO_A }),
+          expect.objectContaining({ workspaceId: REPO_B }),
+        ]),
+      )
+    } finally {
+      runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+    }
+  })
+
   test('preserves runtime epochs when durable workspace removal fails to persist', async () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

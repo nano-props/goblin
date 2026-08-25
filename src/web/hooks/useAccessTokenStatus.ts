@@ -4,6 +4,7 @@ import { decodeWith } from '#/shared/http-response-schema.ts'
 import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { fetchServerJson, postServerCommandJson, ServerRequestError } from '#/web/lib/server-fetch.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 const AUTH_STATUS_TIMEOUT_MS = 15_000
 
@@ -58,7 +59,7 @@ export function useAccessTokenStatus(): AccessTokenStatusState {
     try {
       const urlLoginStatus = await exchangeUrlTokenForCookie(timeout.signal)
       if (currentGeneration !== generation) return
-      if (urlLoginStatus === 'unauthenticated' || urlLoginStatus === 'unavailable') {
+      if (urlLoginStatus !== 'check-current-auth') {
         status.state = urlLoginStatus
         return
       }
@@ -89,14 +90,15 @@ export function useAccessTokenStatus(): AccessTokenStatusState {
 
 async function exchangeUrlTokenForCookie(
   signal: AbortSignal,
-): Promise<'absent' | 'authenticated' | 'unauthenticated' | 'unavailable'> {
+): Promise<'check-current-auth' | 'unauthenticated' | 'unavailable'> {
   const urlToken = readAccessTokenFromUrl()
-  if (!urlToken) return 'absent'
+  if (!urlToken) return 'check-current-auth'
   stripAccessTokenFromUrl()
   try {
     await postServerCommandJson('/api/login', { token: urlToken }, decodeWith(OkResponseSchema), { signal })
-    return 'authenticated'
+    return 'check-current-auth'
   } catch (error) {
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return 'check-current-auth'
     return isUnauthorized(error) ? 'unauthenticated' : 'unavailable'
   }
 }
