@@ -42,6 +42,7 @@ import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-pro
 import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 import { resetServerCommandTransport } from '#/web/lib/server-command-transport.ts'
+import type { WorkspaceRuntimeMembershipRecoveryResult } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -599,11 +600,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('restarts an in-flight reconnect recovery after command transport reset', async () => {
     const repo = seedCurrentRepo()
-    const interruptedRecovery = Promise.withResolvers<{
-      kind: 'settled'
-      targets: Array<{ workspaceId: string; workspaceRuntimeId: string }>
-      changedTargets: []
-    }>()
+    const interruptedRecovery = Promise.withResolvers<WorkspaceRuntimeMembershipRecoveryResult>()
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships
       .mockReturnValueOnce(interruptedRecovery.promise)
       .mockResolvedValueOnce({
@@ -683,11 +680,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('invalidates a pending membership recovery when the provider unmounts', async () => {
     const repo = seedCurrentRepo()
-    const membershipRecovery = Promise.withResolvers<{
-      kind: 'settled'
-      targets: Array<{ workspaceId: string; workspaceRuntimeId: string }>
-      changedTargets: []
-    }>()
+    const membershipRecovery = Promise.withResolvers<WorkspaceRuntimeMembershipRecoveryResult>()
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockReturnValueOnce(membershipRecovery.promise)
     const result = renderRuntimeProvider(REPO_ID)
     await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())

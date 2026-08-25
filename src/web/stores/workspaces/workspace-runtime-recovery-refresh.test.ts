@@ -12,6 +12,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { CodedError } from '#/shared/coded-error.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/runtime-recovery-refresh')
 const NEXT_RUNTIME_ID = 'repo-runtime-recovery-refresh-123456789'
@@ -131,7 +132,9 @@ describe('workspace runtime recovery Refresh boundary', () => {
   test('settles an unchanged local runtime left probing by an interrupted recovery', async () => {
     const refresh = vi
       .fn<() => Promise<WorkspaceRefreshResult>>()
-      .mockResolvedValueOnce({ kind: 'stale-runtime' })
+      .mockRejectedValueOnce(
+        new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'workspace refresh outcome is uncertain' }),
+      )
       .mockResolvedValueOnce({ kind: 'committed', probe: readyGitProbe() })
     const snapshot = vi.fn(async () => repoSnapshotResponse())
     installGoblinTestBridge({

@@ -248,7 +248,7 @@ describe('native host startup lifecycle', () => {
     expect(mocks.quit).toHaveBeenCalledOnce()
   })
 
-  test('flushes renderer connections before resetting command transport after resume', async () => {
+  test('flushes default session connections before resetting renderer command transport after resume', async () => {
     const closing = Promise.withResolvers<void>()
     mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
     await import('#/main/main.ts')

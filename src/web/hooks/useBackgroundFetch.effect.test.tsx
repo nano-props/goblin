@@ -81,11 +81,7 @@ describe('useBackgroundFetch request lifecycle', () => {
   })
 
   test('redeclares the current target after command transport recovery', async () => {
-    mocks.setBackgroundSyncRepos.mockImplementationOnce((_targets, signal) => {
-      return new Promise((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
-      })
-    })
+    mocks.setBackgroundSyncRepos.mockImplementationOnce(waitForRegistrationAbort)
     const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
     const staleSignal = mocks.setBackgroundSyncRepos.mock.calls[0]?.[1]
@@ -104,11 +100,7 @@ describe('useBackgroundFetch request lifecycle', () => {
   test('retains an empty declaration across transport recovery after owner disposal', async () => {
     const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
-    mocks.setBackgroundSyncRepos.mockImplementationOnce((_targets, signal) => {
-      return new Promise((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
-      })
-    })
+    mocks.setBackgroundSyncRepos.mockImplementationOnce(waitForRegistrationAbort)
 
     view.unmount()
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
@@ -175,4 +167,11 @@ function renderBackgroundFetchHost(workspaceId: WorkspaceId, workspaceRuntimeId:
       <BackgroundFetchHost workspaceId={workspaceId} workspaceRuntimeId={workspaceRuntimeId} />
     </VueQueryClientScope>,
   )
+}
+
+function waitForRegistrationAbort(_targets: unknown, signal?: AbortSignal): Promise<void> {
+  if (!signal) throw new Error('background sync registration signal is required')
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+  })
 }

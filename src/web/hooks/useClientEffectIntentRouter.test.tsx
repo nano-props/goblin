@@ -56,14 +56,12 @@ import {
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type * as ServerCommandTransport from '#/web/lib/server-command-transport.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
 const commandTransportMocks = vi.hoisted(() => ({ reset: vi.fn() }))
 
-vi.mock('#/web/lib/server-command-transport.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof ServerCommandTransport>()),
+vi.mock('#/web/lib/server-command-transport.ts', () => ({
   resetServerCommandTransport: commandTransportMocks.reset,
 }))
 

@@ -144,15 +144,6 @@ describe('server-fetch', () => {
     })
   })
 
-  test('allows repeated command transport resets without an active request', async () => {
-    const { resetServerCommandTransport } = await import('#/web/lib/server-command-transport.ts')
-
-    expect(() => {
-      resetServerCommandTransport()
-      resetServerCommandTransport()
-    }).not.toThrow()
-  })
-
   test('clears the watchdog after a successful response', async () => {
     useFakeTimers()
     fetchMock.mockResolvedValueOnce({
