@@ -148,6 +148,13 @@ async function recoverClientTransportAfterResume(): Promise<void> {
     // window. Flush it before exposing a fresh renderer command generation.
     // The renderer abort owns deterministic settlement of active HTTP/1
     // requests, which Chromium may not close here immediately.
+    //
+    // This wait intentionally has no deadline. Opening the new generation
+    // while cleanup is still pending would let a late cleanup completion
+    // close connections created by post-resume commands. Electron 43.4.1
+    // provides no rejection path or cancellation handle for this operation,
+    // so a callback that never returns remains an accepted theoretical risk;
+    // changing that tradeoff requires a two-phase command admission boundary.
     await session.defaultSession.closeAllConnections()
   } catch (err) {
     // Electron 43.4.1's native binding resolves this Promise from the
