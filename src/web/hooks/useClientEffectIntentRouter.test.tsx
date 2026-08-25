@@ -56,8 +56,16 @@ import {
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import type * as ServerCommandTransport from '#/web/lib/server-command-transport.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
+
+const commandTransportMocks = vi.hoisted(() => ({ reset: vi.fn() }))
+
+vi.mock('#/web/lib/server-command-transport.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof ServerCommandTransport>()),
+  resetServerCommandTransport: commandTransportMocks.reset,
+}))
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentWorkspaceHistory: vi.fn(async () => {}),
@@ -106,6 +114,7 @@ beforeEach(() => {
   appDataClientMocks.removeWorkspaceFromSession.mockResolvedValue(undefined)
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
+  commandTransportMocks.reset.mockClear()
   overlayOpen = false
   workspaceShortcutSuppressed = false
   currentWorkspaceId = null
@@ -192,6 +201,18 @@ afterEach(() => {
 })
 
 describe('useClientEffectIntentRouter', () => {
+  test('resets command transport immediately on every native resume effect', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      emitIntent({ type: 'system-resumed' })
+      emitIntent({ type: 'system-resumed' })
+    })
+
+    expect(commandTransportMocks.reset).toHaveBeenCalledTimes(2)
+  })
+
   test('dispatches global dialogs while workspace bootstrap is still restoring', async () => {
     currentWorkspaceId = null
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }

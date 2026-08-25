@@ -27,6 +27,7 @@ import type { GitRemoteInfo } from '#/shared/git-types.ts'
 import { repoSnapshotResponse } from '#/web/stores/workspaces/refresh-test-utils.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-branch-actions-test-repo')
 const REPO_WORKTREE_PATH = '/tmp/goblin-branch-actions-test-repo'
 const refreshStoreAccess = { get: workspacesStore.getState, set: workspacesStore.setState }
@@ -468,6 +469,24 @@ describe('runBranchAction', () => {
       phase: 'idle',
       target: null,
     })
+  })
+
+  test('settles an uncertain branch command with the actionable recovery message', async () => {
+    installGoblinTestBridge({
+      'repo.pull': async () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost after delivery' })
+      },
+    })
+
+    const result = await workspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+
+    expect(result).toEqual({ ok: false, message: 'error.operation-outcome-uncertain' })
+    expect(
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction,
+    ).toMatchObject({ phase: 'idle', target: null })
+    expect(
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1),
+    ).toMatchObject({ result: { ok: false, message: 'error.operation-outcome-uncertain' } })
   })
 
   test('runs branch network actions independently of snapshot reads', async () => {

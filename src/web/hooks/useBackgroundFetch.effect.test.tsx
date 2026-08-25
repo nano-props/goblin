@@ -11,6 +11,7 @@ import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
+import { resetServerCommandTransport } from '#/web/lib/server-command-transport.ts'
 
 const mocks = vi.hoisted(() => ({
   setBackgroundSyncRepos: vi.fn(async (_targets: unknown, _signal?: AbortSignal) => {}),
@@ -77,6 +78,27 @@ describe('useBackgroundFetch request lifecycle', () => {
     expect(signal?.aborted).toBe(false)
     view.unmount()
     expect(signal?.aborted).toBe(true)
+  })
+
+  test('redeclares the current target after command transport recovery', async () => {
+    mocks.setBackgroundSyncRepos.mockImplementationOnce((_targets, signal) => {
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+    const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
+    const staleSignal = mocks.setBackgroundSyncRepos.mock.calls[0]?.[1]
+
+    resetServerCommandTransport()
+
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
+    expect(staleSignal?.aborted).toBe(true)
+    expect(mocks.setBackgroundSyncRepos.mock.calls[1]?.[0]).toEqual([
+      { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-background-sync' },
+    ])
+    expect(mocks.setBackgroundSyncRepos.mock.calls[1]?.[1]?.aborted).toBe(false)
+    view.unmount()
   })
 
   test('does not declare a Git target when the required repo snapshot has no remotes', async () => {

@@ -9,6 +9,7 @@ import { useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { goblinLog } from '#/web/logger.ts'
+import { subscribeServerCommandTransportReset } from '#/web/lib/server-command-transport.ts'
 
 function isExecutableGitWorkspace(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
   return !!repo && workspaceCanExecute(repo) && repo.capability.kind === 'git'
@@ -35,6 +36,8 @@ export function useBackgroundFetch({
   workspaceRuntimeId: MaybeRefOrGetter<string>
 }) {
   let hasDeclaredGitTarget = false
+  let currentTargets: GitBackgroundSyncTarget[] = []
+  let registrationController: AbortController | null = null
   const snapshotReadModel = useRepoSnapshotReadModel(
     () => toValue(workspaceId),
     () => toValue(workspaceRuntimeId),
@@ -43,31 +46,48 @@ export function useBackgroundFetch({
   const fetchSettings = useFetchSettings()
   const fetchEnabled = computed(() => fetchSettings.value.fetchIntervalSec > 0)
 
-  // This watch owns the server registration and aborts the superseded request
-  // whenever the authoritative target or fetch policy changes.
+  const declareCurrentTargets = () => {
+    registrationController?.abort('background-sync-registration-superseded')
+    const controller = new AbortController()
+    registrationController = controller
+    const targets = currentTargets
+    if (targets.length > 0) hasDeclaredGitTarget = true
+    void setBackgroundSyncRepos(targets, controller.signal)
+      .then(() => {
+        if (registrationController !== controller) return
+        if (targets.length === 0) hasDeclaredGitTarget = false
+      })
+      .catch((err: unknown) => {
+        if (registrationController !== controller) return
+        if (!controller.signal.aborted) goblinLog.warn('background sync registration failed', { err })
+      })
+  }
+
+  // This watch owns the authoritative declaration. A transport reset aborts
+  // every delivered command, so this declarative projection rehydrates from
+  // the complete current target instead of replaying an opaque mutation.
   watch(
     [() => toValue(workspaceId), () => toValue(workspaceRuntimeId), hasRemotes, fetchEnabled],
-    ([currentWorkspaceId, currentWorkspaceRuntimeId, remoteAvailable, enabled], _previous, onCleanup) => {
-      const targets: GitBackgroundSyncTarget[] =
+    ([currentWorkspaceId, currentWorkspaceRuntimeId, remoteAvailable, enabled]) => {
+      currentTargets =
         enabled && remoteAvailable
           ? [{ workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }]
           : []
-      if (targets.length === 0 && !hasDeclaredGitTarget) return
-      const controller = new AbortController()
-      onCleanup(() => controller.abort('background-sync-target-changed'))
-      if (targets.length > 0) hasDeclaredGitTarget = true
-      void setBackgroundSyncRepos(targets, controller.signal)
-        .then(() => {
-          if (targets.length === 0) hasDeclaredGitTarget = false
-        })
-        .catch((err: unknown) => {
-          if (!controller.signal.aborted) goblinLog.warn('background sync registration failed', { err })
-        })
+      if (currentTargets.length === 0 && !hasDeclaredGitTarget) return
+      declareCurrentTargets()
     },
     { immediate: true },
   )
 
+  const unsubscribeTransportReset = subscribeServerCommandTransportReset(() => {
+    if (currentTargets.length === 0 && !hasDeclaredGitTarget) return
+    declareCurrentTargets()
+  })
+
   onScopeDispose(() => {
+    unsubscribeTransportReset()
+    registrationController?.abort('background-sync-owner-disposed')
+    registrationController = null
     if (!hasDeclaredGitTarget) return
     hasDeclaredGitTarget = false
     void setBackgroundSyncRepos([]).catch((err: unknown) => {

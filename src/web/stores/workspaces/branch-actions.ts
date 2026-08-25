@@ -35,6 +35,7 @@ import {
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -237,7 +238,12 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
     const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
       throwIfStale(get, id, workspaceRuntimeId)
       ctx.setPhase('running')
-      return execute(workspaceRuntimeId, signal)
+      try {
+        return await execute(workspaceRuntimeId, signal)
+      } catch (error) {
+        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return failureResult('error.operation-outcome-uncertain')
+        throw error
+      }
     }
 
     if (network) {

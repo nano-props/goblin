@@ -121,6 +121,38 @@ describe('server-fetch', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  test('aborts the stale command generation and admits a fresh command after resume', async () => {
+    fetchMock.mockImplementationOnce((_url, init) => {
+      const signal = (init as RequestInit | undefined)?.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+
+    const { postServerCommandJson } = await import('#/web/lib/server-fetch.ts')
+    const { resetServerCommandTransport } = await import('#/web/lib/server-command-transport.ts')
+    const staleRequest = postServerCommandJson('/api/repo/pull', {}, decodeJson, { timeoutMs: 0 })
+    await Promise.resolve()
+
+    resetServerCommandTransport()
+
+    await expect(staleRequest).rejects.toMatchObject({ name: 'CodedError', code: 'OUTCOME_UNCERTAIN' })
+
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+    await expect(postServerCommandJson('/api/repo/pull', {}, decodeJson, { timeoutMs: 0 })).resolves.toEqual({
+      ok: true,
+    })
+  })
+
+  test('allows repeated command transport resets without an active request', async () => {
+    const { resetServerCommandTransport } = await import('#/web/lib/server-command-transport.ts')
+
+    expect(() => {
+      resetServerCommandTransport()
+      resetServerCommandTransport()
+    }).not.toThrow()
+  })
+
   test('clears the watchdog after a successful response', async () => {
     useFakeTimers()
     fetchMock.mockResolvedValueOnce({
