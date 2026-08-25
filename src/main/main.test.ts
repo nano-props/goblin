@@ -44,7 +44,7 @@ const mocks = vi.hoisted(() => {
     whenReady: vi.fn(() => whenReadyPromise),
     activatePrimaryWindow: vi.fn(() => Promise.resolve({})),
     closeAllConnections: vi.fn(() => Promise.resolve()),
-    getPrimaryWindow: vi.fn(),
+    broadcastClientEffectIntent: vi.fn(),
     assertDictionaryParity: vi.fn(),
     buildAppMenu: vi.fn(),
     flushWindowState: vi.fn(() => Promise.resolve(true)),
@@ -94,6 +94,9 @@ vi.mock('electron', () => ({
   powerMonitor: {
     on: mocks.powerMonitorOn,
   },
+  session: {
+    defaultSession: { closeAllConnections: mocks.closeAllConnections },
+  },
   // wireNativeHostIpc() registers IPC handlers; the test never reads
   // from them but the calls must not throw, so we expose a no-op ipcMain.
   ipcMain: {
@@ -115,8 +118,11 @@ vi.mock('#/main/native-settings-projection-sync.ts', () => ({
 
 vi.mock('#/main/window.ts', () => ({
   activatePrimaryWindow: mocks.activatePrimaryWindow,
-  getPrimaryWindow: mocks.getPrimaryWindow,
   sendExistingPrimaryWindowEffectIntent: mocks.sendExistingPrimaryWindowEffectIntent,
+}))
+
+vi.mock('#/main/client-surface-events.ts', () => ({
+  broadcastClientEffectIntent: mocks.broadcastClientEffectIntent,
 }))
 
 vi.mock('#/main/theme.ts', () => ({
@@ -205,14 +211,6 @@ describe('native host startup lifecycle', () => {
     mocks.sendExistingPrimaryWindowEffectIntent.mockResolvedValue(true)
     mocks.closeAllConnections.mockReset()
     mocks.closeAllConnections.mockResolvedValue()
-    mocks.getPrimaryWindow.mockReset()
-    mocks.getPrimaryWindow.mockReturnValue({
-      isDestroyed: () => false,
-      webContents: {
-        isDestroyed: () => false,
-        session: { closeAllConnections: mocks.closeAllConnections },
-      },
-    })
   })
 
   test('flushes settings and shortcut cleanup before exiting', async () => {
@@ -259,13 +257,13 @@ describe('native host startup lifecycle', () => {
 
     const recovering = emitPower('resume')
     await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledOnce())
-    expect(mocks.sendExistingPrimaryWindowEffectIntent).not.toHaveBeenCalledWith({ type: 'system-resumed' })
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({ type: 'system-resumed' })
 
     closing.resolve()
     await recovering
 
     await vi.waitFor(() => {
-      expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledWith({ type: 'system-resumed' })
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'system-resumed' })
     })
   })
 
@@ -283,11 +281,11 @@ describe('native host startup lifecycle', () => {
     closing.resolve()
     await vi.waitFor(() => {
       expect(mocks.closeAllConnections).toHaveBeenCalledTimes(2)
-      expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledTimes(2)
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledTimes(2)
     })
 
-    expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenNthCalledWith(1, { type: 'system-resumed' })
-    expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenNthCalledWith(2, { type: 'system-resumed' })
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenNthCalledWith(1, { type: 'system-resumed' })
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenNthCalledWith(2, { type: 'system-resumed' })
   })
 
   test('does not reset renderer transport when quit starts during resume cleanup', async () => {
@@ -308,7 +306,7 @@ describe('native host startup lifecycle', () => {
     await Promise.all([recovering, quitting])
     await flushMicrotasks()
 
-    expect(mocks.sendExistingPrimaryWindowEffectIntent).not.toHaveBeenCalledWith({ type: 'system-resumed' })
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({ type: 'system-resumed' })
   })
 
   test('does not wait for timeout when the client quit drain reports failure', async () => {

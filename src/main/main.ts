@@ -1,7 +1,8 @@
-import { app, dialog, ipcMain, powerMonitor } from 'electron'
+import { app, dialog, ipcMain, powerMonitor, session } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
-import { activatePrimaryWindow, getPrimaryWindow, sendExistingPrimaryWindowEffectIntent } from '#/main/window.ts'
+import { activatePrimaryWindow, sendExistingPrimaryWindowEffectIntent } from '#/main/window.ts'
+import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
 import { buildAppMenu } from '#/main/menu.ts'
@@ -51,7 +52,7 @@ interface ClientQuitDrainOwner {
   failDelivery: (error: unknown) => void
 }
 
-const requestPrimaryWindowTransportRecovery = createPrimaryWindowTransportRecoveryRequester()
+const requestClientTransportRecovery = createClientTransportRecoveryRequester()
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -139,41 +140,40 @@ async function activateClient(): Promise<void> {
   clientActivated = true
 }
 
-async function recoverPrimaryWindowTransportAfterResume(): Promise<void> {
+async function recoverClientTransportAfterResume(): Promise<void> {
   if (isQuitting) return
-  const win = getPrimaryWindow()
-  if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
   try {
-    // Flush pre-sleep pooled connections before the renderer exposes a fresh
-    // command generation. The renderer abort owns deterministic settlement of
-    // active HTTP/1 requests, which Chromium may not close here immediately.
-    await win.webContents.session.closeAllConnections()
+    // BrowserWindow does not set a partition, so the process-level default
+    // session owns this pool even while macOS keeps the app alive without a
+    // window. Flush it before exposing a fresh renderer command generation.
+    // The renderer abort owns deterministic settlement of active HTTP/1
+    // requests, which Chromium may not close here immediately.
+    await session.defaultSession.closeAllConnections()
   } catch (err) {
     // Electron 43.4.1's native binding resolves this Promise from the
     // NetworkContext callback and has no rejection path. This catch only
-    // protects a synchronous throw from a session destroyed after the checks
-    // above (and future binding changes). We still notify the surviving
-    // renderer because leaving its pre-resume commands pending would retain
-    // the known permanent-busy failure; this is not a successful cleanup path
-    // that silently ignores a normal closeAllConnections rejection.
+    // protects a synchronous binding failure and future implementation
+    // changes. We still notify any surviving renderer because leaving its
+    // pre-resume commands pending would retain the known permanent-busy
+    // failure; this is not a normal rejected-cleanup path being ignored.
     windowNodeLog.warn({ err }, 'failed to close renderer connections after system resume')
   }
   if (isQuitting) return
-  try {
-    await sendExistingPrimaryWindowEffectIntent({ type: 'system-resumed' })
-  } catch (err) {
-    windowNodeLog.warn({ err }, 'failed to reset renderer command transport after system resume')
-  }
+  // This lifecycle effect does not require exact-document acknowledgement.
+  // The preload listener spans the document lifetime and queues it until the
+  // Vue consumer mounts; if no surface exists, the broadcast is a no-op and a
+  // later document starts with a fresh command generation by construction.
+  broadcastClientEffectIntent({ type: 'system-resumed' })
 }
 
-function createPrimaryWindowTransportRecoveryRequester(): () => void {
+function createClientTransportRecoveryRequester(): () => void {
   let runningPromise: Promise<void> | null = null
   let pending = false
 
   const drain = async () => {
     while (pending && !isQuitting) {
       pending = false
-      await recoverPrimaryWindowTransportAfterResume()
+      await recoverClientTransportAfterResume()
     }
   }
 
@@ -232,7 +232,7 @@ async function initializeNativeHost(): Promise<void> {
   // System resume is an Electron-only transport lifecycle boundary. Browser
   // clients do not receive this native effect and retain their normal server
   // request lifecycle.
-  powerMonitor.on('resume', requestPrimaryWindowTransportRecovery)
+  powerMonitor.on('resume', requestClientTransportRecovery)
   await startEmbeddedServer()
   const settingsSnapshot = await getSettingsSnapshot()
   initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })

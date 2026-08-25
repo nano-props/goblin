@@ -327,6 +327,19 @@ describe('preload goblinNative bridge', () => {
     expect(nextConsumer).toHaveBeenCalledWith(queuedIntent)
   })
 
+  test('queues system resume until the renderer intent consumer mounts', () => {
+    const { goblinNative, ipcRenderer } = loadPreload()
+    const intentListener = ipcRenderer.on.mock.calls.find(
+      ([channel]) => channel === CLIENT_EFFECT_INTENT_CHANNEL,
+    )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
+
+    intentListener?.(null, { type: 'system-resumed' })
+    const consumer = vi.fn()
+    goblinNative.onIntent(consumer)
+
+    expect(consumer).toHaveBeenCalledWith({ type: 'system-resumed' })
+  })
+
   test('forwards access-token projection and rotation to their native IPC channels', async () => {
     // Token rotation exists only in the embedded Electron build because
     // main owns the canonical next-start token file.
