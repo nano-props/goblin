@@ -145,14 +145,13 @@ async function closeDefaultSessionConnectionsForResumeRecovery(): Promise<void> 
   try {
     // BrowserWindow uses the default session even while macOS keeps the app
     // alive without a window. Close its pool before opening a fresh command
-    // generation; advancing the renderer generation settles commands Chromium may
-    // leave open. This wait has no deadline: timing out would let late cleanup
-    // close fresh connections, so we accept the theoretical risk that this
-    // uncancellable call hangs.
+    // generation; advancing it settles client-side waits for stale commands as
+    // uncertain. This wait has no deadline: timing out would let late cleanup close
+    // fresh connections, so we accept the theoretical risk that this uncancellable
+    // call hangs.
     await session.defaultSession.closeAllConnections()
   } catch (err) {
-    // Electron currently has no asynchronous rejection path here. Still advance
-    // the renderer generation after a synchronous or future failure so commands settle.
+    // Cleanup failure must not strand renderer waits; still request a command reset.
     windowNodeLog.warn({ err }, 'failed to close renderer connections after system resume')
   }
 }

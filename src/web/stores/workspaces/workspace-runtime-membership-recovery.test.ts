@@ -54,20 +54,13 @@ describe('workspace runtime membership recovery', () => {
   })
 
   test('atomically advances a current repo shell to the reconciled server epoch', async () => {
-    const previousWorkspaceRuntimeId = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] }).workspaceRuntimeId
+    seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
 
     const result = await reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
 
     expect(result).toEqual({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-123456789012345678901' }],
-      changedTargets: [
-        {
-          workspaceId: REPO_ROOT,
-          previousWorkspaceRuntimeId,
-          workspaceRuntimeId: 'repo-runtime-123456789012345678901',
-        },
-      ],
     })
     const repo = workspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-123456789012345678901')
@@ -97,13 +90,17 @@ describe('workspace runtime membership recovery', () => {
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toMatchObject({ kind: 'settled', changedTargets: [] })
+    ).resolves.toMatchObject({ kind: 'settled' })
 
     expect(runWorkspaceRefresh).not.toHaveBeenCalled()
   })
 
   test('keeps membership recovery settled when the one-shot local refresh fails', async () => {
-    vi.mocked(runWorkspaceRefresh).mockResolvedValue({ ok: false, message: 'error.workspace-operation-failed' })
+    vi.mocked(runWorkspaceRefresh).mockResolvedValue({
+      ok: false,
+      kind: 'failed',
+      message: 'error.workspace-operation-failed',
+    })
     seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
 
     await expect(
@@ -111,7 +108,6 @@ describe('workspace runtime membership recovery', () => {
     ).resolves.toMatchObject({
       kind: 'settled',
       targets: [],
-      changedTargets: [{ workspaceId: REPO_ROOT }],
     })
     expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
   })
@@ -150,7 +146,6 @@ describe('workspace runtime membership recovery', () => {
     ).resolves.toMatchObject({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-first-123456789012345' }],
-      changedTargets: [{ workspaceId: REPO_ROOT }, { workspaceId: SECOND_REPO_ROOT }],
     })
     expect(runWorkspaceRefresh).toHaveBeenCalledTimes(2)
   })
@@ -158,7 +153,7 @@ describe('workspace runtime membership recovery', () => {
   test('attempts changed local runtimes in parallel and omits only the failed target', async () => {
     resetWorkspacesStore()
     const firstRefresh = Promise.withResolvers<{ ok: true }>()
-    const secondRefresh = Promise.withResolvers<{ ok: false; cancelled: true }>()
+    const secondRefresh = Promise.withResolvers<{ ok: false; kind: 'cancelled' }>()
     vi.mocked(runWorkspaceRefresh).mockImplementation((_, workspaceId) =>
       workspaceId === REPO_ROOT ? firstRefresh.promise : secondRefresh.promise,
     )
@@ -189,11 +184,10 @@ describe('workspace runtime membership recovery', () => {
     await vi.waitFor(() => expect(runWorkspaceRefresh).toHaveBeenCalledTimes(2))
 
     firstRefresh.resolve({ ok: true })
-    secondRefresh.resolve({ ok: false, cancelled: true })
+    secondRefresh.resolve({ ok: false, kind: 'cancelled' })
     await expect(recovery).resolves.toMatchObject({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-first-123456789012345' }],
-      changedTargets: [{ workspaceId: REPO_ROOT }, { workspaceId: SECOND_REPO_ROOT }],
     })
   })
 
@@ -257,7 +251,7 @@ describe('workspace runtime membership recovery', () => {
       ],
     })
 
-    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [], changedTargets: [] })
+    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [] })
     expect(reconcile).toHaveBeenNthCalledWith(1, expect.objectContaining({ workspaceIds: [REPO_ROOT] }))
     expect(reconcile).toHaveBeenNthCalledWith(2, expect.objectContaining({ workspaceIds: [] }))
   })
@@ -316,7 +310,6 @@ describe('workspace runtime membership recovery', () => {
     await expect(recovery).resolves.toMatchObject({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }],
-      changedTargets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }],
     })
     expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
     expect(reconcile).toHaveBeenNthCalledWith(
@@ -341,7 +334,7 @@ describe('workspace runtime membership recovery', () => {
     expect(runtimeOpen).not.toHaveBeenCalled()
 
     reconcileResponse.resolve({ runtimes: [] })
-    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [], changedTargets: [] })
+    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [] })
     await expect(open).resolves.toBe('repo-runtime-123456789012345678901')
     expect(runtimeOpen).toHaveBeenCalledOnce()
   })
@@ -572,9 +565,6 @@ describe('workspace runtime membership recovery', () => {
     ).resolves.toEqual({
       kind: 'settled',
       targets: [],
-      changedTargets: [
-        expect.objectContaining({ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: nextRemoteRuntimeId }),
-      ],
     })
     expect(remoteLifecycle).toHaveBeenCalledOnce()
   })
@@ -633,7 +623,6 @@ describe('workspace runtime membership recovery', () => {
     ).resolves.toEqual({
       kind: 'settled',
       targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: workspace.workspaceRuntimeId }],
-      changedTargets: [],
     })
 
     remoteEnsure.resolve({ kind: 'superseded', workspaceId: REMOTE_REPO_ROOT })

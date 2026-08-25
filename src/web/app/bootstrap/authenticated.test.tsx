@@ -81,6 +81,28 @@ beforeEach(() => {
 })
 
 describe('app bootstrap hooks', () => {
+  test('revokes previous workspace membership authority before starting a new restore', async () => {
+    const clientWorkspace = Promise.withResolvers<ClientWorkspaceState>()
+    mockedReadClientWorkspaceState.mockReturnValueOnce(clientWorkspace.promise)
+    workspacesStore.setState({
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+      sessionRestoreError: 'previous restore error',
+    })
+
+    const result = renderInJsdom(<Harness />)
+
+    expect(workspacesStore.getState()).toMatchObject({
+      workspaceMembershipReady: false,
+      sessionPersistenceReady: false,
+      sessionRestoreError: null,
+    })
+
+    clientWorkspace.resolve(defaultClientWorkspaceState())
+    await vi.waitFor(() => expect(result.container.textContent).toBe('ready'))
+    expect(workspacesStore.getState().workspaceMembershipReady).toBe(true)
+  })
+
   test('canonicalizes boot session pane state before applying it to the repos store', async () => {
     const targetKey = branchTargetKey('goblin+file:///tmp/repo', 'main')
     const session = workspaceRestoreFixture(

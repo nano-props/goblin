@@ -282,7 +282,15 @@ async function openLocalWorkspace(
   workspaceInput: string,
 ): Promise<OpenWorkspaceResult> {
   const prepared = await runWorkspaceRuntimeMembershipCommand(workspaceInput, async () => {
-    const opened = await openLocalWorkspaceRuntimeForCommandInput(workspaceInput)
+    let opened: RuntimeOpenResolvedWorkspace
+    try {
+      opened = await openLocalWorkspaceRuntimeForCommandInput(workspaceInput)
+    } catch (error) {
+      if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+        return { kind: 'uncertain' as const }
+      }
+      throw error
+    }
     if (!opened.workspace || !opened.workspaceRuntimeId) {
       return { kind: 'rejected' as const, message: opened.reason ?? 'error.workspace-open-failed' }
     }
@@ -302,7 +310,7 @@ async function openLocalWorkspace(
     }
     const initialRefresh = projectResolvedWorkspaceIntoSession(set, workspace, workspaceRuntimeId)
     return membershipOutcome === 'uncertain'
-      ? { kind: 'uncertain' as const, workspaceId: workspace.id }
+      ? { kind: 'uncertain' as const }
       : { kind: 'prepared' as const, workspace, initialRefresh }
   })
   if (prepared.kind === 'rejected') return { ok: false, kind: 'failed', message: prepared.message }
@@ -310,7 +318,6 @@ async function openLocalWorkspace(
     return {
       ok: false,
       kind: 'uncertain',
-      workspaceId: prepared.workspaceId,
       message: 'error.operation-outcome-uncertain',
     }
   }
@@ -333,20 +340,27 @@ async function openRemoteWorkspace(
   const prepared = await runWorkspaceCommand(entry.id, async () => {
     let openedWorkspaceRuntimeId: string | null = null
     if (!get().workspaces[entry.id]) {
-      await openWorkspaceRuntimeWithCache(entry.id, (workspaceRuntimeId) => {
-        openedWorkspaceRuntimeId = workspaceRuntimeId
-        set((state) => {
-          const result = insertPlaceholderWorkspace(
-            {
-              workspaces: state.workspaces,
-              workspaceOrder: state.workspaceOrder,
-            },
-            entry,
-            workspaceRuntimeId,
-          )
-          return { ...state, workspaces: result.workspaces, workspaceOrder: result.workspaceOrder }
+      try {
+        await openWorkspaceRuntimeWithCache(entry.id, (workspaceRuntimeId) => {
+          openedWorkspaceRuntimeId = workspaceRuntimeId
+          set((state) => {
+            const result = insertPlaceholderWorkspace(
+              {
+                workspaces: state.workspaces,
+                workspaceOrder: state.workspaceOrder,
+              },
+              entry,
+              workspaceRuntimeId,
+            )
+            return { ...state, workspaces: result.workspaces, workspaceOrder: result.workspaceOrder }
+          })
         })
-      })
+      } catch (error) {
+        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+          return { kind: 'uncertain' as const }
+        }
+        throw error
+      }
     }
     const workspaceRuntimeId = get().workspaces[entry.id]?.workspaceRuntimeId ?? null
     if (!workspaceRuntimeId) return null
@@ -364,7 +378,7 @@ async function openRemoteWorkspace(
       return null
     }
     return membershipOutcome === 'uncertain'
-      ? { kind: 'uncertain' as const, workspaceId: entry.id }
+      ? { kind: 'uncertain' as const }
       : { kind: 'prepared' as const, workspaceRuntimeId }
   })
   if (!prepared) return { ok: false, kind: 'failed', message: 'error.workspace-open-failed' }
@@ -372,7 +386,6 @@ async function openRemoteWorkspace(
     return {
       ok: false,
       kind: 'uncertain',
-      workspaceId: prepared.workspaceId,
       message: 'error.operation-outcome-uncertain',
     }
   }
@@ -384,7 +397,6 @@ async function openRemoteWorkspace(
     return {
       ok: false,
       kind: 'uncertain',
-      workspaceId: entry.id,
       message: 'error.operation-outcome-uncertain',
     }
   }

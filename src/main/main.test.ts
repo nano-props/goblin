@@ -248,7 +248,7 @@ describe('native host startup lifecycle', () => {
     expect(mocks.quit).toHaveBeenCalledOnce()
   })
 
-  test('closes default session connections before requesting a command generation advance', async () => {
+  test('closes default session connections before requesting a command reset', async () => {
     const closing = Promise.withResolvers<void>()
     mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
     await import('#/main/main.ts')
@@ -271,7 +271,7 @@ describe('native host startup lifecycle', () => {
     })
   })
 
-  test('requests one command generation advance after draining follow-up connection cleanup', async () => {
+  test('requests one command reset after draining follow-up connection cleanup', async () => {
     const firstClosing = Promise.withResolvers<void>()
     const secondClosing = Promise.withResolvers<void>()
     mocks.closeAllConnections.mockReturnValueOnce(firstClosing.promise).mockReturnValueOnce(secondClosing.promise)
@@ -295,7 +295,23 @@ describe('native host startup lifecycle', () => {
     })
   })
 
-  test('does not request a command generation advance when quit starts during resume cleanup', async () => {
+  test('still requests a command reset when connection cleanup fails', async () => {
+    mocks.closeAllConnections.mockRejectedValueOnce(new Error('connection cleanup failed'))
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
+
+    await emitPower('resume')
+
+    await vi.waitFor(() => {
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
+        type: 'server-command-reset-requested',
+      })
+    })
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledOnce()
+  })
+
+  test('does not request a command reset when quit starts during resume cleanup', async () => {
     const closing = Promise.withResolvers<void>()
     mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
     await import('#/main/main.ts')

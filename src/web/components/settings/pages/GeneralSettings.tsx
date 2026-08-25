@@ -15,6 +15,7 @@ import { COLOR_THEMES, isColorTheme } from '#/shared/color-theme.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { useSettingsMutation } from '#/web/settings/mutations.ts'
 
 export const GeneralSettings = defineComponent({
   name: 'GeneralSettings',
@@ -24,6 +25,9 @@ export const GeneralSettings = defineComponent({
     const langPref = useStoreSelector(i18nStore, (state) => state.pref)
     const { setPref: setThemePref, setColorTheme } = themeStore.getState()
     const setLangPref = i18nStore.getState().setPref
+    const colorThemeMutation = useSettingsMutation('color theme update', setColorTheme)
+    const themePrefMutation = useSettingsMutation('theme preference update', setThemePref)
+    const langPrefMutation = useSettingsMutation('language preference update', setLangPref)
     const appearanceOptions: { value: ThemePref; labelKey: string; icon: LucideIcon }[] = [
       { value: 'auto', labelKey: 'settings.appearance.auto', icon: Laptop },
       { value: 'light', labelKey: 'settings.appearance.light', icon: Sun },
@@ -53,7 +57,7 @@ export const GeneralSettings = defineComponent({
                   value={theme.value.colorTheme}
                   options={themePresetOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                   onChange={(value) => {
-                    if (typeof value === 'string' && isColorTheme(value)) void setColorTheme(value)
+                    if (typeof value === 'string' && isColorTheme(value)) colorThemeMutation.mutate(value)
                   }}
                 />
               }
@@ -67,7 +71,7 @@ export const GeneralSettings = defineComponent({
                   value={theme.value.pref}
                   options={appearanceOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
                   onChange={(value) => {
-                    if (value === 'auto' || value === 'light' || value === 'dark') void setThemePref(value)
+                    if (value === 'auto' || value === 'light' || value === 'dark') themePrefMutation.mutate(value)
                   }}
                 />
               }
@@ -85,7 +89,7 @@ export const GeneralSettings = defineComponent({
                   })}
                   onChange={(value) => {
                     if (value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja') {
-                      void setLangPref(value)
+                      langPrefMutation.mutate(value)
                     }
                   }}
                 />

@@ -166,12 +166,27 @@ describe('repo lifecycle', () => {
     expect(result).toEqual({
       ok: false,
       kind: 'uncertain',
-      workspaceId: REPO_A,
       message: 'error.operation-outcome-uncertain',
     })
     expect(workspacesStore.getState().workspaces[REPO_A]).toBeDefined()
     expect(workspacesStore.getState().workspaceOrder).toContain(REPO_A)
     expect(calls.recent).toEqual([])
+  })
+
+  test('stops local open automation when runtime admission is uncertain before identity resolves', async () => {
+    const calls = installGoblin({
+      'workspace.runtimeOpen': () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'runtime open outcome uncertain' })
+      },
+    })
+
+    await expect(workspacesStore.getState().openWorkspaceMembership('/tmp/uncertain-workspace')).resolves.toEqual({
+      ok: false,
+      kind: 'uncertain',
+      message: 'error.operation-outcome-uncertain',
+    })
+    expect(calls.workspaceEntries).toEqual([])
+    expect(workspacesStore.getState().workspaceOrder).toEqual([])
   })
 
   test('closeWorkspace keeps local state when shared membership persistence fails', async () => {
@@ -487,6 +502,25 @@ describe('repo lifecycle', () => {
     expect(workspacesStore.getState().workspaces[target.id]).toBeDefined()
   })
 
+  test('stops remote open automation when runtime admission is uncertain', async () => {
+    const target = standardRemoteTargetForTest()
+    const calls = installGoblin({
+      'workspace.runtimeOpen': () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'runtime open outcome uncertain' })
+      },
+    })
+
+    await expect(
+      workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target)),
+    ).resolves.toEqual({
+      ok: false,
+      kind: 'uncertain',
+      message: 'error.operation-outcome-uncertain',
+    })
+    expect(calls.workspaceEntries).toEqual([])
+    expect(workspacesStore.getState().workspaces[target.id]).toBeUndefined()
+  })
+
   test('stops remote open automation when lifecycle command outcome is uncertain', async () => {
     const target = standardRemoteTargetForTest()
     const calls = installGoblin({
@@ -500,7 +534,6 @@ describe('repo lifecycle', () => {
     ).resolves.toEqual({
       ok: false,
       kind: 'uncertain',
-      workspaceId: target.id,
       message: 'error.operation-outcome-uncertain',
     })
     expect(workspacesStore.getState().workspaces[target.id]).toBeDefined()
@@ -522,7 +555,6 @@ describe('repo lifecycle', () => {
     ).resolves.toEqual({
       ok: false,
       kind: 'uncertain',
-      workspaceId: target.id,
       message: 'error.operation-outcome-uncertain',
     })
     expect(lifecycle).not.toHaveBeenCalled()

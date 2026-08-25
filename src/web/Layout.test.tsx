@@ -39,7 +39,6 @@ const runtimeProjectionRecoveryMock = vi.hoisted(() => ({
   reconcileOpenWorkspaceRuntimeMemberships: vi.fn(async () => ({
     kind: 'settled' as const,
     targets: [],
-    changedTargets: [],
   })),
 }))
 const layoutQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -64,8 +63,7 @@ vi.mock('#/web/hooks/useClientWorkspacePersistence.ts', () => ({
   useClientWorkspacePersistence: clientWorkspacePersistence,
 }))
 
-vi.mock('#/web/stores/workspaces/workspace-runtime-membership-recovery.ts', async (importOriginal) => ({
-  ...(await importOriginal()),
+vi.mock('#/web/stores/workspaces/workspace-runtime-membership-recovery.ts', () => ({
   reconcileOpenWorkspaceRuntimeMemberships: runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships,
 }))
 

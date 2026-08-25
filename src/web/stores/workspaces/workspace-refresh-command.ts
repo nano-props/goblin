@@ -20,9 +20,9 @@ export interface WorkspaceRefreshStoreAccess {
 
 export type WorkspaceRefreshOutcome =
   | { ok: true }
-  | { ok: false; message: string }
-  | { ok: false; cancelled: true }
-  | { ok: false; uncertain: true; message: 'error.operation-outcome-uncertain' }
+  | { ok: false; kind: 'failed'; message: string }
+  | { ok: false; kind: 'cancelled' }
+  | { ok: false; kind: 'uncertain'; message: 'error.operation-outcome-uncertain' }
 
 const commands = new Map<string, Promise<WorkspaceRefreshOutcome>>()
 
@@ -32,9 +32,9 @@ export async function runWorkspaceRefresh(
   options?: { workspaceRuntimeId?: string },
 ): Promise<WorkspaceRefreshOutcome> {
   const workspace = store.get().workspaces[workspaceId]
-  if (!workspace) return { ok: false, cancelled: true }
+  if (!workspace) return { ok: false, kind: 'cancelled' }
   const workspaceRuntimeId = options?.workspaceRuntimeId ?? workspace.workspaceRuntimeId
-  if (workspace.workspaceRuntimeId !== workspaceRuntimeId) return { ok: false, cancelled: true }
+  if (workspace.workspaceRuntimeId !== workspaceRuntimeId) return { ok: false, kind: 'cancelled' }
   const key = `${workspaceId}\0${workspaceRuntimeId}`
   const existing = commands.get(key)
   if (existing) return existing
@@ -53,16 +53,18 @@ async function runWorkspaceRefreshOnce(
   workspaceRuntimeId: string,
 ): Promise<WorkspaceRefreshOutcome> {
   const outcome = await requestWorkspaceCapabilityRefresh(workspaceId, workspaceRuntimeId)
-  if (outcome.kind === 'cancelled') return { ok: false, cancelled: true }
+  if (outcome.kind === 'cancelled') return { ok: false, kind: 'cancelled' }
   if (outcome.kind === 'outcome-uncertain') {
-    return { ok: false, uncertain: true, message: 'error.operation-outcome-uncertain' }
+    return { ok: false, kind: 'uncertain', message: 'error.operation-outcome-uncertain' }
   }
-  if (outcome.kind === 'failed') return { ok: false, message: outcome.message }
+  if (outcome.kind === 'failed') return { ok: false, kind: 'failed', message: outcome.message }
   const refreshed: WorkspaceRefreshResult = outcome.result
-  if (refreshed.kind === 'stale-runtime') return { ok: false, message: 'error.workspace-runtime-stale' }
+  if (refreshed.kind === 'stale-runtime') {
+    return { ok: false, kind: 'failed', message: 'error.workspace-runtime-stale' }
+  }
   if (refreshed.kind === 'failed') {
     const diagnostic = refreshed.probe.status === 'ready' ? refreshed.probe.diagnostics[0]?.message : undefined
-    return { ok: false, message: diagnostic ?? 'error.workspace-operation-failed' }
+    return { ok: false, kind: 'failed', message: diagnostic ?? 'error.workspace-operation-failed' }
   }
   updateIfFresh(store.set, workspaceId, workspaceRuntimeId, (workspace) => {
     acceptWorkspaceProbeState(workspace, refreshed.probe)

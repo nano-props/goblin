@@ -121,6 +121,7 @@ describe('workspace refresh capability', () => {
 
     await expect(runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
       ok: false,
+      kind: 'failed',
       message: 'git timed out',
     })
 
@@ -138,6 +139,7 @@ describe('workspace refresh capability', () => {
 
     await expect(runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
       ok: false,
+      kind: 'failed',
       message: 'workspace transport unavailable',
     })
     expect(workspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('filesystem')
@@ -154,7 +156,7 @@ describe('workspace refresh capability', () => {
     await vi.waitFor(() => expect(refreshRequest).toHaveBeenCalledOnce())
     await expect(workspacesStore.getState().closeWorkspace(REPO_ID)).resolves.toEqual({ ok: true })
 
-    await expect(refresh).resolves.toEqual({ ok: false, cancelled: true })
+    await expect(refresh).resolves.toEqual({ ok: false, kind: 'cancelled' })
     expect(workspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
   })
 

@@ -19,11 +19,12 @@ import { repoOperationsQueryKey } from '#/web/repos/query-keys.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceRefreshOutcome } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 
 const refreshMocks = vi.hoisted(() => ({
-  run: vi.fn<() => Promise<{ ok: true } | { ok: false; message: string }>>(async () => ({ ok: true })),
+  run: vi.fn<() => Promise<WorkspaceRefreshOutcome>>(async () => ({ ok: true })),
 }))
-const toastMocks = vi.hoisted(() => ({ error: vi.fn() }))
+const toastMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
 
 vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
   runWorkspaceRefresh: refreshMocks.run,
@@ -36,6 +37,7 @@ beforeEach(() => {
   refreshMocks.run.mockReset()
   refreshMocks.run.mockResolvedValue({ ok: true })
   toastMocks.error.mockClear()
+  toastMocks.warning.mockClear()
   resetWorkspacesStore()
   // Empty dict so `t('key')` returns the key itself — lets the test
   // assert the exact key the tooltip wires up, independent of the
@@ -167,12 +169,35 @@ describe('RepoActivityControl', () => {
 
   test('presents capability refresh failures from the Git refresh button', async () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: false } })
-    refreshMocks.run.mockResolvedValueOnce({ ok: false, message: 'error.workspace-operation-failed' })
+    refreshMocks.run.mockResolvedValueOnce({
+      ok: false,
+      kind: 'failed',
+      message: 'error.workspace-operation-failed',
+    })
     const { container } = renderControl()
 
     await fireEvent.click(button(container))
 
     await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith('error.workspace-operation-failed'))
+  })
+
+  test('presents uncertain capability refresh outcomes without treating them as failures', async () => {
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: false } })
+    refreshMocks.run.mockResolvedValueOnce({
+      ok: false,
+      kind: 'uncertain',
+      message: 'error.operation-outcome-uncertain',
+    })
+    const { container } = renderControl()
+
+    await fireEvent.click(button(container))
+
+    await waitFor(() => {
+      expect(toastMocks.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
+        id: 'workspace-refresh-outcome-uncertain',
+      })
+    })
+    expect(toastMocks.error).not.toHaveBeenCalled()
   })
 
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {

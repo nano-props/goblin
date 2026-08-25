@@ -120,7 +120,6 @@ describe('workspace runtime recovery Refresh boundary', () => {
     ).resolves.toMatchObject({
       kind: 'settled',
       targets: [],
-      changedTargets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: NEXT_RUNTIME_ID }],
     })
     expect(refresh).toHaveBeenCalledOnce()
     expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({

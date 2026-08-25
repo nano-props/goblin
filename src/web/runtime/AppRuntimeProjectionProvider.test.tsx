@@ -108,7 +108,6 @@ describe('AppRuntimeProjectionProvider', () => {
         workspaceId: repo.id,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       })),
-      changedTargets: [],
     }))
     projectionMocks.resyncActiveRepoReadQueries.mockReset()
     projectionMocks.resyncActiveRepoReadQueries.mockResolvedValue(undefined)
@@ -432,13 +431,6 @@ describe('AppRuntimeProjectionProvider', () => {
       return {
         kind: 'settled' as const,
         targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: nextWorkspaceRuntimeId }],
-        changedTargets: [
-          {
-            workspaceId: REPO_ID,
-            previousWorkspaceRuntimeId: repo.workspaceRuntimeId,
-            workspaceRuntimeId: nextWorkspaceRuntimeId,
-          },
-        ],
       }
     })
     const result = renderRuntimeProvider(REPO_ID)
@@ -606,7 +598,6 @@ describe('AppRuntimeProjectionProvider', () => {
       .mockResolvedValueOnce({
         kind: 'settled',
         targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
-        changedTargets: [],
       })
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -696,7 +687,6 @@ describe('AppRuntimeProjectionProvider', () => {
     membershipRecovery.resolve({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
-      changedTargets: [],
     })
     await waitForNextMacrotask()
 

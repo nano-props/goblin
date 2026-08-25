@@ -23,16 +23,17 @@ export type WorkspaceRuntimeMembershipRecoveryResult =
   | {
       kind: 'settled'
       targets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
-      changedTargets: Array<{
-        workspaceId: WorkspaceId
-        previousWorkspaceRuntimeId: string
-        workspaceRuntimeId: string
-      }>
     }
   | { kind: 'superseded' }
 
 type SettledWorkspaceRuntimeMembershipRecovery = Extract<WorkspaceRuntimeMembershipRecoveryResult, { kind: 'settled' }>
+type ChangedWorkspaceRuntimeTarget = {
+  workspaceId: WorkspaceId
+  previousWorkspaceRuntimeId: string
+  workspaceRuntimeId: string
+}
 type CapturedWorkspaceRuntimeMembershipRecovery = SettledWorkspaceRuntimeMembershipRecovery & {
+  changedTargets: ChangedWorkspaceRuntimeTarget[]
   remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
 }
 type ReconciledWorkspaceRuntimeMembershipRecovery = CapturedWorkspaceRuntimeMembershipRecovery | { kind: 'superseded' }
@@ -103,7 +104,6 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   return {
     kind: 'settled',
     targets: recovery.targets.filter((target) => !ineligibleWorkspaceIds.has(target.workspaceId)),
-    changedTargets: recovery.changedTargets,
   }
 }
 
@@ -134,7 +134,7 @@ async function settleWorkspaceRuntimeForProjection(
       workspaceRuntimeId: target.workspaceRuntimeId,
     })
     if (outcome.ok) return true
-    if ('cancelled' in outcome) return false
+    if (outcome.kind === 'cancelled') return false
     workspacesLog.warn('workspace refresh did not settle the local runtime for projection recovery', {
       workspaceId: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
@@ -188,7 +188,7 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
     )
   )
     return null
-  const changedTargets: SettledWorkspaceRuntimeMembershipRecovery['changedTargets'] = []
+  const changedTargets: ChangedWorkspaceRuntimeTarget[] = []
 
   set((state) => {
     let workspaces = state.workspaces

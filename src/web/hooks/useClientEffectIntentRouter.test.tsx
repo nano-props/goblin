@@ -56,6 +56,7 @@ import {
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
@@ -599,7 +600,6 @@ describe('useClientEffectIntentRouter', () => {
     first.resolve({
       ok: false,
       kind: 'uncertain',
-      workspaceId: firstWorkspaceId,
       message: 'error.operation-outcome-uncertain',
     })
     await flushTestUpdates(() => {})
@@ -831,6 +831,23 @@ describe('useClientEffectIntentRouter', () => {
 
     await waitFor(() => {
       expect(appDataClientMocks.clearRecentWorkspaceHistory).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  test('surfaces an uncertain app intent outcome once', async () => {
+    appDataClientMocks.clearRecentWorkspaceHistory.mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'clear recent outcome uncertain' }),
+    )
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      emitIntent({ type: 'clear-recent-workspaces-requested' })
+    })
+
+    await waitFor(() => {
+      expect(toast.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
+        id: 'intent-operation-outcome-uncertain',
+      })
     })
   })
 })

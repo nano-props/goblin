@@ -25,6 +25,7 @@ import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { clientEffectIntentRequiresWorkspaceBootstrap } from '#/web/hooks/client-effect-intent-plans.ts'
 import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 interface ClientEffectIntentRouterOptions {
   authenticatedBootstrapState: MaybeRefOrGetter<AuthenticatedAppBootstrapState>
@@ -94,6 +95,10 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
     if (disposed) return
     void executeClientEffectIntent(intent).catch((err) => {
       intentLog.warn(`${intent.type} failed`, { err })
+      if (hasErrorCode(err, 'OUTCOME_UNCERTAIN')) {
+        const messageKey = 'error.operation-outcome-uncertain'
+        toast.warning(t(messageKey), { id: 'intent-operation-outcome-uncertain' })
+      }
     })
   }
 
