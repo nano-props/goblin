@@ -204,8 +204,8 @@ describe('useClientEffectIntentRouter', () => {
     await renderHookHost()
 
     await flushTestUpdates(() => {
-      emitIntent({ type: 'server-command-generation-advance-requested' })
-      emitIntent({ type: 'server-command-generation-advance-requested' })
+      emitIntent({ type: 'server-command-reset-requested' })
+      emitIntent({ type: 'server-command-reset-requested' })
     })
 
     expect(commandGenerationMocks.advance).toHaveBeenCalledTimes(2)

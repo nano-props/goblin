@@ -177,7 +177,7 @@ function createRendererCommandRecoveryRequester(): () => void {
     // The preload listener spans the document lifetime and queues it until the
     // Vue consumer mounts; if no surface exists, the broadcast is a no-op and
     // a later document starts with a fresh command generation by construction.
-    broadcastClientEffectIntent({ type: 'server-command-generation-advance-requested' })
+    broadcastClientEffectIntent({ type: 'server-command-reset-requested' })
   }
 
   return () => {

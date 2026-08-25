@@ -101,7 +101,7 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
     switch (intent.type) {
       case 'app-quitting':
         return
-      case 'server-command-generation-advance-requested':
+      case 'server-command-reset-requested':
         advanceServerCommandGeneration()
         return
       case 'external-open-enqueued':

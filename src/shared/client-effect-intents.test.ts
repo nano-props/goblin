@@ -3,7 +3,7 @@ import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 describe('isClientEffectIntent', () => {
   test('accepts a server command generation advance request', () => {
-    expect(isClientEffectIntent({ type: 'server-command-generation-advance-requested' })).toBe(true)
+    expect(isClientEffectIntent({ type: 'server-command-reset-requested' })).toBe(true)
   })
 
   test('accepts tab close without a window-close variant', () => {

@@ -85,9 +85,9 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         appRuntimeProjectionLog.warn('failed to recover runtime projections', { error })
       },
     })
-    // Membership is a complete declaration owned by this provider. Rehydrate
-    // it on the fresh command generation so an interrupted projection recovery
-    // cannot leave runtime projections permanently stale.
+    // Complete membership recovery belongs to the authenticated app lifecycle,
+    // even without an active workspace route; re-declare it after a command
+    // reset so interrupted recovery cannot leave projections stale.
     const offGenerationAdvance = subscribeServerCommandGenerationAdvance(() => {
       if (workspacesStore.getState().workspaceMembershipReady) projectionRecovery.request()
     })

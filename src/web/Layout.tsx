@@ -205,7 +205,9 @@ const AuthenticatedAppShell = defineComponent({
     return () => (
       <TerminalSessionProvider>
         <AppNavigationProvider value={navigation.value}>
-          {renderShellContent()}
+          <AppRuntimeProjectionProvider currentWorkspaceId={runtime.hydratedRouteWorkspaceId.value}>
+            {renderShellContent()}
+          </AppRuntimeProjectionProvider>
           <AppGlobalOverlays overlays={overlays} />
         </AppNavigationProvider>
       </TerminalSessionProvider>
@@ -259,25 +261,23 @@ const AuthenticatedWorkspaceShell = defineComponent<{ runtime: AuthenticatedAppR
             navigateToSettingsShortcuts={runtime.navigateToSettingsShortcuts}
             navigateToIndex={runtime.navigateToIndex}
           />
-          <AppRuntimeProjectionProvider currentWorkspaceId={runtime.hydratedRouteWorkspaceId.value}>
-            <div
-              class="relative flex h-full flex-col"
-              onDragenter={workspaceDrop.onDragEnter}
-              onDragover={workspaceDrop.onDragOver}
-              onDragleave={workspaceDrop.onDragLeave}
-              onDrop={workspaceDrop.onDrop}
-            >
-              <RouterView />
-              <WorkspaceContextOverlays
-                workspaceDrop={workspaceDrop}
-                navigation={currentNavigation}
-                hydratedRouteWorkspaceId={runtime.hydratedRouteWorkspaceId.value}
-                currentWorkspaceRuntimeId={runtime.commandWorkspaceRuntimeId.value}
-                currentBranchName={runtime.currentBranchName.value}
-                currentWorkspacePaneRoute={runtime.currentWorkspacePaneRoute.value}
-              />
-            </div>
-          </AppRuntimeProjectionProvider>
+          <div
+            class="relative flex h-full flex-col"
+            onDragenter={workspaceDrop.onDragEnter}
+            onDragover={workspaceDrop.onDragOver}
+            onDragleave={workspaceDrop.onDragLeave}
+            onDrop={workspaceDrop.onDrop}
+          >
+            <RouterView />
+            <WorkspaceContextOverlays
+              workspaceDrop={workspaceDrop}
+              navigation={currentNavigation}
+              hydratedRouteWorkspaceId={runtime.hydratedRouteWorkspaceId.value}
+              currentWorkspaceRuntimeId={runtime.commandWorkspaceRuntimeId.value}
+              currentBranchName={runtime.currentBranchName.value}
+              currentWorkspacePaneRoute={runtime.currentWorkspacePaneRoute.value}
+            />
+          </div>
         </>
       )
     }

@@ -258,7 +258,7 @@ describe('native host startup lifecycle', () => {
     const recovering = emitPower('resume')
     await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledOnce())
     expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({
-      type: 'server-command-generation-advance-requested',
+      type: 'server-command-reset-requested',
     })
 
     closing.resolve()
@@ -266,7 +266,7 @@ describe('native host startup lifecycle', () => {
 
     await vi.waitFor(() => {
       expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
-        type: 'server-command-generation-advance-requested',
+        type: 'server-command-reset-requested',
       })
     })
   })
@@ -291,7 +291,7 @@ describe('native host startup lifecycle', () => {
     await vi.waitFor(() => expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledOnce())
 
     expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
-      type: 'server-command-generation-advance-requested',
+      type: 'server-command-reset-requested',
     })
   })
 
@@ -314,7 +314,7 @@ describe('native host startup lifecycle', () => {
     await flushMicrotasks()
 
     expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({
-      type: 'server-command-generation-advance-requested',
+      type: 'server-command-reset-requested',
     })
   })
 

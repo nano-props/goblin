@@ -15,6 +15,8 @@ import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authent
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
+import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 const authenticatedBootstrapMock = vi.hoisted(() => ({
@@ -33,6 +35,13 @@ const clientIntentIngress = vi.hoisted(() => ({
   subscriptionStarts: 0,
 }))
 const clientWorkspacePersistence = vi.hoisted(() => vi.fn())
+const runtimeProjectionRecoveryMock = vi.hoisted(() => ({
+  reconcileOpenWorkspaceRuntimeMemberships: vi.fn(async () => ({
+    kind: 'settled' as const,
+    targets: [],
+    changedTargets: [],
+  })),
+}))
 const layoutQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
 vi.mock('#/web/auth/AuthProvider.tsx', () => ({
@@ -53,6 +62,11 @@ vi.mock('#/web/bridge/ingress.ts', () => ({
 
 vi.mock('#/web/hooks/useClientWorkspacePersistence.ts', () => ({
   useClientWorkspacePersistence: clientWorkspacePersistence,
+}))
+
+vi.mock('#/web/stores/workspaces/workspace-runtime-membership-recovery.ts', async (importOriginal) => ({
+  ...(await importOriginal()),
+  reconcileOpenWorkspaceRuntimeMemberships: runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships,
 }))
 
 vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
@@ -173,10 +187,38 @@ beforeEach(() => {
   clientIntentIngress.listeners.clear()
   clientIntentIngress.subscriptionStarts = 0
   clientWorkspacePersistence.mockClear()
+  runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
+  workspacesStore.setState({ workspaceMembershipReady: false })
   layoutQueryClient.clear()
 })
 
 describe('Layout shell providers', () => {
+  test('keeps runtime projection recovery active across the settings route', async () => {
+    workspacesStore.setState({ workspaceMembershipReady: true })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: { template: '<div>workspace</div>' } },
+        { path: '/settings/general', name: 'settings', component: { template: '<div>settings</div>' } },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
+    renderLayout(router)
+
+    await flushTestUpdates(async () => await router.push('/settings/general'))
+    advanceServerCommandGeneration()
+    await waitFor(() =>
+      expect(runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce(),
+    )
+
+    await flushTestUpdates(async () => await router.push('/'))
+    advanceServerCommandGeneration()
+    await waitFor(() =>
+      expect(runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2),
+    )
+  })
+
   test('owns the intent router on settings and keeps the single preload consumer across route changes', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
