@@ -25,6 +25,7 @@ import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pa
 import { provideWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { resyncActiveRepoReadQueries } from '#/web/stores/workspaces/repo-refresh-actions.ts'
+import { subscribeServerCommandTransportReset } from '#/web/lib/server-command-transport.ts'
 
 export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
   name: 'AppRuntimeProjectionProvider',
@@ -83,6 +84,12 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
       logFailure: (error) => {
         appRuntimeProjectionLog.warn('failed to recover runtime projections after reconnect', { error })
       },
+    })
+    // Membership is a complete declaration owned by this provider. Rehydrate
+    // it on the fresh command generation so a realtime recovery interrupted by
+    // native resume cannot leave runtime projections permanently stale.
+    const unsubscribeTransportReset = subscribeServerCommandTransportReset(() => {
+      if (workspacesStore.getState().workspaceMembershipReady) reconnectRecovery.request()
     })
     useRepoStoreInvalidationRefresh(() => {
       if (workspacesStore.getState().workspaceMembershipReady) reconnectRecovery.request()
@@ -171,6 +178,7 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
     )
 
     onScopeDispose(() => {
+      unsubscribeTransportReset()
       reconnectRecovery.invalidate()
       scopeRegistry.disposeScopes()
       document.removeEventListener('visibilitychange', onVisibilityChange)

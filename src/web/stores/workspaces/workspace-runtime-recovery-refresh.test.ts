@@ -127,4 +127,46 @@ describe('workspace runtime recovery Refresh boundary', () => {
       capability: { kind: 'probing' },
     })
   })
+
+  test('settles an unchanged local runtime left probing by an interrupted recovery', async () => {
+    const refresh = vi
+      .fn<() => Promise<WorkspaceRefreshResult>>()
+      .mockResolvedValueOnce({ kind: 'stale-runtime' })
+      .mockResolvedValueOnce({ kind: 'committed', probe: readyGitProbe() })
+    const snapshot = vi.fn(async () => repoSnapshotResponse())
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: WORKSPACE_ID,
+            workspaceRuntimeId: NEXT_RUNTIME_ID,
+            workspaceProbe: { status: 'probing' as const },
+          },
+        ],
+      }),
+      'workspace.refresh': refresh,
+      'repo.snapshot': snapshot,
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+    ).resolves.toMatchObject({ kind: 'settled', targets: [] })
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
+      workspaceRuntimeId: NEXT_RUNTIME_ID,
+      capability: { kind: 'probing' },
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      targets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: NEXT_RUNTIME_ID }],
+    })
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(snapshot).toHaveBeenCalledOnce()
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
+      workspaceRuntimeId: NEXT_RUNTIME_ID,
+      capability: { kind: 'git', probe: { status: 'ready' } },
+    })
+  })
 })

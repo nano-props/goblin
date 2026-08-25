@@ -32,19 +32,18 @@ export type WorkspaceRuntimeMembershipRecoveryResult =
   | { kind: 'superseded' }
 
 type SettledWorkspaceRuntimeMembershipRecovery = Extract<WorkspaceRuntimeMembershipRecoveryResult, { kind: 'settled' }>
-type ReconciledWorkspaceRuntimeMembershipRecovery = WorkspaceRuntimeMembershipRecoveryResult & {
-  remoteEnsureTargets?: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
-}
 type CapturedWorkspaceRuntimeMembershipRecovery = SettledWorkspaceRuntimeMembershipRecovery & {
   remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
 }
-type ChangedWorkspaceRuntimeTarget = SettledWorkspaceRuntimeMembershipRecovery['changedTargets'][number]
+type ReconciledWorkspaceRuntimeMembershipRecovery = CapturedWorkspaceRuntimeMembershipRecovery | { kind: 'superseded' }
+type WorkspaceRuntimeRecoveryTarget = SettledWorkspaceRuntimeMembershipRecovery['targets'][number]
 
 /**
  * Re-declares this window's complete workspace membership after realtime recovery,
  * then atomically advances every still-current shell to the server's canonical
- * runtime epoch. Changed targets remain eligible for downstream projection
- * recovery only after their one-shot capability command succeeds.
+ * runtime epoch. Changed targets and local targets left probing by an earlier
+ * interrupted recovery remain eligible for downstream projection recovery only
+ * after their one-shot capability command succeeds.
  *
  * Capability commands stay outside membership admission. #359 accepts that
  * overlapping recovery may project a settling epoch instead of adding generation joining.
@@ -63,7 +62,7 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
       .map((target) => target.workspaceId),
   )
   void Promise.all(
-    (recovery.remoteEnsureTargets ?? [])
+    recovery.remoteEnsureTargets
       .filter((target) => !changedRemoteWorkspaceIds.has(target.workspaceId))
       .map(async (target) => {
         await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
@@ -74,13 +73,23 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   ).catch((err) => {
     workspacesLog.warn('failed to ensure remote lifecycle after runtime membership recovery', { err })
   })
-  const remoteEnsureWorkspaceIds = new Set((recovery.remoteEnsureTargets ?? []).map((target) => target.workspaceId))
+  const remoteEnsureWorkspaceIds = new Set(recovery.remoteEnsureTargets.map((target) => target.workspaceId))
+  const changedWorkspaceIds = new Set(recovery.changedTargets.map((target) => target.workspaceId))
+  const settlementTargets = recovery.targets.filter((target) => {
+    if (changedWorkspaceIds.has(target.workspaceId)) return true
+    const workspace = get().workspaces[target.workspaceId]
+    return (
+      !isRemoteWorkspaceId(target.workspaceId) &&
+      workspace?.workspaceRuntimeId === target.workspaceRuntimeId &&
+      workspace.capability.kind === 'probing'
+    )
+  })
   // Settle one batch before projection recovery. #359 accepts cross-workspace
   // delay instead of adding per-target generation coordination.
-  const changedTargetEligibility = await Promise.all(
-    recovery.changedTargets.map(async (target) => ({
+  const settlementEligibility = await Promise.all(
+    settlementTargets.map(async (target) => ({
       workspaceId: target.workspaceId,
-      eligible: await settleChangedWorkspaceRuntimeForProjection(
+      eligible: await settleWorkspaceRuntimeForProjection(
         set,
         get,
         target,
@@ -89,7 +98,7 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
     })),
   )
   const ineligibleWorkspaceIds = new Set(
-    changedTargetEligibility.filter((target) => !target.eligible).map((target) => target.workspaceId),
+    settlementEligibility.filter((target) => !target.eligible).map((target) => target.workspaceId),
   )
   return {
     kind: 'settled',
@@ -98,10 +107,10 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   }
 }
 
-async function settleChangedWorkspaceRuntimeForProjection(
+async function settleWorkspaceRuntimeForProjection(
   set: WorkspacesSet,
   get: WorkspacesGet,
-  target: ChangedWorkspaceRuntimeTarget,
+  target: WorkspaceRuntimeRecoveryTarget,
   remoteEnsureRequired: boolean,
 ): Promise<boolean> {
   if (isRemoteWorkspaceId(target.workspaceId)) {
@@ -223,15 +232,16 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   const targets: SettledWorkspaceRuntimeMembershipRecovery['targets'] = []
   const remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }> = []
   for (const { workspaceId } of captured) {
-    const currentWorkspaceRuntimeId = currentWorkspaces[workspaceId]?.workspaceRuntimeId
-    if (!currentWorkspaceRuntimeId) continue
-    targets.push({ workspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId })
+    const currentWorkspace = currentWorkspaces[workspaceId]
+    if (!currentWorkspace) continue
+    const target = { workspaceId, workspaceRuntimeId: currentWorkspace.workspaceRuntimeId }
+    targets.push(target)
 
     const runtime = runtimeByWorkspaceId.get(workspaceId)
     if (
       runtime &&
       isRemoteWorkspaceId(workspaceId) &&
-      currentWorkspaceRuntimeId === runtime.workspaceRuntimeId &&
+      currentWorkspace.workspaceRuntimeId === runtime.workspaceRuntimeId &&
       ['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
     ) {
       remoteEnsureTargets.push({ workspaceId, workspaceRuntimeId: runtime.workspaceRuntimeId })

@@ -41,6 +41,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
+import { resetServerCommandTransport } from '#/web/lib/server-command-transport.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -591,6 +592,69 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
       await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('restarts an in-flight reconnect recovery after command transport reset', async () => {
+    const repo = seedCurrentRepo()
+    const interruptedRecovery = Promise.withResolvers<{
+      kind: 'settled'
+      targets: Array<{ workspaceId: string; workspaceRuntimeId: string }>
+      changedTargets: []
+    }>()
+    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships
+      .mockReturnValueOnce(interruptedRecovery.promise)
+      .mockResolvedValueOnce({
+        kind: 'settled',
+        targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
+        changedTargets: [],
+      })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      recoverSessionsMock.mockClear()
+      listWorkspaceTabsMock.mockClear()
+      projectionMocks.resyncActiveRepoReadQueries.mockClear()
+
+      await flushTestUpdates(() => recoveredHandler?.('client_sharedterminal'))
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
+
+      resetServerCommandTransport()
+      interruptedRecovery.reject(new Error('command transport reset'))
+
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
+      expect(recoverSessionsMock).toHaveBeenCalledOnce()
+      expect(listWorkspaceTabsMock).toHaveBeenCalledOnce()
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('does not recover membership after the provider releases its transport reset subscription', async () => {
+    seedCurrentRepo()
+    const result = renderRuntimeProvider(REPO_ID)
+    await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
+
+    result.unmount()
+    resetServerCommandTransport()
+    await waitForNextMacrotask()
+
+    expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()
+  })
+
+  test('does not recover membership on transport reset before membership is authoritative', async () => {
+    seedCurrentRepo()
+    workspacesStore.setState({ workspaceMembershipReady: false })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      resetServerCommandTransport()
+      await waitForNextMacrotask()
+
+      expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()
     } finally {
       result.unmount()
     }
