@@ -110,6 +110,7 @@ vi.mock('node:fs', async () => {
 
 vi.mock('#/server/settings/source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
+  reconcileWorkspaceRuntimeMemberships: vi.fn(async () => []),
 }))
 
 const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {

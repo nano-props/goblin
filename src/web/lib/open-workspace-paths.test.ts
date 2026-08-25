@@ -72,6 +72,26 @@ describe('openWorkspacePaths', () => {
     expect(activateWorkspace).not.toHaveBeenCalled()
   })
 
+  test('does not navigate to an earlier success after a later open becomes uncertain', async () => {
+    const firstWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
+    const openWorkspaceMembership = vi
+      .fn<(path: string) => Promise<OpenWorkspaceResult>>()
+      .mockResolvedValueOnce({ ok: true, workspaceId: firstWorkspaceId })
+      .mockResolvedValueOnce({
+        ok: false,
+        kind: 'uncertain',
+        message: 'error.operation-outcome-uncertain',
+      })
+    const activateWorkspace = vi.fn()
+
+    await expect(
+      openWorkspacePaths(['/tmp/a', '/tmp/b'], { openWorkspaceMembership, activateWorkspace }),
+    ).resolves.toBeNull()
+
+    expect(openWorkspaceMembership).toHaveBeenCalledTimes(2)
+    expect(activateWorkspace).not.toHaveBeenCalled()
+  })
+
   test('reports post-open errors without treating the path as failed', async () => {
     const openWorkspaceMembership = vi.fn<(path: string) => Promise<OpenWorkspaceResult>>().mockResolvedValue({
       ok: true,

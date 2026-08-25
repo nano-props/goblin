@@ -95,6 +95,20 @@ describe('workspace runtime membership recovery', () => {
     expect(runWorkspaceRefresh).not.toHaveBeenCalled()
   })
 
+  test('does not recover a local shell omitted from the canonical runtime response', async () => {
+    const workspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({ runtimes: [] }),
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+    ).resolves.toEqual({ kind: 'settled', targets: [] })
+
+    expect(workspacesStore.getState().workspaces[REPO_ROOT]).toBe(workspace)
+    expect(runWorkspaceRefresh).not.toHaveBeenCalled()
+  })
+
   test('keeps membership recovery settled when the one-shot local refresh fails', async () => {
     vi.mocked(runWorkspaceRefresh).mockResolvedValue({
       ok: false,

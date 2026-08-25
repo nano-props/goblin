@@ -5,7 +5,7 @@ import {
   SettingsPersistenceWriteError,
   writeUserSettingsJson,
 } from '#/server/settings/persistence.ts'
-import type { ServerWorkspaceState } from '#/shared/api-types.ts'
+import type { ServerWorkspaceState, WorkspaceRuntimeEntry } from '#/shared/api-types.ts'
 import type { UserSettings } from '#/shared/settings.ts'
 import {
   normalizeWorkspaceSessionEntry,
@@ -44,6 +44,7 @@ import type {
 import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 import {
   closeWorkspaceRuntimesForDurableRemoval,
+  replaceWorkspaceRuntimeMembershipsForClient,
   runWithWorkspaceRuntimeEpochCommitOwnership,
 } from '#/server/workspaces/runtime/authority.ts'
 import { MAX_RECENT_WORKSPACES, defaultUserSettings, defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
@@ -186,30 +187,38 @@ type UserSettingsMutationOperation<T> =
     }
 
 async function runUserSettingsMutation<T>(operation: UserSettingsMutationOperation<T>): Promise<T> {
+  return await runSerializedUserSettingsOperation(async (current) => {
+    const commit = await operation.mutation(current)
+    if (operation.kind === 'workspace-runtime') {
+      if (operation.epochCapability.workspaceId !== operation.workspaceId) {
+        throw new Error('workspace runtime epoch capability scope mismatch')
+      }
+    }
+    const publish = async () => {
+      if (commit.changed !== false) {
+        await writeUserSettingsJson(commit.next)
+        settingsData = commit.next
+        settingsLoadPromise = Promise.resolve(commit.next)
+        invalidateRemovedWorkspaceRuntimes(current.workspace, commit.next.workspace)
+      }
+      commit.afterCommit?.()
+      return commit.result
+    }
+    if (operation.kind === 'workspace-runtime') {
+      return await runWithWorkspaceRuntimeEpochCommitOwnership(operation.epochCapability, publish)
+    }
+    return await publish()
+  })
+}
+
+async function runSerializedUserSettingsOperation<T>(
+  operation: (data: UserSettingsData) => Promise<T> | T,
+): Promise<T> {
   const run = settingsMutationPromise
     .catch(() => {})
     .then(async () => {
       const current = await loadUserSettings()
-      const commit = await operation.mutation(current)
-      if (operation.kind === 'workspace-runtime') {
-        if (operation.epochCapability.workspaceId !== operation.workspaceId) {
-          throw new Error('workspace runtime epoch capability scope mismatch')
-        }
-      }
-      const publish = async () => {
-        if (commit.changed !== false) {
-          await writeUserSettingsJson(commit.next)
-          settingsData = commit.next
-          settingsLoadPromise = Promise.resolve(commit.next)
-          invalidateRemovedWorkspaceRuntimes(current.workspace, commit.next.workspace)
-        }
-        commit.afterCommit?.()
-        return commit.result
-      }
-      if (operation.kind === 'workspace-runtime') {
-        return await runWithWorkspaceRuntimeEpochCommitOwnership(operation.epochCapability, publish)
-      }
-      return await publish()
+      return await operation(current)
     })
   settingsMutationPromise = run.then(
     () => {},
@@ -317,6 +326,20 @@ export async function removeServerWorkspaceEntry(workspaceId: WorkspaceId): Prom
     }
     const workspace = { ...data.workspace, openWorkspaceEntries }
     return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
+  })
+}
+
+export async function reconcileWorkspaceRuntimeMemberships(input: {
+  userId: string
+  clientId: string
+  workspaceIds: readonly WorkspaceId[]
+}): Promise<WorkspaceRuntimeEntry[]> {
+  return await runSerializedUserSettingsOperation((data) => {
+    // Recovery admission shares the durable membership queue with close, so
+    // either ordering converges to the committed open-workspace set.
+    const openWorkspaceIds = new Set(data.workspace.openWorkspaceEntries.map(workspaceSessionEntryId))
+    const workspaceIds = input.workspaceIds.filter((workspaceId) => openWorkspaceIds.has(workspaceId))
+    return replaceWorkspaceRuntimeMembershipsForClient(input.userId, input.clientId, workspaceIds)
   })
 }
 

@@ -342,6 +342,45 @@ describe('settings source', () => {
     }
   })
 
+  test('keeps runtime recovery subordinate to serialized durable workspace removal', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+    previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+    process.env.GOBLIN_SERVER_DATA_DIR = tmp
+    const source = await import('#/server/settings/source.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
+    const clientId = 'client-resume-recovery'
+    runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+    try {
+      await source.addServerWorkspaceEntry({ id: REPO_A })
+      runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, clientId)
+
+      const removal = source.removeServerWorkspaceEntry(REPO_A)
+      const staleRecovery = source.reconcileWorkspaceRuntimeMemberships({
+        userId: RUNTIME_USER_ID,
+        clientId,
+        workspaceIds: [REPO_A],
+      })
+
+      await removal
+      await expect(staleRecovery).resolves.toEqual([])
+      expect(runtimes.listWorkspaceRuntimes(RUNTIME_USER_ID)).toEqual([])
+
+      await source.addServerWorkspaceEntry({ id: REPO_A })
+      const recoveryBeforeRemoval = source.reconcileWorkspaceRuntimeMemberships({
+        userId: RUNTIME_USER_ID,
+        clientId,
+        workspaceIds: [REPO_A],
+      })
+      const laterRemoval = source.removeServerWorkspaceEntry(REPO_A)
+
+      await expect(recoveryBeforeRemoval).resolves.toEqual([expect.objectContaining({ workspaceId: REPO_A })])
+      await laterRemoval
+      expect(runtimes.listWorkspaceRuntimes(RUNTIME_USER_ID)).toEqual([])
+    } finally {
+      runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+    }
+  })
+
   test('preserves runtime epochs when durable workspace removal fails to persist', async () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

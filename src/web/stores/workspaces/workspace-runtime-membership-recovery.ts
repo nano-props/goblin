@@ -233,17 +233,13 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   const remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }> = []
   for (const { workspaceId } of captured) {
     const currentWorkspace = currentWorkspaces[workspaceId]
-    if (!currentWorkspace) continue
+    const runtime = runtimeByWorkspaceId.get(workspaceId)
+    if (!currentWorkspace || !runtime || currentWorkspace.workspaceRuntimeId !== runtime.workspaceRuntimeId) continue
     const target = { workspaceId, workspaceRuntimeId: currentWorkspace.workspaceRuntimeId }
     targets.push(target)
 
-    const runtime = runtimeByWorkspaceId.get(workspaceId)
-    if (
-      runtime &&
-      isRemoteWorkspaceId(workspaceId) &&
-      currentWorkspace.workspaceRuntimeId === runtime.workspaceRuntimeId &&
-      ['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
-    ) {
+    const lifecycleKind = runtime.remoteLifecycle?.kind
+    if (isRemoteWorkspaceId(workspaceId) && (lifecycleKind === 'idle' || lifecycleKind === 'connecting')) {
       remoteEnsureTargets.push({ workspaceId, workspaceRuntimeId: runtime.workspaceRuntimeId })
     }
   }
