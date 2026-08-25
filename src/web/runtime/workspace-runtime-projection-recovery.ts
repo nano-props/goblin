@@ -6,7 +6,7 @@ import type { WorkspacePaneTabsRecoveryActions } from '#/web/runtime/workspace-p
 type WorkspaceRuntimeMembershipRecovery =
   { kind: 'superseded' } | { kind: 'settled'; targets: RuntimeProjectionTarget[] }
 
-export interface WorkspaceRuntimeReconnectRecoveryDependencies {
+export interface WorkspaceRuntimeProjectionRecoveryDependencies {
   scopeRegistry: RuntimeProjectionScopeRegistry
   reconcileMemberships: () => Promise<WorkspaceRuntimeMembershipRecovery>
   currentWorkspaceRuntimeId: (workspaceId: WorkspaceId) => string | null
@@ -16,28 +16,28 @@ export interface WorkspaceRuntimeReconnectRecoveryDependencies {
   logFailure: (error: unknown) => void
 }
 
-export class WorkspaceRuntimeReconnectRecovery {
-  private readonly dependencies: WorkspaceRuntimeReconnectRecoveryDependencies
-  private generation = 0
+export class WorkspaceRuntimeProjectionRecovery {
+  private readonly dependencies: WorkspaceRuntimeProjectionRecoveryDependencies
+  private requestGeneration = 0
 
-  constructor(dependencies: WorkspaceRuntimeReconnectRecoveryDependencies) {
+  constructor(dependencies: WorkspaceRuntimeProjectionRecoveryDependencies) {
     this.dependencies = dependencies
   }
 
   request(): void {
-    const generation = ++this.generation
-    void this.run(generation)
+    const requestGeneration = ++this.requestGeneration
+    void this.run(requestGeneration)
   }
 
   invalidate(): void {
-    this.generation += 1
+    this.requestGeneration += 1
   }
 
-  private async run(generation: number): Promise<void> {
+  private async run(requestGeneration: number): Promise<void> {
     try {
       const recovery = await this.dependencies.reconcileMemberships()
-      // Only the latest reconnect may publish recovered projections.
-      if (generation !== this.generation || recovery.kind === 'superseded') return
+      // Only the latest recovery may publish recovered projections.
+      if (requestGeneration !== this.requestGeneration || recovery.kind === 'superseded') return
       this.dependencies.scopeRegistry.disposeScopes()
       for (const target of recovery.targets) {
         if (this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId) continue
@@ -47,7 +47,7 @@ export class WorkspaceRuntimeReconnectRecovery {
       }
       await this.dependencies.resyncRepoReads()
     } catch (error) {
-      if (generation === this.generation) this.dependencies.logFailure(error)
+      if (requestGeneration === this.requestGeneration) this.dependencies.logFailure(error)
     }
   }
 }

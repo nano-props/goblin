@@ -21,7 +21,7 @@ export type ClientEffectIntent =
   | { type: 'clone-repo-requested' }
   | { type: 'create-worktree-requested' }
   | { type: 'app-quitting' }
-  | { type: 'system-resumed' }
+  | { type: 'server-command-generation-advance-requested' }
   | { type: 'terminal-new-tab-requested' }
   | { type: 'workspace-pane-close-tab-requested' }
   | { type: 'close-workspace-requested' }
@@ -50,7 +50,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'clone-repo-requested':
     case 'create-worktree-requested':
     case 'app-quitting':
-    case 'system-resumed':
+    case 'server-command-generation-advance-requested':
     case 'terminal-new-tab-requested':
     case 'workspace-pane-close-tab-requested':
     case 'close-workspace-requested':

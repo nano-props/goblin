@@ -24,7 +24,7 @@ import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { clientEffectIntentRequiresWorkspaceBootstrap } from '#/web/hooks/client-effect-intent-plans.ts'
-import { resetServerCommandTransport } from '#/web/lib/server-command-transport.ts'
+import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
 
 interface ClientEffectIntentRouterOptions {
   authenticatedBootstrapState: MaybeRefOrGetter<AuthenticatedAppBootstrapState>
@@ -101,8 +101,8 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
     switch (intent.type) {
       case 'app-quitting':
         return
-      case 'system-resumed':
-        resetServerCommandTransport()
+      case 'server-command-generation-advance-requested':
+        advanceServerCommandGeneration()
         return
       case 'external-open-enqueued':
         externalOpenDrainer.drain()

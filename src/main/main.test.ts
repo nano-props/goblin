@@ -248,7 +248,7 @@ describe('native host startup lifecycle', () => {
     expect(mocks.quit).toHaveBeenCalledOnce()
   })
 
-  test('flushes default session connections before resetting renderer command transport after resume', async () => {
+  test('closes default session connections before requesting a command generation advance', async () => {
     const closing = Promise.withResolvers<void>()
     mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
     await import('#/main/main.ts')
@@ -257,17 +257,21 @@ describe('native host startup lifecycle', () => {
 
     const recovering = emitPower('resume')
     await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledOnce())
-    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({ type: 'system-resumed' })
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({
+      type: 'server-command-generation-advance-requested',
+    })
 
     closing.resolve()
     await recovering
 
     await vi.waitFor(() => {
-      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'system-resumed' })
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
+        type: 'server-command-generation-advance-requested',
+      })
     })
   })
 
-  test('drains a follow-up cleanup before publishing one fresh transport generation', async () => {
+  test('requests one command generation advance after draining follow-up connection cleanup', async () => {
     const firstClosing = Promise.withResolvers<void>()
     const secondClosing = Promise.withResolvers<void>()
     mocks.closeAllConnections.mockReturnValueOnce(firstClosing.promise).mockReturnValueOnce(secondClosing.promise)
@@ -286,10 +290,12 @@ describe('native host startup lifecycle', () => {
     secondClosing.resolve()
     await vi.waitFor(() => expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledOnce())
 
-    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'system-resumed' })
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
+      type: 'server-command-generation-advance-requested',
+    })
   })
 
-  test('does not reset renderer transport when quit starts during resume cleanup', async () => {
+  test('does not request a command generation advance when quit starts during resume cleanup', async () => {
     const closing = Promise.withResolvers<void>()
     mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
     await import('#/main/main.ts')
@@ -307,7 +313,9 @@ describe('native host startup lifecycle', () => {
     await Promise.all([recovering, quitting])
     await flushMicrotasks()
 
-    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({ type: 'system-resumed' })
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({
+      type: 'server-command-generation-advance-requested',
+    })
   })
 
   test('does not wait for timeout when the client quit drain reports failure', async () => {

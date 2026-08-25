@@ -703,7 +703,7 @@ describe('client effect intent plans', () => {
     { type: 'open-workspace-path-requested' as const },
     { type: 'clone-repo-requested' as const },
     { type: 'open-remote-workspace-requested' as const },
-    { type: 'system-resumed' as const },
+    { type: 'server-command-generation-advance-requested' as const },
   ])('does not bind $type to workspace bootstrap', (intent) => {
     expect(clientEffectIntentRequiresWorkspaceBootstrap(intent)).toBe(false)
   })

@@ -18,14 +18,14 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { AppTerminalProjectionRecovery } from '#/web/runtime/app-terminal-projection-recovery.ts'
 import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-recovery.ts'
-import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
+import { WorkspaceRuntimeProjectionRecovery } from '#/web/runtime/workspace-runtime-projection-recovery.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import { provideWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { resyncActiveRepoReadQueries } from '#/web/stores/workspaces/repo-refresh-actions.ts'
-import { subscribeServerCommandTransportReset } from '#/web/lib/server-command-transport.ts'
+import { subscribeServerCommandGenerationAdvance } from '#/web/lib/server-command-generation.ts'
 
 export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
   name: 'AppRuntimeProjectionProvider',
@@ -70,7 +70,7 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         appRuntimeProjectionLog.debug('failed to refresh workspace pane tabs', { ...target, error })
       },
     })
-    const reconnectRecovery = new WorkspaceRuntimeReconnectRecovery({
+    const projectionRecovery = new WorkspaceRuntimeProjectionRecovery({
       scopeRegistry,
       reconcileMemberships: () =>
         reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
@@ -82,19 +82,19 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
           get: workspacesStore.getState,
         }),
       logFailure: (error) => {
-        appRuntimeProjectionLog.warn('failed to recover runtime projections after reconnect', { error })
+        appRuntimeProjectionLog.warn('failed to recover runtime projections', { error })
       },
     })
     // Membership is a complete declaration owned by this provider. Rehydrate
-    // it on the fresh command generation so a realtime recovery interrupted by
-    // native resume cannot leave runtime projections permanently stale.
-    const unsubscribeTransportReset = subscribeServerCommandTransportReset(() => {
-      if (workspacesStore.getState().workspaceMembershipReady) reconnectRecovery.request()
+    // it on the fresh command generation so an interrupted projection recovery
+    // cannot leave runtime projections permanently stale.
+    const offGenerationAdvance = subscribeServerCommandGenerationAdvance(() => {
+      if (workspacesStore.getState().workspaceMembershipReady) projectionRecovery.request()
     })
     useRepoStoreInvalidationRefresh(() => {
-      if (workspacesStore.getState().workspaceMembershipReady) reconnectRecovery.request()
+      if (workspacesStore.getState().workspaceMembershipReady) projectionRecovery.request()
     })
-    provideWorkspaceRuntimeRecoveryActions({ request: () => reconnectRecovery.request() })
+    provideWorkspaceRuntimeRecoveryActions({ request: () => projectionRecovery.request() })
     const projectionScopeForWorkspace = (workspaceId: WorkspaceId) => {
       const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
       return workspaceRuntimeId ? scopeRegistry.scopeFor({ workspaceId, workspaceRuntimeId }) : null
@@ -162,13 +162,13 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
           if (hydrated && localRevision >= event.revision) return
           terminalRecovery.request(scope, { kind: 'minimum-revision', revision: event.revision })
         })
-        const offRecovered = appRealtimeClient.onRecovered(() => reconnectRecovery.request())
+        const offRecovered = appRealtimeClient.onRecovered(() => projectionRecovery.request())
         const offWorkspaceTabsChanged = workspacePaneTabsClient.onChanged((message) => {
           const scope = currentScopeForWorkspace(scopeRegistry, message.workspaceId)
           if (scope) workspaceTabsRecovery.handleChanged(scope, message)
         })
         onCleanup(() => {
-          reconnectRecovery.invalidate()
+          projectionRecovery.invalidate()
           offSessionsChanged()
           offRecovered()
           offWorkspaceTabsChanged()
@@ -178,8 +178,8 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
     )
 
     onScopeDispose(() => {
-      unsubscribeTransportReset()
-      reconnectRecovery.invalidate()
+      offGenerationAdvance()
+      projectionRecovery.invalidate()
       scopeRegistry.disposeScopes()
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('pageshow', onPageShow)

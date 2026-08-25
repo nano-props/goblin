@@ -2,14 +2,14 @@ import { describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { createRuntimeProjectionScopeRegistry } from '#/web/runtime/runtime-projection-scope.ts'
-import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
+import { WorkspaceRuntimeProjectionRecovery } from '#/web/runtime/workspace-runtime-projection-recovery.ts'
 
 const TARGET = {
   workspaceId: workspaceIdForTest('goblin+file:///workspace'),
   workspaceRuntimeId: 'workspace-runtime-current',
 }
 
-describe('WorkspaceRuntimeReconnectRecovery', () => {
+describe('WorkspaceRuntimeProjectionRecovery', () => {
   test('recovers projections only after canonical membership reconciliation', async () => {
     const order: string[] = []
     const terminalRecovery = { begin: vi.fn(() => order.push('terminal')), request: vi.fn() }
@@ -17,7 +17,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     const resyncRepoReads = vi.fn(async () => {
       order.push('repo')
     })
-    const recovery = new WorkspaceRuntimeReconnectRecovery({
+    const recovery = new WorkspaceRuntimeProjectionRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
       reconcileMemberships: async () => {
         order.push('membership')
@@ -43,7 +43,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
     const workspaceTabsRecovery = { request: vi.fn() }
     const resyncRepoReads = vi.fn(async () => {})
-    const recovery = new WorkspaceRuntimeReconnectRecovery({
+    const recovery = new WorkspaceRuntimeProjectionRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
       reconcileMemberships: () => membership.promise,
       currentWorkspaceRuntimeId: () => TARGET.workspaceRuntimeId,
@@ -67,7 +67,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
     const workspaceTabsRecovery = { request: vi.fn() }
     const resyncRepoReads = vi.fn(async () => {})
-    const recovery = new WorkspaceRuntimeReconnectRecovery({
+    const recovery = new WorkspaceRuntimeProjectionRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
       reconcileMemberships: async () => ({ kind: 'settled', targets: [TARGET] }),
       currentWorkspaceRuntimeId: () => 'workspace-runtime-newer',
@@ -84,7 +84,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     expect(workspaceTabsRecovery.request).not.toHaveBeenCalled()
   })
 
-  test('lets only the latest reconnect publish recovered projections', async () => {
+  test('lets only the latest recovery publish recovered projections', async () => {
     const firstMembership = Promise.withResolvers<{ kind: 'settled'; targets: [typeof TARGET] }>()
     const secondMembership = Promise.withResolvers<{ kind: 'settled'; targets: [typeof TARGET] }>()
     const reconcileMemberships = vi
@@ -93,7 +93,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
       .mockReturnValueOnce(secondMembership.promise)
     const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
     const resyncRepoReads = vi.fn(async () => {})
-    const recovery = new WorkspaceRuntimeReconnectRecovery({
+    const recovery = new WorkspaceRuntimeProjectionRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
       reconcileMemberships,
       currentWorkspaceRuntimeId: () => TARGET.workspaceRuntimeId,
@@ -120,7 +120,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     const logFailure = vi.fn()
     const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
     const resyncRepoReads = vi.fn(async () => {})
-    const recovery = new WorkspaceRuntimeReconnectRecovery({
+    const recovery = new WorkspaceRuntimeProjectionRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
       reconcileMemberships: async () => {
         throw failure

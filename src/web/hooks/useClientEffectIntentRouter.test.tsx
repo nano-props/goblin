@@ -59,10 +59,10 @@ import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
-const commandTransportMocks = vi.hoisted(() => ({ reset: vi.fn() }))
+const commandGenerationMocks = vi.hoisted(() => ({ advance: vi.fn() }))
 
-vi.mock('#/web/lib/server-command-transport.ts', () => ({
-  resetServerCommandTransport: commandTransportMocks.reset,
+vi.mock('#/web/lib/server-command-generation.ts', () => ({
+  advanceServerCommandGeneration: commandGenerationMocks.advance,
 }))
 
 const appDataClientMocks = vi.hoisted(() => ({
@@ -112,7 +112,7 @@ beforeEach(() => {
   appDataClientMocks.removeWorkspaceFromSession.mockResolvedValue(undefined)
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
-  commandTransportMocks.reset.mockClear()
+  commandGenerationMocks.advance.mockClear()
   overlayOpen = false
   workspaceShortcutSuppressed = false
   currentWorkspaceId = null
@@ -199,16 +199,16 @@ afterEach(() => {
 })
 
 describe('useClientEffectIntentRouter', () => {
-  test('resets command transport immediately on every native resume effect', async () => {
+  test('advances the server command generation immediately on every native advance request', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     await renderHookHost()
 
     await flushTestUpdates(() => {
-      emitIntent({ type: 'system-resumed' })
-      emitIntent({ type: 'system-resumed' })
+      emitIntent({ type: 'server-command-generation-advance-requested' })
+      emitIntent({ type: 'server-command-generation-advance-requested' })
     })
 
-    expect(commandTransportMocks.reset).toHaveBeenCalledTimes(2)
+    expect(commandGenerationMocks.advance).toHaveBeenCalledTimes(2)
   })
 
   test('dispatches global dialogs while workspace bootstrap is still restoring', async () => {

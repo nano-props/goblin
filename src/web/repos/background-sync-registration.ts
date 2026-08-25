@@ -1,15 +1,15 @@
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import { subscribeServerCommandTransportReset } from '#/web/lib/server-command-transport.ts'
+import { subscribeServerCommandGenerationAdvance } from '#/web/lib/server-command-generation.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { setBackgroundSyncRepos } from '#/web/repos/client.ts'
 
-interface BackgroundSyncRegistrationOwner {
+interface BackgroundSyncRegistration {
   setTargets: (targets: GitBackgroundSyncTarget[]) => void
-  dispose: () => void
+  clearTargets: () => void
 }
 
 let desiredTargets: GitBackgroundSyncTarget[] = []
-let mayHaveDeclaredTarget = false
+let serverMayHaveRegisteredTargets = false
 let registrationController: AbortController | null = null
 
 function declareDesiredTargets(): void {
@@ -17,11 +17,11 @@ function declareDesiredTargets(): void {
   const controller = new AbortController()
   registrationController = controller
   const targets = desiredTargets
-  if (targets.length > 0) mayHaveDeclaredTarget = true
+  if (targets.length > 0) serverMayHaveRegisteredTargets = true
   void setBackgroundSyncRepos(targets, controller.signal)
     .then(() => {
       if (registrationController !== controller) return
-      if (targets.length === 0) mayHaveDeclaredTarget = false
+      if (targets.length === 0) serverMayHaveRegisteredTargets = false
     })
     .catch((err: unknown) => {
       if (registrationController !== controller) return
@@ -30,22 +30,22 @@ function declareDesiredTargets(): void {
 }
 
 // Registration state follows the page-scoped clientId and outlives the
-// conditional Vue owner so an interrupted empty declaration can be rehydrated.
-subscribeServerCommandTransportReset(() => {
-  if (desiredTargets.length === 0 && !mayHaveDeclaredTarget) return
+// conditional Vue scope so an interrupted empty declaration can be rehydrated.
+subscribeServerCommandGenerationAdvance(() => {
+  if (desiredTargets.length === 0 && !serverMayHaveRegisteredTargets) return
   declareDesiredTargets()
 })
 
-export const backgroundSyncRegistration: BackgroundSyncRegistrationOwner = {
+export const backgroundSyncRegistration: BackgroundSyncRegistration = {
   setTargets(targets) {
     desiredTargets = targets
-    if (desiredTargets.length === 0 && !mayHaveDeclaredTarget) return
+    if (desiredTargets.length === 0 && !serverMayHaveRegisteredTargets) return
     declareDesiredTargets()
   },
-  dispose() {
+  clearTargets() {
     desiredTargets = []
-    if (!mayHaveDeclaredTarget) {
-      registrationController?.abort('background-sync-owner-disposed')
+    if (!serverMayHaveRegisteredTargets) {
+      registrationController?.abort('background-sync-targets-cleared')
       registrationController = null
       return
     }

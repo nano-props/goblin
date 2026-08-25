@@ -81,7 +81,7 @@ export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-r
 export function clientEffectIntentRequiresWorkspaceBootstrap(event: ClientEffectIntent): boolean {
   switch (event.type) {
     case 'app-quitting':
-    case 'system-resumed':
+    case 'server-command-generation-advance-requested':
     case 'open-settings-requested':
     case 'theme-pref-set-requested':
     case 'lang-pref-set-requested':

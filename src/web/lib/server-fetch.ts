@@ -2,7 +2,7 @@ import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 import { requireClientServerConfig } from '#/web/lib/server-config.ts'
 import { CodedError } from '#/shared/coded-error.ts'
-import { serverCommandTransportSignal } from '#/web/lib/server-command-transport.ts'
+import { composeServerCommandGenerationSignal } from '#/web/lib/server-command-generation.ts'
 import * as v from 'valibot'
 
 const ServerErrorResponseSchema = v.strictObject({
@@ -140,7 +140,7 @@ export async function postServerCommandJson<TInput extends object, TOutput>(
   decode: (value: unknown) => TOutput,
   options?: { signal?: AbortSignal; keepalive?: boolean; timeoutMs?: number },
 ): Promise<TOutput> {
-  const signal = serverCommandTransportSignal(options?.signal)
+  const signal = composeServerCommandGenerationSignal(options?.signal)
   return requestServerJson(
     path,
     decode,

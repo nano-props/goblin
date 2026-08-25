@@ -41,7 +41,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
-import { resetServerCommandTransport } from '#/web/lib/server-command-transport.ts'
+import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
 import type { WorkspaceRuntimeMembershipRecoveryResult } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
 
 const projectionMocks = vi.hoisted(() => ({
@@ -581,7 +581,7 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('routes explicit runtime recovery through the same reconnect owner', async () => {
+  test('routes explicit runtime recovery through the same projection recovery', async () => {
     seedCurrentRepo()
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -598,7 +598,7 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('restarts an in-flight reconnect recovery after command transport reset', async () => {
+  test('restarts an in-flight projection recovery after the command generation advances', async () => {
     const repo = seedCurrentRepo()
     const interruptedRecovery = Promise.withResolvers<WorkspaceRuntimeMembershipRecoveryResult>()
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships
@@ -618,8 +618,8 @@ describe('AppRuntimeProjectionProvider', () => {
       await flushTestUpdates(() => recoveredHandler?.('client_sharedterminal'))
       await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
 
-      resetServerCommandTransport()
-      interruptedRecovery.reject(new Error('command transport reset'))
+      advanceServerCommandGeneration()
+      interruptedRecovery.reject(new Error('command generation advanced'))
 
       await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2))
       await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
@@ -630,25 +630,25 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('does not recover membership after the provider releases its transport reset subscription', async () => {
+  test('does not recover membership after the provider releases its generation-advance subscription', async () => {
     seedCurrentRepo()
     const result = renderRuntimeProvider(REPO_ID)
     await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
 
     result.unmount()
-    resetServerCommandTransport()
+    advanceServerCommandGeneration()
     await waitForNextMacrotask()
 
     expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()
   })
 
-  test('does not recover membership on transport reset before membership is authoritative', async () => {
+  test('does not recover membership on generation advance before membership is authoritative', async () => {
     seedCurrentRepo()
     workspacesStore.setState({ workspaceMembershipReady: false })
     const result = renderRuntimeProvider(REPO_ID)
     try {
-      resetServerCommandTransport()
+      advanceServerCommandGeneration()
       await waitForNextMacrotask()
 
       expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()

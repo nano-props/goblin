@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 describe('isClientEffectIntent', () => {
-  test('accepts the Electron system resume effect', () => {
-    expect(isClientEffectIntent({ type: 'system-resumed' })).toBe(true)
+  test('accepts a server command generation advance request', () => {
+    expect(isClientEffectIntent({ type: 'server-command-generation-advance-requested' })).toBe(true)
   })
 
   test('accepts tab close without a window-close variant', () => {

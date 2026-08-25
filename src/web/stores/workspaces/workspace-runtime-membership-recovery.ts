@@ -135,14 +135,14 @@ async function settleWorkspaceRuntimeForProjection(
     })
     if (outcome.ok) return true
     if ('cancelled' in outcome) return false
-    workspacesLog.warn('workspace refresh did not recover the changed local runtime', {
+    workspacesLog.warn('workspace refresh did not settle the local runtime for projection recovery', {
       workspaceId: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
       message: outcome.message,
     })
     return false
   } catch (err) {
-    workspacesLog.warn('workspace refresh failed after local runtime epoch replacement', {
+    workspacesLog.warn('workspace refresh failed while settling the local runtime for projection recovery', {
       workspaceId: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
       err,

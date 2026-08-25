@@ -11,7 +11,7 @@ import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
-import { resetServerCommandTransport } from '#/web/lib/server-command-transport.ts'
+import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
 
 const mocks = vi.hoisted(() => ({
   setBackgroundSyncRepos: vi.fn(async (_targets: unknown, _signal?: AbortSignal) => {}),
@@ -80,13 +80,13 @@ describe('useBackgroundFetch request lifecycle', () => {
     expect(signal?.aborted).toBe(true)
   })
 
-  test('redeclares the current target after command transport recovery', async () => {
+  test('redeclares the current target after the command generation advances', async () => {
     mocks.setBackgroundSyncRepos.mockImplementationOnce(waitForRegistrationAbort)
     const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
     const staleSignal = mocks.setBackgroundSyncRepos.mock.calls[0]?.[1]
 
-    resetServerCommandTransport()
+    advanceServerCommandGeneration()
 
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
     expect(staleSignal?.aborted).toBe(true)
@@ -97,7 +97,7 @@ describe('useBackgroundFetch request lifecycle', () => {
     view.unmount()
   })
 
-  test('retains an empty declaration across transport recovery after owner disposal', async () => {
+  test('redeclares empty targets when a generation advance interrupts scope cleanup', async () => {
     const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
     mocks.setBackgroundSyncRepos.mockImplementationOnce(waitForRegistrationAbort)
@@ -107,7 +107,7 @@ describe('useBackgroundFetch request lifecycle', () => {
     const staleClearSignal = mocks.setBackgroundSyncRepos.mock.calls[1]?.[1]
     expect(mocks.setBackgroundSyncRepos.mock.calls[1]?.[0]).toEqual([])
 
-    resetServerCommandTransport()
+    advanceServerCommandGeneration()
 
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(3))
     expect(staleClearSignal?.aborted).toBe(true)

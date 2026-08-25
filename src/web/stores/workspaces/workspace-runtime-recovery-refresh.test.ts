@@ -129,7 +129,7 @@ describe('workspace runtime recovery Refresh boundary', () => {
     })
   })
 
-  test('settles an unchanged local runtime left probing by an interrupted recovery', async () => {
+  test('settles the probing capability of an unchanged local runtime after interrupted recovery', async () => {
     const refresh = vi
       .fn<() => Promise<WorkspaceRefreshResult>>()
       .mockRejectedValueOnce(

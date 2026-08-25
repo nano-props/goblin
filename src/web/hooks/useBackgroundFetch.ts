@@ -41,7 +41,7 @@ export function useBackgroundFetch({
   const fetchSettings = useFetchSettings()
   const fetchEnabled = computed(() => fetchSettings.value.fetchIntervalSec > 0)
 
-  // This watch owns the authoritative declaration. A transport reset aborts
+  // This watch owns the authoritative declaration. A generation advance aborts
   // every delivered command, so this declarative projection rehydrates from
   // the complete current target instead of replaying an opaque mutation.
   watch(
@@ -56,5 +56,5 @@ export function useBackgroundFetch({
     { immediate: true },
   )
 
-  onScopeDispose(backgroundSyncRegistration.dispose)
+  onScopeDispose(backgroundSyncRegistration.clearTargets)
 }

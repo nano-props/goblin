@@ -121,7 +121,7 @@ describe('server-fetch', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  test('aborts the stale command generation and admits a fresh command after resume', async () => {
+  test('aborts the stale command generation and admits a command in the next generation', async () => {
     fetchMock.mockImplementationOnce((_url, init) => {
       const signal = (init as RequestInit | undefined)?.signal
       return new Promise((_resolve, reject) => {
@@ -130,11 +130,11 @@ describe('server-fetch', () => {
     })
 
     const { postServerCommandJson } = await import('#/web/lib/server-fetch.ts')
-    const { resetServerCommandTransport } = await import('#/web/lib/server-command-transport.ts')
+    const { advanceServerCommandGeneration } = await import('#/web/lib/server-command-generation.ts')
     const staleRequest = postServerCommandJson('/api/repo/pull', {}, decodeJson, { timeoutMs: 0 })
     await Promise.resolve()
 
-    resetServerCommandTransport()
+    advanceServerCommandGeneration()
 
     await expect(staleRequest).rejects.toMatchObject({ name: 'CodedError', code: 'OUTCOME_UNCERTAIN' })
 

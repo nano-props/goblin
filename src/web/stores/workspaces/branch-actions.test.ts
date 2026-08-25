@@ -471,7 +471,7 @@ describe('runBranchAction', () => {
     })
   })
 
-  test('settles an uncertain branch command with the actionable recovery message', async () => {
+  test('surfaces an uncertain branch command outcome with the actionable recovery message', async () => {
     installGoblinTestBridge({
       'repo.pull': async () => {
         throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost after delivery' })

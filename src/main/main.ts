@@ -52,7 +52,7 @@ interface ClientQuitDrainOwner {
   failDelivery: (error: unknown) => void
 }
 
-const requestClientTransportRecovery = createClientTransportRecoveryRequester()
+const requestRendererCommandRecovery = createRendererCommandRecoveryRequester()
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -140,31 +140,31 @@ async function activateClient(): Promise<void> {
   clientActivated = true
 }
 
-async function closeClientTransportConnectionsAfterResume(): Promise<void> {
+async function closeDefaultSessionConnectionsForResumeRecovery(): Promise<void> {
   if (isQuitting) return
   try {
     // BrowserWindow uses the default session even while macOS keeps the app
     // alive without a window. Close its pool before opening a fresh command
-    // generation; the renderer reset settles active commands Chromium may
+    // generation; advancing the renderer generation settles commands Chromium may
     // leave open. This wait has no deadline: timing out would let late cleanup
     // close fresh connections, so we accept the theoretical risk that this
     // uncancellable call hangs.
     await session.defaultSession.closeAllConnections()
   } catch (err) {
-    // Electron currently has no asynchronous rejection path here. Still reset
-    // the renderer after a synchronous or future failure so commands can settle.
+    // Electron currently has no asynchronous rejection path here. Still advance
+    // the renderer generation after a synchronous or future failure so commands settle.
     windowNodeLog.warn({ err }, 'failed to close renderer connections after system resume')
   }
 }
 
-function createClientTransportRecoveryRequester(): () => void {
-  let runningPromise: Promise<void> | null = null
-  let pending = false
+function createRendererCommandRecoveryRequester(): () => void {
+  let activeRecoveryPromise: Promise<void> | null = null
+  let connectionCleanupPending = false
 
-  const drain = async () => {
-    while (pending && !isQuitting) {
-      pending = false
-      await closeClientTransportConnectionsAfterResume()
+  const drainResumeConnectionCleanups = async () => {
+    while (connectionCleanupPending && !isQuitting) {
+      connectionCleanupPending = false
+      await closeDefaultSessionConnectionsForResumeRecovery()
     }
     if (isQuitting) return
     // Open one fresh generation only after all observed resume cleanups drain;
@@ -177,16 +177,16 @@ function createClientTransportRecoveryRequester(): () => void {
     // The preload listener spans the document lifetime and queues it until the
     // Vue consumer mounts; if no surface exists, the broadcast is a no-op and
     // a later document starts with a fresh command generation by construction.
-    broadcastClientEffectIntent({ type: 'system-resumed' })
+    broadcastClientEffectIntent({ type: 'server-command-generation-advance-requested' })
   }
 
   return () => {
-    pending = true
-    if (runningPromise) return
-    const recovery = drain()
-    runningPromise = recovery
+    connectionCleanupPending = true
+    if (activeRecoveryPromise) return
+    const recovery = drainResumeConnectionCleanups()
+    activeRecoveryPromise = recovery
     void recovery.finally(() => {
-      if (runningPromise === recovery) runningPromise = null
+      if (activeRecoveryPromise === recovery) activeRecoveryPromise = null
     })
   }
 }
@@ -235,7 +235,7 @@ async function initializeNativeHost(): Promise<void> {
   // System resume is an Electron-only transport lifecycle boundary. Browser
   // clients do not receive this native effect and retain their normal server
   // request lifecycle.
-  powerMonitor.on('resume', requestClientTransportRecovery)
+  powerMonitor.on('resume', requestRendererCommandRecovery)
   await startEmbeddedServer()
   const settingsSnapshot = await getSettingsSnapshot()
   initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })
