@@ -117,6 +117,10 @@ async function settleWorkspaceRuntimeForProjection(
     if (workspace.admission.kind !== 'remote') return false
     if (workspace.admission.lifecycle?.kind === 'ready') return true
     if (workspace.admission.lifecycle?.kind === 'failed') return false
+    // A lost ensure response—or, rarely, a fresher cross-window attempt—can
+    // leave this projection connecting. Fail fast with explicit Retry instead
+    // of automatically following moving lifecycle authority; a later settlement
+    // may therefore leave the recovery warning visible until that Retry.
     throw new Error(`remote runtime recovery did not settle for ${target.workspaceId}`)
   }
 
