@@ -60,7 +60,7 @@ describe('useBackgroundFetch request lifecycle', () => {
     expect(secondSignal?.aborted).toBe(false)
     view.unmount()
     expect(secondSignal?.aborted).toBe(true)
-    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenLastCalledWith([]))
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenLastCalledWith([], expect.any(AbortSignal)))
   })
 
   test('does not redeclare an unchanged target when its snapshot projection is refreshed', async () => {
@@ -99,6 +99,43 @@ describe('useBackgroundFetch request lifecycle', () => {
     ])
     expect(mocks.setBackgroundSyncRepos.mock.calls[1]?.[1]?.aborted).toBe(false)
     view.unmount()
+  })
+
+  test('retains an empty declaration across transport recovery after owner disposal', async () => {
+    const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
+    mocks.setBackgroundSyncRepos.mockImplementationOnce((_targets, signal) => {
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+
+    view.unmount()
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
+    const staleClearSignal = mocks.setBackgroundSyncRepos.mock.calls[1]?.[1]
+    expect(mocks.setBackgroundSyncRepos.mock.calls[1]?.[0]).toEqual([])
+
+    resetServerCommandTransport()
+
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(3))
+    expect(staleClearSignal?.aborted).toBe(true)
+    expect(mocks.setBackgroundSyncRepos.mock.calls[2]?.[0]).toEqual([])
+    expect(mocks.setBackgroundSyncRepos.mock.calls[2]?.[1]?.aborted).toBe(false)
+  })
+
+  test('does not let a replaced owner clear the current declaration', async () => {
+    const firstView = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
+    const secondView = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
+
+    firstView.unmount()
+    await Promise.resolve()
+    expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2)
+
+    secondView.unmount()
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(3))
+    expect(mocks.setBackgroundSyncRepos).toHaveBeenLastCalledWith([], expect.any(AbortSignal))
   })
 
   test('does not declare a Git target when the required repo snapshot has no remotes', async () => {
