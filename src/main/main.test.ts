@@ -267,9 +267,10 @@ describe('native host startup lifecycle', () => {
     })
   })
 
-  test('runs one follow-up recovery when a resume arrives during recovery', async () => {
-    const closing = Promise.withResolvers<void>()
-    mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
+  test('drains a follow-up cleanup before publishing one fresh transport generation', async () => {
+    const firstClosing = Promise.withResolvers<void>()
+    const secondClosing = Promise.withResolvers<void>()
+    mocks.closeAllConnections.mockReturnValueOnce(firstClosing.promise).mockReturnValueOnce(secondClosing.promise)
     await import('#/main/main.ts')
     mocks.resolveReady()
     await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
@@ -278,14 +279,14 @@ describe('native host startup lifecycle', () => {
     void emitPower('resume')
     await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledOnce())
 
-    closing.resolve()
-    await vi.waitFor(() => {
-      expect(mocks.closeAllConnections).toHaveBeenCalledTimes(2)
-      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledTimes(2)
-    })
+    firstClosing.resolve()
+    await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledTimes(2))
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalled()
 
-    expect(mocks.broadcastClientEffectIntent).toHaveBeenNthCalledWith(1, { type: 'system-resumed' })
-    expect(mocks.broadcastClientEffectIntent).toHaveBeenNthCalledWith(2, { type: 'system-resumed' })
+    secondClosing.resolve()
+    await vi.waitFor(() => expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledOnce())
+
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'system-resumed' })
   })
 
   test('does not reset renderer transport when quit starts during resume cleanup', async () => {

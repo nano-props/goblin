@@ -7,7 +7,7 @@ import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import { createBackgroundSyncRegistrationOwner } from '#/web/repos/background-sync-registration.ts'
+import { backgroundSyncRegistration } from '#/web/repos/background-sync-registration.ts'
 
 function isExecutableGitWorkspace(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
   return !!repo && workspaceCanExecute(repo) && repo.capability.kind === 'git'
@@ -33,7 +33,6 @@ export function useBackgroundFetch({
   workspaceId: MaybeRefOrGetter<WorkspaceId>
   workspaceRuntimeId: MaybeRefOrGetter<string>
 }) {
-  const registration = createBackgroundSyncRegistrationOwner()
   const snapshotReadModel = useRepoSnapshotReadModel(
     () => toValue(workspaceId),
     () => toValue(workspaceRuntimeId),
@@ -52,10 +51,10 @@ export function useBackgroundFetch({
         enabled && remoteAvailable
           ? [{ workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }]
           : []
-      registration.setTargets(targets)
+      backgroundSyncRegistration.setTargets(targets)
     },
     { immediate: true },
   )
 
-  onScopeDispose(registration.dispose)
+  onScopeDispose(backgroundSyncRegistration.dispose)
 }

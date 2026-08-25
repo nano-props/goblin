@@ -115,21 +115,6 @@ describe('useBackgroundFetch request lifecycle', () => {
     expect(mocks.setBackgroundSyncRepos.mock.calls[2]?.[1]?.aborted).toBe(false)
   })
 
-  test('does not let a replaced owner clear the current declaration', async () => {
-    const firstView = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
-    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
-    const secondView = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
-    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
-
-    firstView.unmount()
-    await Promise.resolve()
-    expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2)
-
-    secondView.unmount()
-    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(3))
-    expect(mocks.setBackgroundSyncRepos).toHaveBeenLastCalledWith([], expect.any(AbortSignal))
-  })
-
   test('does not declare a Git target when the required repo snapshot has no remotes', async () => {
     const snapshot = appQueryClient.getQueryData<RepoSnapshotResponse>(
       repoSnapshotQueryKey(WORKSPACE_ID, 'workspace-runtime-background-sync'),

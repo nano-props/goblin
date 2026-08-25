@@ -8,7 +8,6 @@ interface BackgroundSyncRegistrationOwner {
   dispose: () => void
 }
 
-let activeOwner: object | null = null
 let desiredTargets: GitBackgroundSyncTarget[] = []
 let mayHaveDeclaredTarget = false
 let registrationController: AbortController | null = null
@@ -30,38 +29,26 @@ function declareDesiredTargets(): void {
     })
 }
 
-// This registration owner is scoped to the browser page, matching the
-// page-scoped clientId used by the server protocol. It intentionally outlives
-// the conditional Vue owner so an empty declaration that loses its response
-// during transport recovery can still be rehydrated after that scope unmounts.
+// Registration state follows the page-scoped clientId and outlives the
+// conditional Vue owner so an interrupted empty declaration can be rehydrated.
 subscribeServerCommandTransportReset(() => {
   if (desiredTargets.length === 0 && !mayHaveDeclaredTarget) return
   declareDesiredTargets()
 })
 
-export function createBackgroundSyncRegistrationOwner(): BackgroundSyncRegistrationOwner {
-  const owner = {}
-  // Vue can mount a replacement owner before disposing the previous scope.
-  // The latest lease is decisive: a late callback or dispose from the stale
-  // scope must not overwrite or clear the replacement's complete declaration.
-  activeOwner = owner
-  return {
-    setTargets(targets) {
-      if (activeOwner !== owner) return
-      desiredTargets = targets
-      if (desiredTargets.length === 0 && !mayHaveDeclaredTarget) return
-      declareDesiredTargets()
-    },
-    dispose() {
-      if (activeOwner !== owner) return
-      activeOwner = null
-      desiredTargets = []
-      if (!mayHaveDeclaredTarget) {
-        registrationController?.abort('background-sync-owner-disposed')
-        registrationController = null
-        return
-      }
-      declareDesiredTargets()
-    },
-  }
+export const backgroundSyncRegistration: BackgroundSyncRegistrationOwner = {
+  setTargets(targets) {
+    desiredTargets = targets
+    if (desiredTargets.length === 0 && !mayHaveDeclaredTarget) return
+    declareDesiredTargets()
+  },
+  dispose() {
+    desiredTargets = []
+    if (!mayHaveDeclaredTarget) {
+      registrationController?.abort('background-sync-owner-disposed')
+      registrationController = null
+      return
+    }
+    declareDesiredTargets()
+  },
 }

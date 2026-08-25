@@ -140,37 +140,21 @@ async function activateClient(): Promise<void> {
   clientActivated = true
 }
 
-async function recoverClientTransportAfterResume(): Promise<void> {
+async function closeClientTransportConnectionsAfterResume(): Promise<void> {
   if (isQuitting) return
   try {
-    // BrowserWindow does not set a partition, so the process-level default
-    // session owns this pool even while macOS keeps the app alive without a
-    // window. Flush it before exposing a fresh renderer command generation.
-    // The renderer abort owns deterministic settlement of active HTTP/1
-    // requests, which Chromium may not close here immediately.
-    //
-    // This wait intentionally has no deadline. Opening the new generation
-    // while cleanup is still pending would let a late cleanup completion
-    // close connections created by post-resume commands. Electron 43.4.1
-    // provides no rejection path or cancellation handle for this operation,
-    // so a callback that never returns remains an accepted theoretical risk;
-    // changing that tradeoff requires a two-phase command admission boundary.
+    // BrowserWindow uses the default session even while macOS keeps the app
+    // alive without a window. Close its pool before opening a fresh command
+    // generation; the renderer reset settles active commands Chromium may
+    // leave open. This wait has no deadline: timing out would let late cleanup
+    // close fresh connections, so we accept the theoretical risk that this
+    // uncancellable call hangs.
     await session.defaultSession.closeAllConnections()
   } catch (err) {
-    // Electron 43.4.1's native binding resolves this Promise from the
-    // NetworkContext callback and has no rejection path. This catch only
-    // protects a synchronous binding failure and future implementation
-    // changes. We still notify any surviving renderer because leaving its
-    // pre-resume commands pending would retain the known permanent-busy
-    // failure; this is not a normal rejected-cleanup path being ignored.
+    // Electron currently has no asynchronous rejection path here. Still reset
+    // the renderer after a synchronous or future failure so commands can settle.
     windowNodeLog.warn({ err }, 'failed to close renderer connections after system resume')
   }
-  if (isQuitting) return
-  // This lifecycle effect does not require exact-document acknowledgement.
-  // The preload listener spans the document lifetime and queues it until the
-  // Vue consumer mounts; if no surface exists, the broadcast is a no-op and a
-  // later document starts with a fresh command generation by construction.
-  broadcastClientEffectIntent({ type: 'system-resumed' })
 }
 
 function createClientTransportRecoveryRequester(): () => void {
@@ -180,8 +164,20 @@ function createClientTransportRecoveryRequester(): () => void {
   const drain = async () => {
     while (pending && !isQuitting) {
       pending = false
-      await recoverClientTransportAfterResume()
+      await closeClientTransportConnectionsAfterResume()
     }
+    if (isQuitting) return
+    // Open one fresh generation only after all observed resume cleanups drain;
+    // opening between passes would expose its connections to the next cleanup.
+    // A command started during cleanup may still settle as uncertain and
+    // require retry. Closing that narrow window would require a disproportionate
+    // two-phase cross-process admission protocol.
+    //
+    // This lifecycle effect does not require exact-document acknowledgement.
+    // The preload listener spans the document lifetime and queues it until the
+    // Vue consumer mounts; if no surface exists, the broadcast is a no-op and
+    // a later document starts with a fresh command generation by construction.
+    broadcastClientEffectIntent({ type: 'system-resumed' })
   }
 
   return () => {
