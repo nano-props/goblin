@@ -18,6 +18,11 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { normalizeRemoteTarget, type RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { CodedError } from '#/shared/coded-error.ts'
+import {
+  acceptRemoteWorkspaceLifecycleProjection,
+  acceptRemoteWorkspaceRuntimeProjection,
+} from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 
 vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
   runWorkspaceRefresh: vi.fn(async () => ({ ok: true })),
@@ -54,20 +59,13 @@ describe('workspace runtime membership recovery', () => {
   })
 
   test('atomically advances a current repo shell to the reconciled server epoch', async () => {
-    const previousWorkspaceRuntimeId = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] }).workspaceRuntimeId
+    seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
 
     const result = await reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
 
     expect(result).toEqual({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-123456789012345678901' }],
-      changedTargets: [
-        {
-          workspaceId: REPO_ROOT,
-          previousWorkspaceRuntimeId,
-          workspaceRuntimeId: 'repo-runtime-123456789012345678901',
-        },
-      ],
     })
     const repo = workspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-123456789012345678901')
@@ -97,26 +95,76 @@ describe('workspace runtime membership recovery', () => {
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toMatchObject({ kind: 'settled', changedTargets: [] })
+    ).resolves.toMatchObject({ kind: 'settled' })
 
     expect(runWorkspaceRefresh).not.toHaveBeenCalled()
   })
 
-  test('keeps membership recovery settled when the one-shot local refresh fails', async () => {
-    vi.mocked(runWorkspaceRefresh).mockResolvedValue({ ok: false, message: 'error.workspace-operation-failed' })
+  test('removes a local shell rejected by the canonical membership response', async () => {
+    seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    workspacesStore.setState({ restoredWorkspaceId: REPO_ROOT })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({ runtimes: [] }),
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+    ).resolves.toEqual({ kind: 'settled', targets: [] })
+
+    expect(workspacesStore.getState().workspaces[REPO_ROOT]).toBeUndefined()
+    expect(workspacesStore.getState().workspaceOrder).toEqual([])
+    expect(workspacesStore.getState().restoredWorkspaceId).toBeNull()
+    expect(runWorkspaceRefresh).not.toHaveBeenCalled()
+  })
+
+  test('keeps a concurrently replaced shell when the captured membership is rejected', async () => {
+    const reconcileResponse = Promise.withResolvers<{ runtimes: [] }>()
+    const reconcile = vi.fn(() => reconcileResponse.promise)
+    const previous = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': reconcile,
+    })
+
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
+    await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce())
+    const replacement = { ...previous, workspaceRuntimeId: 'repo-runtime-concurrent-replacement-123' }
+    workspacesStore.setState({ workspaces: { [REPO_ROOT]: replacement } })
+    reconcileResponse.resolve({ runtimes: [] })
+
+    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [] })
+    expect(workspacesStore.getState().workspaces[REPO_ROOT]).toBe(replacement)
+  })
+
+  test('applies canonical membership rejection when the later runtime snapshot refresh fails', async () => {
+    seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({ runtimes: [] }),
+      'workspace.runtimeList': async () => {
+        throw new Error('runtime snapshot unavailable')
+      },
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+    ).rejects.toThrow('runtime snapshot unavailable')
+    expect(workspacesStore.getState().workspaces[REPO_ROOT]).toBeUndefined()
+  })
+
+  test('keeps membership authoritative but fails recovery when the one-shot local refresh fails', async () => {
+    vi.mocked(runWorkspaceRefresh).mockResolvedValue({
+      ok: false,
+      kind: 'failed',
+      message: 'error.workspace-operation-failed',
+    })
     seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toMatchObject({
-      kind: 'settled',
-      targets: [],
-      changedTargets: [{ workspaceId: REPO_ROOT }],
-    })
+    ).rejects.toThrow('error.workspace-operation-failed')
     expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
   })
 
-  test('omits only the changed local target whose one-shot Refresh throws', async () => {
+  test('attempts every changed local target before reporting a one-shot Refresh failure', async () => {
     resetWorkspacesStore()
     vi.mocked(runWorkspaceRefresh).mockImplementation(async (_, workspaceId) => {
       if (workspaceId === SECOND_REPO_ROOT) throw new Error('probe transport failed')
@@ -147,18 +195,14 @@ describe('workspace runtime membership recovery', () => {
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toMatchObject({
-      kind: 'settled',
-      targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-first-123456789012345' }],
-      changedTargets: [{ workspaceId: REPO_ROOT }, { workspaceId: SECOND_REPO_ROOT }],
-    })
+    ).rejects.toThrow('probe transport failed')
     expect(runWorkspaceRefresh).toHaveBeenCalledTimes(2)
   })
 
-  test('attempts changed local runtimes in parallel and omits only the failed target', async () => {
+  test('waits for parallel changed local runtimes before reporting incomplete recovery', async () => {
     resetWorkspacesStore()
     const firstRefresh = Promise.withResolvers<{ ok: true }>()
-    const secondRefresh = Promise.withResolvers<{ ok: false; cancelled: true }>()
+    const secondRefresh = Promise.withResolvers<{ ok: false; kind: 'cancelled' }>()
     vi.mocked(runWorkspaceRefresh).mockImplementation((_, workspaceId) =>
       workspaceId === REPO_ROOT ? firstRefresh.promise : secondRefresh.promise,
     )
@@ -189,12 +233,8 @@ describe('workspace runtime membership recovery', () => {
     await vi.waitFor(() => expect(runWorkspaceRefresh).toHaveBeenCalledTimes(2))
 
     firstRefresh.resolve({ ok: true })
-    secondRefresh.resolve({ ok: false, cancelled: true })
-    await expect(recovery).resolves.toMatchObject({
-      kind: 'settled',
-      targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-first-123456789012345' }],
-      changedTargets: [{ workspaceId: REPO_ROOT }, { workspaceId: SECOND_REPO_ROOT }],
-    })
+    secondRefresh.resolve({ ok: false, kind: 'cancelled' })
+    await expect(recovery).rejects.toThrow('cancelled')
   })
 
   test('projects the reconciled local probe without accepting a later runtime-list probe', async () => {
@@ -257,7 +297,7 @@ describe('workspace runtime membership recovery', () => {
       ],
     })
 
-    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [], changedTargets: [] })
+    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [] })
     expect(reconcile).toHaveBeenNthCalledWith(1, expect.objectContaining({ workspaceIds: [REPO_ROOT] }))
     expect(reconcile).toHaveBeenNthCalledWith(2, expect.objectContaining({ workspaceIds: [] }))
   })
@@ -316,7 +356,6 @@ describe('workspace runtime membership recovery', () => {
     await expect(recovery).resolves.toMatchObject({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }],
-      changedTargets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }],
     })
     expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
     expect(reconcile).toHaveBeenNthCalledWith(
@@ -341,7 +380,7 @@ describe('workspace runtime membership recovery', () => {
     expect(runtimeOpen).not.toHaveBeenCalled()
 
     reconcileResponse.resolve({ runtimes: [] })
-    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [], changedTargets: [] })
+    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [] })
     await expect(open).resolves.toBe('repo-runtime-123456789012345678901')
     expect(runtimeOpen).toHaveBeenCalledOnce()
   })
@@ -444,6 +483,56 @@ describe('workspace runtime membership recovery', () => {
     await expect(opening).resolves.toMatchObject({ ok: true, workspaceId: REPO_ROOT })
     await expect(recovery).resolves.toMatchObject({ kind: 'settled' })
     expect(reconcile).toHaveBeenCalledWith(expect.objectContaining({ workspaceIds: [REPO_ROOT] }))
+  })
+
+  test('keeps production remote open durable admission inside one shared lease', async () => {
+    resetWorkspacesStore()
+    const membershipWrite = Promise.withResolvers<{
+      openWorkspaceEntries: Array<{ id: WorkspaceId }>
+      workspacePaneTabsByTargetByWorkspace: Record<string, never>
+    }>()
+    const addWorkspaceEntry = vi.fn(() => membershipWrite.promise)
+    const workspaceRuntimeId = 'repo-runtime-remote-open-123456789'
+    const reconcile = vi.fn(async () => ({
+      runtimes: [
+        {
+          workspaceId: REMOTE_REPO_ROOT,
+          workspaceRuntimeId,
+          workspaceProbe: createGitWorkspaceProbeForTest(),
+          remoteLifecycle: { kind: 'ready' as const, attemptId: 1, target: REMOTE_TARGET },
+        },
+      ],
+    }))
+    installGoblinTestBridge({
+      'workspace.runtimeOpen': async () => ({ ok: true, workspaceRuntimeId }),
+      'settings.addWorkspaceEntry': addWorkspaceEntry,
+      'workspace.runtimeReconcile': reconcile,
+      'workspace.runtimeList': reconcile,
+      'remote.lifecycle': async () => ({
+        kind: 'settled' as const,
+        workspaceId: REMOTE_REPO_ROOT,
+        lifecycle: { kind: 'ready' as const, attemptId: 1, target: REMOTE_TARGET },
+        workspaceProbe: createGitWorkspaceProbeForTest(),
+      }),
+    })
+
+    const opening = workspacesStore.getState().openWorkspaceMembership({ id: REMOTE_REPO_ROOT })
+    await vi.waitFor(() => expect(addWorkspaceEntry).toHaveBeenCalledOnce())
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
+    await Promise.resolve()
+    expect(reconcile).not.toHaveBeenCalled()
+
+    membershipWrite.resolve({
+      openWorkspaceEntries: [{ id: REMOTE_REPO_ROOT }],
+      workspacePaneTabsByTargetByWorkspace: {},
+    })
+
+    await expect(opening).resolves.toMatchObject({ ok: true, workspaceId: REMOTE_REPO_ROOT })
+    await expect(recovery).resolves.toMatchObject({
+      kind: 'settled',
+      targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId }],
+    })
+    expect(reconcile).toHaveBeenCalledWith(expect.objectContaining({ workspaceIds: [REMOTE_REPO_ROOT] }))
   })
 
   test('bootstraps a changed remote epoch from the reconcile lifecycle and probe', async () => {
@@ -572,9 +661,6 @@ describe('workspace runtime membership recovery', () => {
     ).resolves.toEqual({
       kind: 'settled',
       targets: [],
-      changedTargets: [
-        expect.objectContaining({ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: nextRemoteRuntimeId }),
-      ],
     })
     expect(remoteLifecycle).toHaveBeenCalledOnce()
   })
@@ -607,9 +693,10 @@ describe('workspace runtime membership recovery', () => {
     expect(remoteLifecycle).not.toHaveBeenCalled()
   })
 
-  test('keeps an unchanged remote ensure best-effort and non-blocking', async () => {
+  test('waits for an unchanged remote ensure before completing recovery', async () => {
     resetWorkspacesStore()
     const remoteEnsure = Promise.withResolvers<RemoteWorkspaceLifecycleCommandResult>()
+    const remoteLifecycle = vi.fn(() => remoteEnsure.promise)
     const workspace = seedRepoShellForTest({
       id: REMOTE_REPO_ROOT,
       remoteLifecycle: { kind: 'connecting' },
@@ -625,17 +712,146 @@ describe('workspace runtime membership recovery', () => {
           },
         ],
       }),
-      'remote.lifecycle': () => remoteEnsure.promise,
+      'remote.lifecycle': remoteLifecycle,
+    })
+
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
+    await vi.waitFor(() => expect(remoteLifecycle).toHaveBeenCalledOnce())
+    let completed = false
+    void recovery.then(() => {
+      completed = true
+    })
+    await Promise.resolve()
+    expect(completed).toBe(false)
+
+    remoteEnsure.resolve({
+      kind: 'settled',
+      workspaceId: REMOTE_REPO_ROOT,
+      lifecycle: { kind: 'ready', attemptId: 1, target: REMOTE_TARGET },
+      workspaceProbe: createGitWorkspaceProbeForTest(),
+    })
+    await expect(recovery).resolves.toEqual({
+      kind: 'settled',
+      targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: workspace.workspaceRuntimeId }],
+    })
+  })
+
+  test('accepts a remote ensure superseded by a newer ready projection', async () => {
+    resetWorkspacesStore()
+    const remoteEnsure = Promise.withResolvers<RemoteWorkspaceLifecycleCommandResult>()
+    const remoteLifecycle = vi.fn(() => remoteEnsure.promise)
+    const workspace = seedRepoShellForTest({
+      id: REMOTE_REPO_ROOT,
+      remoteLifecycle: { kind: 'connecting' },
+    })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REMOTE_REPO_ROOT,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            workspaceProbe: { status: 'probing' as const },
+            remoteLifecycle: { kind: 'connecting', attemptId: 1 },
+          },
+        ],
+      }),
+      'remote.lifecycle': remoteLifecycle,
+    })
+
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
+    await vi.waitFor(() => expect(remoteLifecycle).toHaveBeenCalledOnce())
+    expect(
+      acceptRemoteWorkspaceRuntimeProjection(workspacesStore.setState, workspacesStore.getState, {
+        workspaceId: REMOTE_REPO_ROOT,
+        workspaceRuntimeId: workspace.workspaceRuntimeId,
+        workspaceProbe: createGitWorkspaceProbeForTest(),
+        remoteLifecycle: { kind: 'ready', attemptId: 2, target: REMOTE_TARGET },
+      }),
+    ).toBe(true)
+    remoteEnsure.resolve({
+      kind: 'settled',
+      workspaceId: REMOTE_REPO_ROOT,
+      lifecycle: { kind: 'ready', attemptId: 1, target: REMOTE_TARGET },
+      workspaceProbe: createGitWorkspaceProbeForTest(),
+    })
+
+    await expect(recovery).resolves.toEqual({
+      kind: 'settled',
+      targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: workspace.workspaceRuntimeId }],
+    })
+  })
+
+  test('uses a newer failed projection after a remote ensure returns ready', async () => {
+    resetWorkspacesStore()
+    const remoteEnsure = Promise.withResolvers<RemoteWorkspaceLifecycleCommandResult>()
+    const remoteLifecycle = vi.fn(() => remoteEnsure.promise)
+    const workspace = seedRepoShellForTest({
+      id: REMOTE_REPO_ROOT,
+      remoteLifecycle: { kind: 'connecting' },
+    })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REMOTE_REPO_ROOT,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            workspaceProbe: { status: 'probing' as const },
+            remoteLifecycle: { kind: 'connecting', attemptId: 1 },
+          },
+        ],
+      }),
+      'remote.lifecycle': remoteLifecycle,
+    })
+
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
+    await vi.waitFor(() => expect(remoteLifecycle).toHaveBeenCalledOnce())
+    remoteEnsure.resolve({
+      kind: 'settled',
+      workspaceId: REMOTE_REPO_ROOT,
+      lifecycle: { kind: 'ready', attemptId: 1, target: REMOTE_TARGET },
+      workspaceProbe: createGitWorkspaceProbeForTest(),
+    })
+    queueMicrotask(() => {
+      expect(
+        acceptRemoteWorkspaceLifecycleProjection(workspacesStore.setState, workspacesStore.getState, {
+          workspaceId: REMOTE_REPO_ROOT,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
+          remoteLifecycle: { kind: 'failed', attemptId: 2, reason: 'unreachable', target: REMOTE_TARGET },
+        }),
+      ).toBe(true)
+    })
+
+    await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [] })
+    expect(workspacesStore.getState().workspaces[REMOTE_REPO_ROOT]?.admission).toMatchObject({
+      kind: 'remote',
+      lifecycle: { kind: 'failed', reason: 'unreachable', target: REMOTE_TARGET },
+    })
+  })
+
+  test('reports an unchanged remote ensure transport uncertainty as incomplete recovery', async () => {
+    resetWorkspacesStore()
+    const workspace = seedRepoShellForTest({
+      id: REMOTE_REPO_ROOT,
+      remoteLifecycle: { kind: 'connecting' },
+    })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REMOTE_REPO_ROOT,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            workspaceProbe: { status: 'probing' as const },
+            remoteLifecycle: { kind: 'connecting', attemptId: 1 },
+          },
+        ],
+      }),
+      'remote.lifecycle': async () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'remote ensure outcome uncertain' })
+      },
     })
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toEqual({
-      kind: 'settled',
-      targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: workspace.workspaceRuntimeId }],
-      changedTargets: [],
-    })
-
-    remoteEnsure.resolve({ kind: 'superseded', workspaceId: REMOTE_REPO_ROOT })
+    ).rejects.toThrow('remote runtime recovery did not settle')
   })
 })

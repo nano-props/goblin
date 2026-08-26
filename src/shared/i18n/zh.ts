@@ -863,4 +863,6 @@ export const zh: Record<DictKey, string> = {
   'auth.gate.unavailable-description': 'Goblin 无法确认登录状态。请检查服务器和网络连接，然后重新打开 Goblin。',
   'lazy-restore.failed': '无法打开工作区',
   'workspace-restore.failed': '无法恢复工作区',
+  'runtime-recovery.failed-title': '无法恢复工作区运行时',
+  'runtime-recovery.failed-description': '部分工作区视图可能已过期。请检查当前状态或重试。',
 }

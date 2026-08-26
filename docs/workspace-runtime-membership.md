@@ -93,11 +93,16 @@ Realtime recovery:
 4. Reconnect cancels the timer. Expiry releases only the captured generations,
    so a later HTTP acquire cannot be removed by an old disconnect timer.
 5. After reconnect, the window submits its complete current workspace set through
-   one batch reconcile command. The server replaces only that client's
-   memberships and returns canonical runtime ids.
-6. The client commits changed runtime ids atomically, resets transient
-   epoch-owned state, and only then recovers remote lifecycle, terminals and
-   workspace tabs with the new scopes.
+   one batch reconcile command. The server admits only entries still present in
+   durable workspace membership, replaces only that client's runtime leases, and
+   returns canonical runtimes for the admitted declaration.
+6. The client atomically removes rejected entries and commits changed runtime ids,
+   resets transient epoch-owned state, and only then recovers remote lifecycle,
+   terminals and workspace tabs with the new scopes.
+7. Membership changes already accepted from the server remain authoritative if
+   later capability or snapshot projection fails. The recovery remains incomplete
+   and exposes an explicit retry instead of rolling those facts back or reporting
+   the partial projection as settled.
 
 ## Rules
 

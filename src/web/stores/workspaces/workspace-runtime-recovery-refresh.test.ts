@@ -12,6 +12,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { CodedError } from '#/shared/coded-error.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/runtime-recovery-refresh')
 const NEXT_RUNTIME_ID = 'repo-runtime-recovery-refresh-123456789'
@@ -99,7 +100,7 @@ describe('workspace runtime recovery Refresh boundary', () => {
     })
   })
 
-  test('keeps the new membership authoritative but omits a stale Refresh target without retrying', async () => {
+  test('keeps the new membership authoritative but fails recovery for a stale Refresh target', async () => {
     const refresh = vi.fn(async (): Promise<WorkspaceRefreshResult> => ({ kind: 'stale-runtime' }))
     installGoblinTestBridge({
       'workspace.runtimeReconcile': async () => ({
@@ -116,15 +117,55 @@ describe('workspace runtime recovery Refresh boundary', () => {
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
-    ).resolves.toMatchObject({
-      kind: 'settled',
-      targets: [],
-      changedTargets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: NEXT_RUNTIME_ID }],
-    })
+    ).rejects.toThrow('error.workspace-runtime-stale')
     expect(refresh).toHaveBeenCalledOnce()
     expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
       workspaceRuntimeId: NEXT_RUNTIME_ID,
       capability: { kind: 'probing' },
+    })
+  })
+
+  test('settles the probing capability of an unchanged local runtime after interrupted recovery', async () => {
+    const refresh = vi
+      .fn<() => Promise<WorkspaceRefreshResult>>()
+      .mockRejectedValueOnce(
+        new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'workspace refresh outcome is uncertain' }),
+      )
+      .mockResolvedValueOnce({ kind: 'committed', probe: readyGitProbe() })
+    const snapshot = vi.fn(async () => repoSnapshotResponse())
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: WORKSPACE_ID,
+            workspaceRuntimeId: NEXT_RUNTIME_ID,
+            workspaceProbe: { status: 'probing' as const },
+          },
+        ],
+      }),
+      'workspace.refresh': refresh,
+      'repo.snapshot': snapshot,
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+    ).rejects.toThrow('error.operation-outcome-uncertain')
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
+      workspaceRuntimeId: NEXT_RUNTIME_ID,
+      capability: { kind: 'probing' },
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      targets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: NEXT_RUNTIME_ID }],
+    })
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(snapshot).toHaveBeenCalledOnce()
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
+      workspaceRuntimeId: NEXT_RUNTIME_ID,
+      capability: { kind: 'git', probe: { status: 'ready' } },
     })
   })
 })

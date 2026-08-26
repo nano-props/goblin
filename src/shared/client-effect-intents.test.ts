@@ -2,6 +2,10 @@ import { describe, expect, test } from 'vitest'
 import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 describe('isClientEffectIntent', () => {
+  test('accepts a server command generation advance request', () => {
+    expect(isClientEffectIntent({ type: 'server-command-reset-requested' })).toBe(true)
+  })
+
   test('accepts tab close without a window-close variant', () => {
     expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-requested' })).toBe(true)
     expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-or-window-requested' })).toBe(false)

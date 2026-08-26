@@ -48,13 +48,11 @@ describe('openWorkspacePaths', () => {
   })
 
   test('stops opening later paths after an uncertain membership write', async () => {
-    const uncertainWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
     const openWorkspaceMembership = vi
       .fn<(path: string) => Promise<OpenWorkspaceResult>>()
       .mockResolvedValueOnce({
         ok: false,
         kind: 'uncertain',
-        workspaceId: uncertainWorkspaceId,
         message: 'error.operation-outcome-uncertain',
       })
       .mockResolvedValueOnce({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///tmp/workspace-b') })
@@ -69,9 +67,28 @@ describe('openWorkspacePaths', () => {
     expect(onOpenFailed).toHaveBeenCalledWith('/tmp/a', {
       ok: false,
       kind: 'uncertain',
-      workspaceId: uncertainWorkspaceId,
       message: 'error.operation-outcome-uncertain',
     })
+    expect(activateWorkspace).not.toHaveBeenCalled()
+  })
+
+  test('does not navigate to an earlier success after a later open becomes uncertain', async () => {
+    const firstWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
+    const openWorkspaceMembership = vi
+      .fn<(path: string) => Promise<OpenWorkspaceResult>>()
+      .mockResolvedValueOnce({ ok: true, workspaceId: firstWorkspaceId })
+      .mockResolvedValueOnce({
+        ok: false,
+        kind: 'uncertain',
+        message: 'error.operation-outcome-uncertain',
+      })
+    const activateWorkspace = vi.fn()
+
+    await expect(
+      openWorkspacePaths(['/tmp/a', '/tmp/b'], { openWorkspaceMembership, activateWorkspace }),
+    ).resolves.toBeNull()
+
+    expect(openWorkspaceMembership).toHaveBeenCalledTimes(2)
     expect(activateWorkspace).not.toHaveBeenCalled()
   })
 

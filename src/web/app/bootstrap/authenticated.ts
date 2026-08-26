@@ -49,6 +49,11 @@ export function useAuthenticatedAppBootstrap(options?: {
 
   function start(): void {
     restoreRun?.cancel()
+    workspacesStore.setState({
+      workspaceMembershipReady: false,
+      sessionPersistenceReady: false,
+      sessionRestoreError: null,
+    })
     state.value = RESTORING_WORKSPACE_BOOTSTRAP_STATE
     const run = startAuthenticatedWorkspaceRestoreRun(
       (outcome) => {
@@ -122,7 +127,6 @@ async function restoreBootSession(
   activeWorkspaceId: WorkspaceId | null,
 ): Promise<WorkspaceRestoreOutcome> {
   try {
-    workspacesStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     const presentation = await readClientWorkspaceState()
     const snapshot = await waitForPromiseWithSignal(settingsSnapshot, signal)
     if (signal.aborted) throw abortReason(signal)

@@ -41,6 +41,8 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
+import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
+import type { WorkspaceRuntimeMembershipRecoveryResult } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -106,7 +108,6 @@ describe('AppRuntimeProjectionProvider', () => {
         workspaceId: repo.id,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       })),
-      changedTargets: [],
     }))
     projectionMocks.resyncActiveRepoReadQueries.mockReset()
     projectionMocks.resyncActiveRepoReadQueries.mockResolvedValue(undefined)
@@ -430,13 +431,6 @@ describe('AppRuntimeProjectionProvider', () => {
       return {
         kind: 'settled' as const,
         targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: nextWorkspaceRuntimeId }],
-        changedTargets: [
-          {
-            workspaceId: REPO_ID,
-            previousWorkspaceRuntimeId: repo.workspaceRuntimeId,
-            workspaceRuntimeId: nextWorkspaceRuntimeId,
-          },
-        ],
       }
     })
     const result = renderRuntimeProvider(REPO_ID)
@@ -579,7 +573,7 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('routes explicit runtime recovery through the same reconnect owner', async () => {
+  test('routes explicit runtime recovery through the same projection recovery', async () => {
     seedCurrentRepo()
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -591,6 +585,87 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
       await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('keeps a retry entry visible when app-level runtime recovery fails without an active Git workspace', async () => {
+    workspacesStore.setState({ workspaceMembershipReady: true })
+    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockRejectedValueOnce(new Error('recovery unavailable'))
+    const result = renderRuntimeProvider(null)
+    try {
+      await flushTestUpdates(() => projectionMocks.repoInvalidationConnectionOpen?.())
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-testid="workspace-runtime-recovery-failure"]')).not.toBeNull(),
+      )
+
+      await flushTestUpdates(() =>
+        document.querySelector<HTMLElement>('[data-testid="workspace-runtime-recovery-failure"] button')?.click(),
+      )
+
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-testid="workspace-runtime-recovery-failure"]')).toBeNull(),
+      )
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('restarts an in-flight projection recovery after the command generation advances', async () => {
+    const repo = seedCurrentRepo()
+    const interruptedRecovery = Promise.withResolvers<WorkspaceRuntimeMembershipRecoveryResult>()
+    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships
+      .mockReturnValueOnce(interruptedRecovery.promise)
+      .mockResolvedValueOnce({
+        kind: 'settled',
+        targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
+      })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      recoverSessionsMock.mockClear()
+      listWorkspaceTabsMock.mockClear()
+      projectionMocks.resyncActiveRepoReadQueries.mockClear()
+
+      await flushTestUpdates(() => recoveredHandler?.('client_sharedterminal'))
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
+
+      advanceServerCommandGeneration()
+      interruptedRecovery.reject(new Error('command generation advanced'))
+
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
+      expect(recoverSessionsMock).toHaveBeenCalledOnce()
+      expect(listWorkspaceTabsMock).toHaveBeenCalledOnce()
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('does not recover membership after the provider releases its generation-advance subscription', async () => {
+    seedCurrentRepo()
+    const result = renderRuntimeProvider(REPO_ID)
+    await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
+
+    result.unmount()
+    advanceServerCommandGeneration()
+    await waitForNextMacrotask()
+
+    expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()
+  })
+
+  test('does not recover membership on generation advance before membership is authoritative', async () => {
+    seedCurrentRepo()
+    workspacesStore.setState({ workspaceMembershipReady: false })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      advanceServerCommandGeneration()
+      await waitForNextMacrotask()
+
+      expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()
     } finally {
       result.unmount()
     }
@@ -619,11 +694,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('invalidates a pending membership recovery when the provider unmounts', async () => {
     const repo = seedCurrentRepo()
-    const membershipRecovery = Promise.withResolvers<{
-      kind: 'settled'
-      targets: Array<{ workspaceId: string; workspaceRuntimeId: string }>
-      changedTargets: []
-    }>()
+    const membershipRecovery = Promise.withResolvers<WorkspaceRuntimeMembershipRecoveryResult>()
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockReturnValueOnce(membershipRecovery.promise)
     const result = renderRuntimeProvider(REPO_ID)
     await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
@@ -639,7 +710,6 @@ describe('AppRuntimeProjectionProvider', () => {
     membershipRecovery.resolve({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
-      changedTargets: [],
     })
     await waitForNextMacrotask()
 

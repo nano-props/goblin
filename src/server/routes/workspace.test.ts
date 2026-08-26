@@ -5,6 +5,7 @@ import {
   captureWorkspaceRuntimeMembershipLease,
   clearWorkspaceRuntimesForUser,
   listWorkspaceRuntimes,
+  replaceWorkspaceRuntimeMembershipsForClient,
   WorkspaceRuntimeStaleError,
 } from '#/server/workspaces/runtime/authority.ts'
 import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
   getLocalPathSuggestions: vi.fn(),
+  reconcileWorkspaceRuntimeMemberships: vi.fn(),
 }))
 
 vi.mock('#/server/workspaces/probe.ts', () => ({
@@ -69,6 +71,10 @@ vi.mock('#/server/common/identity.ts', () => ({
   userIdFromContext: () => USER_ID,
 }))
 
+vi.mock('#/server/settings/source.ts', () => ({
+  reconcileWorkspaceRuntimeMemberships: mocks.reconcileWorkspaceRuntimeMemberships,
+}))
+
 const readyPlainWorkspace = {
   status: 'ready' as const,
   capabilities: {
@@ -105,6 +111,9 @@ describe('workspace routes', () => {
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '' })
     mocks.getLocalPathSuggestions.mockResolvedValue(['/srv/repo'])
+    mocks.reconcileWorkspaceRuntimeMemberships.mockImplementation(async ({ userId, clientId, workspaceIds }) =>
+      replaceWorkspaceRuntimeMembershipsForClient(userId, clientId, workspaceIds),
+    )
   })
 
   test('returns bounded local path suggestions from a validated POST body', async () => {

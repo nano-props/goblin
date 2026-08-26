@@ -5,6 +5,7 @@ import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, Array<(...args: any[]) => any>>()
+  const powerHandlers = new Map<string, Array<(...args: any[]) => any>>()
   const ipcHandlers = new Map<string, (...args: any[]) => any>()
   const timeouts = new Map<number, () => void>()
   let timeoutId = 0
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => {
   let whenReadyPromise = Promise.resolve()
   return {
     handlers,
+    powerHandlers,
     ipcHandlers,
     timeouts,
     setTimeout: vi.fn((handler: () => void) => {
@@ -27,6 +29,11 @@ const mocks = vi.hoisted(() => {
       next.push(handler)
       handlers.set(name, next)
     }),
+    powerMonitorOn: vi.fn((name: string, handler: (...args: any[]) => any) => {
+      const next = powerHandlers.get(name) ?? []
+      next.push(handler)
+      powerHandlers.set(name, next)
+    }),
     requestSingleInstanceLock: vi.fn(() => true),
     getAppPath: vi.fn(() => '/app'),
     exit: vi.fn(),
@@ -36,6 +43,8 @@ const mocks = vi.hoisted(() => {
     stopEmbeddedServer: vi.fn(() => Promise.resolve()),
     whenReady: vi.fn(() => whenReadyPromise),
     activatePrimaryWindow: vi.fn(() => Promise.resolve({})),
+    closeAllConnections: vi.fn(() => Promise.resolve()),
+    broadcastClientEffectIntent: vi.fn(),
     assertDictionaryParity: vi.fn(),
     buildAppMenu: vi.fn(),
     flushWindowState: vi.fn(() => Promise.resolve(true)),
@@ -82,6 +91,12 @@ vi.mock('electron', () => ({
   dialog: {
     showErrorBox: mocks.showErrorBox,
   },
+  powerMonitor: {
+    on: mocks.powerMonitorOn,
+  },
+  session: {
+    defaultSession: { closeAllConnections: mocks.closeAllConnections },
+  },
   // wireNativeHostIpc() registers IPC handlers; the test never reads
   // from them but the calls must not throw, so we expose a no-op ipcMain.
   ipcMain: {
@@ -104,6 +119,10 @@ vi.mock('#/main/native-settings-projection-sync.ts', () => ({
 vi.mock('#/main/window.ts', () => ({
   activatePrimaryWindow: mocks.activatePrimaryWindow,
   sendExistingPrimaryWindowEffectIntent: mocks.sendExistingPrimaryWindowEffectIntent,
+}))
+
+vi.mock('#/main/client-surface-events.ts', () => ({
+  broadcastClientEffectIntent: mocks.broadcastClientEffectIntent,
 }))
 
 vi.mock('#/main/theme.ts', () => ({
@@ -181,6 +200,7 @@ describe('native host startup lifecycle', () => {
     vi.resetModules()
     vi.clearAllMocks()
     mocks.handlers.clear()
+    mocks.powerHandlers.clear()
     mocks.ipcHandlers.clear()
     mocks.isTrustedIpcEvent.mockReturnValue(true)
     mocks.resetReady()
@@ -189,6 +209,8 @@ describe('native host startup lifecycle', () => {
     mocks.stopEmbeddedServer.mockResolvedValue()
     mocks.sendExistingPrimaryWindowEffectIntent.mockReset()
     mocks.sendExistingPrimaryWindowEffectIntent.mockResolvedValue(true)
+    mocks.closeAllConnections.mockReset()
+    mocks.closeAllConnections.mockResolvedValue()
   })
 
   test('flushes settings and shortcut cleanup before exiting', async () => {
@@ -224,6 +246,92 @@ describe('native host startup lifecycle', () => {
     requestQuit?.()
 
     expect(mocks.quit).toHaveBeenCalledOnce()
+  })
+
+  test('closes default session connections before requesting a command reset', async () => {
+    const closing = Promise.withResolvers<void>()
+    mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
+
+    const recovering = emitPower('resume')
+    await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledOnce())
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({
+      type: 'server-command-reset-requested',
+    })
+
+    closing.resolve()
+    await recovering
+
+    await vi.waitFor(() => {
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
+        type: 'server-command-reset-requested',
+      })
+    })
+  })
+
+  test('requests one command reset after draining follow-up connection cleanup', async () => {
+    const firstClosing = Promise.withResolvers<void>()
+    const secondClosing = Promise.withResolvers<void>()
+    mocks.closeAllConnections.mockReturnValueOnce(firstClosing.promise).mockReturnValueOnce(secondClosing.promise)
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
+
+    void emitPower('resume')
+    void emitPower('resume')
+    await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledOnce())
+
+    firstClosing.resolve()
+    await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledTimes(2))
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalled()
+
+    secondClosing.resolve()
+    await vi.waitFor(() => expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledOnce())
+
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
+      type: 'server-command-reset-requested',
+    })
+  })
+
+  test('still requests a command reset when connection cleanup fails', async () => {
+    mocks.closeAllConnections.mockRejectedValueOnce(new Error('connection cleanup failed'))
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
+
+    await emitPower('resume')
+
+    await vi.waitFor(() => {
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({
+        type: 'server-command-reset-requested',
+      })
+    })
+    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledOnce()
+  })
+
+  test('does not request a command reset when quit starts during resume cleanup', async () => {
+    const closing = Promise.withResolvers<void>()
+    mocks.closeAllConnections.mockReturnValueOnce(closing.promise)
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
+
+    const recovering = emitPower('resume')
+    await vi.waitFor(() => expect(mocks.closeAllConnections).toHaveBeenCalledOnce())
+    const quitting = emit('before-quit', { preventDefault: vi.fn() })
+    await vi.waitFor(() => {
+      expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+    })
+    await mocks.ipcHandlers.get('goblin:app-quit-drained')?.(null, { ok: true })
+    closing.resolve()
+    await Promise.all([recovering, quitting])
+    await flushMicrotasks()
+
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalledWith({
+      type: 'server-command-reset-requested',
+    })
   })
 
   test('does not wait for timeout when the client quit drain reports failure', async () => {
@@ -455,4 +563,8 @@ describe('native host startup lifecycle', () => {
 
 async function emit(name: string, ...args: any[]): Promise<void> {
   for (const handler of mocks.handlers.get(name) ?? []) await handler(...args)
+}
+
+async function emitPower(name: string, ...args: any[]): Promise<void> {
+  for (const handler of mocks.powerHandlers.get(name) ?? []) await handler(...args)
 }

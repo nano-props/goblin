@@ -14,6 +14,7 @@ import {
   resetRefreshTest,
   seedRepo,
 } from '#/web/stores/workspaces/refresh-test-utils.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 beforeEach(resetRefreshTest)
 afterEach(() => vi.restoreAllMocks())
@@ -99,6 +100,25 @@ describe('manual workspace refresh', () => {
 
     expect(order[0]).toBe('fetch')
     expect(new Set(order.slice(1))).toEqual(new Set(['snapshot', 'status']))
+  })
+
+  test('stops refresh automation when the fetch outcome is uncertain', async () => {
+    const workspaceRuntimeId = seedRepo([branch('main')])
+    const snapshot = vi.fn()
+    const status = vi.fn()
+    ipcHandlers['repo.fetch'] = async () => {
+      throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost after fetch' })
+    }
+    ipcHandlers['repo.snapshot'] = snapshot
+    ipcHandlers['repo.worktreeStatus'] = status
+
+    await expect(runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
+      ok: false,
+      kind: 'uncertain',
+      message: 'error.operation-outcome-uncertain',
+    })
+    expect(snapshot).not.toHaveBeenCalled()
+    expect(status).not.toHaveBeenCalled()
   })
 
   test('coalesces concurrent refresh commands for the same runtime', async () => {

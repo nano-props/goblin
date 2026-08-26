@@ -1,7 +1,8 @@
-import { app, dialog, ipcMain } from 'electron'
+import { app, dialog, ipcMain, powerMonitor, session } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { activatePrimaryWindow, sendExistingPrimaryWindowEffectIntent } from '#/main/window.ts'
+import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
 import { buildAppMenu } from '#/main/menu.ts'
@@ -50,6 +51,8 @@ interface ClientQuitDrainOwner {
   outcome: Promise<ClientQuitDrain>
   failDelivery: (error: unknown) => void
 }
+
+const requestRendererCommandRecovery = createRendererCommandRecoveryRequester()
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -137,6 +140,56 @@ async function activateClient(): Promise<void> {
   clientActivated = true
 }
 
+async function closeDefaultSessionConnectionsForResumeRecovery(): Promise<void> {
+  if (isQuitting) return
+  try {
+    // BrowserWindow uses the default session even while macOS keeps the app
+    // alive without a window. Close its pool before opening a fresh command
+    // generation; advancing it settles client-side waits for stale commands as
+    // uncertain. This wait has no deadline: timing out would let late cleanup close
+    // fresh connections, so we accept the theoretical risk that this uncancellable
+    // call hangs.
+    await session.defaultSession.closeAllConnections()
+  } catch (err) {
+    // Cleanup failure must not strand renderer waits; still request a command reset.
+    windowNodeLog.warn({ err }, 'failed to close renderer connections after system resume')
+  }
+}
+
+function createRendererCommandRecoveryRequester(): () => void {
+  let activeRecoveryPromise: Promise<void> | null = null
+  let connectionCleanupPending = false
+
+  const drainResumeConnectionCleanups = async () => {
+    while (connectionCleanupPending && !isQuitting) {
+      connectionCleanupPending = false
+      await closeDefaultSessionConnectionsForResumeRecovery()
+    }
+    if (isQuitting) return
+    // Open one fresh generation only after all observed resume cleanups drain;
+    // opening between passes would expose its connections to the next cleanup.
+    // A command started during cleanup may still settle as uncertain and
+    // require retry. Closing that narrow window would require a disproportionate
+    // two-phase cross-process admission protocol.
+    //
+    // This lifecycle effect does not require exact-document acknowledgement.
+    // The preload listener spans the document lifetime and queues it until the
+    // Vue consumer mounts; if no surface exists, the broadcast is a no-op and
+    // a later document starts with a fresh command generation by construction.
+    broadcastClientEffectIntent({ type: 'server-command-reset-requested' })
+  }
+
+  return () => {
+    connectionCleanupPending = true
+    if (activeRecoveryPromise) return
+    const recovery = drainResumeConnectionCleanups()
+    activeRecoveryPromise = recovery
+    void recovery.finally(() => {
+      if (activeRecoveryPromise === recovery) activeRecoveryPromise = null
+    })
+  }
+}
+
 function beginClientQuitDrain(): ClientQuitDrainOwner {
   let finishOwner: (drain: ClientQuitDrain) => void = () => {}
   const outcome = new Promise<ClientQuitDrain>((resolve) => {
@@ -178,6 +231,10 @@ function handleTrustedClientQuitDrainBoundary(
 
 async function initializeNativeHost(): Promise<void> {
   await app.whenReady()
+  // System resume is an Electron-only transport lifecycle boundary. Browser
+  // clients do not receive this native effect and retain their normal server
+  // request lifecycle.
+  powerMonitor.on('resume', requestRendererCommandRecovery)
   await startEmbeddedServer()
   const settingsSnapshot = await getSettingsSnapshot()
   initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })

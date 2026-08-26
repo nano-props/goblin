@@ -21,7 +21,7 @@ export async function openWorkspacePaths(
     const result = await openWorkspaceMembership(path)
     if (!result.ok) {
       onOpenFailed?.(path, result)
-      if (result.kind === 'uncertain') break
+      if (result.kind === 'uncertain') return null
       continue
     }
     firstId ??= result.workspaceId

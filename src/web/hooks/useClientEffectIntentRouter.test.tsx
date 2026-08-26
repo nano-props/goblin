@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'vue-sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
+import { provideDocumentClientEffectIntentIngress } from '#/web/hooks/client-effect-intent-ingress.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { themeStore } from '#/web/stores/theme.ts'
@@ -56,8 +57,15 @@ import {
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
+
+const commandGenerationMocks = vi.hoisted(() => ({ advance: vi.fn() }))
+
+vi.mock('#/web/lib/server-command-generation.ts', () => ({
+  advanceServerCommandGeneration: commandGenerationMocks.advance,
+}))
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentWorkspaceHistory: vi.fn(async () => {}),
@@ -106,6 +114,7 @@ beforeEach(() => {
   appDataClientMocks.removeWorkspaceFromSession.mockResolvedValue(undefined)
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
+  commandGenerationMocks.advance.mockClear()
   overlayOpen = false
   workspaceShortcutSuppressed = false
   currentWorkspaceId = null
@@ -192,6 +201,18 @@ afterEach(() => {
 })
 
 describe('useClientEffectIntentRouter', () => {
+  test('advances the server command generation immediately on every native advance request', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      emitIntent({ type: 'server-command-reset-requested' })
+      emitIntent({ type: 'server-command-reset-requested' })
+    })
+
+    expect(commandGenerationMocks.advance).toHaveBeenCalledTimes(2)
+  })
+
   test('dispatches global dialogs while workspace bootstrap is still restoring', async () => {
     currentWorkspaceId = null
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
@@ -286,7 +307,7 @@ describe('useClientEffectIntentRouter', () => {
       currentBranchName: 'main',
     })
     currentWorkspaceId = repo.id
-    await flushTestUpdates(() => host.rerender(<HookHost />))
+    await flushTestUpdates(() => host.rerender(<IntentIngressTestHost />))
 
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
@@ -308,7 +329,7 @@ describe('useClientEffectIntentRouter', () => {
 
     currentWorkspaceId = repo.id
     await flushTestUpdates(async () => {
-      await host.rerender(<HookHost />)
+      await host.rerender(<IntentIngressTestHost />)
     })
 
     expect(nativeIntentSubscriptionStarts).toBe(1)
@@ -580,7 +601,6 @@ describe('useClientEffectIntentRouter', () => {
     first.resolve({
       ok: false,
       kind: 'uncertain',
-      workspaceId: firstWorkspaceId,
       message: 'error.operation-outcome-uncertain',
     })
     await flushTestUpdates(() => {})
@@ -699,7 +719,7 @@ describe('useClientEffectIntentRouter', () => {
       focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor: vi.fn(() => Promise.resolve({ kind: 'not-committed' as const, message: null })),
     })
-    renderInJsdom(<HookHost />)
+    renderInJsdom(<IntentIngressTestHost />)
     seedInitialObservedWorkspacePaneRouteForTest({
       workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -814,6 +834,23 @@ describe('useClientEffectIntentRouter', () => {
       expect(appDataClientMocks.clearRecentWorkspaceHistory).toHaveBeenCalledTimes(1)
     })
   })
+
+  test('surfaces an uncertain app intent outcome once', async () => {
+    appDataClientMocks.clearRecentWorkspaceHistory.mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'clear recent outcome uncertain' }),
+    )
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      emitIntent({ type: 'clear-recent-workspaces-requested' })
+    })
+
+    await waitFor(() => {
+      expect(toast.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
+        id: 'intent-operation-outcome-uncertain',
+      })
+    })
+  })
 })
 
 function preferredWorkspacePaneTab(repoId: string) {
@@ -834,8 +871,16 @@ function preferredWorkspacePaneTab(repoId: string) {
 }
 
 async function renderHookHost() {
-  return renderInJsdom(<HookHost />)
+  return renderInJsdom(<IntentIngressTestHost />)
 }
+
+const IntentIngressTestHost = defineComponent({
+  name: 'ClientEffectIntentIngressTestHost',
+  setup() {
+    provideDocumentClientEffectIntentIngress()
+    return () => <HookHost />
+  },
+})
 
 const HookHost = defineComponent({
   name: 'ClientEffectIntentRouterTestHost',

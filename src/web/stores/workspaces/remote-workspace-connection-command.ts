@@ -12,41 +12,27 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 
 export type RemoteWorkspaceConnectionOutcome =
-  | { kind: 'ready'; workspaceId: WorkspaceId; target: RemoteWorkspaceTarget }
-  | {
-      kind: 'failed'
-      workspaceId: WorkspaceId
-      reason: RemoteWorkspaceFailureReason
-      target?: RemoteWorkspaceTarget
-    }
-  | { kind: 'superseded'; workspaceId: WorkspaceId }
-  | { kind: 'stale-runtime'; workspaceId: WorkspaceId }
-  | { kind: 'cancelled'; workspaceId: WorkspaceId }
-  | { kind: 'outcome-uncertain'; workspaceId: WorkspaceId }
-  | { kind: 'transport-failed'; workspaceId: WorkspaceId; reason: 'unknown' }
+  | { kind: 'ready'; target: RemoteWorkspaceTarget }
+  | { kind: 'failed'; reason: RemoteWorkspaceFailureReason }
+  | { kind: 'superseded' }
+  | { kind: 'stale-runtime' }
+  | { kind: 'cancelled' }
+  | { kind: 'outcome-uncertain' }
+  | { kind: 'transport-failed'; reason: 'unknown' }
 
 type RemoteWorkspaceConnectionTransportOutcome = Extract<
   RemoteWorkspaceConnectionOutcome,
   { kind: 'outcome-uncertain' | 'cancelled' | 'transport-failed' }
 >
 
-function commandOutcome(
-  result: RemoteWorkspaceLifecycleCommandResult,
-  workspaceId: WorkspaceId,
-): RemoteWorkspaceConnectionOutcome {
-  if (result.workspaceId !== workspaceId) return { kind: 'stale-runtime', workspaceId }
-  if (result.kind !== 'settled') return { kind: result.kind, workspaceId }
+function commandOutcome(result: RemoteWorkspaceLifecycleCommandResult): RemoteWorkspaceConnectionOutcome {
+  if (result.kind !== 'settled') return { kind: result.kind }
   const lifecycle = result.lifecycle
   if (lifecycle.kind === 'ready') {
-    return { kind: 'ready', workspaceId, target: lifecycle.target }
+    return { kind: 'ready', target: lifecycle.target }
   }
   if (lifecycle.kind === 'failed') {
-    return {
-      kind: 'failed',
-      workspaceId,
-      reason: lifecycle.reason,
-      target: lifecycle.target,
-    }
+    return { kind: 'failed', reason: lifecycle.reason }
   }
   const exhaustiveLifecycle: never = lifecycle
   return exhaustiveLifecycle
@@ -72,14 +58,14 @@ export async function runRemoteWorkspaceConnection(
     { workspaceId, workspaceRuntimeId, mode: options.mode },
     options.signal,
   ).catch((error: unknown): RemoteWorkspaceLifecycleCommandResult | RemoteWorkspaceConnectionTransportOutcome => {
-    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return { kind: 'outcome-uncertain', workspaceId }
-    if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', workspaceId }
-    return { kind: 'transport-failed', workspaceId, reason: 'unknown' }
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return { kind: 'outcome-uncertain' }
+    if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled' }
+    return { kind: 'transport-failed', reason: 'unknown' }
   })
   if (result.kind === 'outcome-uncertain' || result.kind === 'cancelled' || result.kind === 'transport-failed') {
     return result
   }
-  if (result.workspaceId !== workspaceId) return { kind: 'stale-runtime', workspaceId }
+  if (result.workspaceId !== workspaceId) return { kind: 'stale-runtime' }
   if (result.kind === 'settled') {
     const accepted = acceptRemoteWorkspaceRuntimeProjection(set, get, {
       workspaceId,
@@ -89,9 +75,9 @@ export async function runRemoteWorkspaceConnection(
     })
     if (!accepted) {
       if (get().workspaces[workspaceId]?.workspaceRuntimeId !== workspaceRuntimeId) {
-        return { kind: 'stale-runtime', workspaceId }
+        return { kind: 'stale-runtime' }
       }
-      return { kind: 'superseded', workspaceId }
+      return { kind: 'superseded' }
     }
     if (
       result.lifecycle.kind === 'ready' &&
@@ -101,7 +87,7 @@ export async function runRemoteWorkspaceConnection(
       void requestRepoSnapshotRefresh({ get, set }, workspaceId, { workspaceRuntimeId })
     }
   }
-  return commandOutcome(result, workspaceId)
+  return commandOutcome(result)
 }
 
 function isAbortError(error: unknown): boolean {

@@ -16,11 +16,9 @@ afterEach(() => {
 
 describe('open workspace result feedback', () => {
   test('presents uncertain open and close outcomes as warnings', () => {
-    const workspaceId = workspaceIdForTest('goblin+file:///workspace')
-
     expect(
       reportOpenWorkspaceUncertainty(
-        { ok: false, kind: 'uncertain', workspaceId, message: 'error.operation-outcome-uncertain' },
+        { ok: false, kind: 'uncertain', message: 'error.operation-outcome-uncertain' },
         (key) => key,
       ),
     ).toBe(true)

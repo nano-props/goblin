@@ -37,15 +37,15 @@ export type RepoEvent =
   | { id: number; kind: 'result'; result: RepoMutationExecResult; action?: RepoEventAction }
   | { id: number; kind: 'error'; message: string }
 
-/** A successful open may be activated immediately. An uncertain open preserves
- *  the already-established workspace projection and exposes its identity, but
- *  callers must stop automation and let the user inspect it deliberately. */
+/** A successful open carries the confirmed identity needed for activation.
+ *  An uncertain open carries no partial identity: callers must stop automation,
+ *  while already-established authoritative facts remain in the workspace store. */
 export type OpenWorkspacePostOpenError =
   | { kind: 'recent-workspace'; message: string }
   | { kind: 'operation-outcome-uncertain'; message: 'error.operation-outcome-uncertain' }
 
 export type OpenWorkspaceFailure =
-  | { ok: false; kind: 'uncertain'; workspaceId: WorkspaceId; message: 'error.operation-outcome-uncertain' }
+  | { ok: false; kind: 'uncertain'; message: 'error.operation-outcome-uncertain' }
   | { ok: false; kind: 'failed'; message: string }
 
 export type OpenWorkspaceResult =

@@ -912,6 +912,9 @@ export const en = {
     'Goblin could not confirm your authentication status. Check the server and network connection, then reopen Goblin.',
   'lazy-restore.failed': 'Could not open workspace',
   'workspace-restore.failed': 'Could not restore workspace',
+  'runtime-recovery.failed-title': 'Could not recover workspace runtimes',
+  'runtime-recovery.failed-description':
+    'Some workspace views may be out of date. Check the current state or try again.',
 } as const
 
 export type DictKey = keyof typeof en

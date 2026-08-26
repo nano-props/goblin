@@ -8,6 +8,8 @@ import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
+import { toast } from 'vue-sonner'
 
 const LOGIN_TIMEOUT_MS = 15_000
 
@@ -26,7 +28,7 @@ export const TokenGate = defineComponent({
     )
     return () => {
       if (auth.state === 'checking') return null
-      if (auth.state === 'unauthenticated') return <LoginForm onSuccess={auth.refresh} />
+      if (auth.state === 'unauthenticated') return <LoginForm onRefreshAuth={auth.refresh} />
       if (auth.state === 'unavailable') return <AuthUnavailable />
       return slots.default?.()
     }
@@ -45,10 +47,10 @@ const AuthUnavailable = defineComponent({
   },
 })
 
-const LoginForm = defineComponent<{ onSuccess: () => void }>({
+const LoginForm = defineComponent<{ onRefreshAuth: () => void }>({
   name: 'LoginForm',
   props: {
-    onSuccess: { type: Function as PropType<() => void>, required: true },
+    onRefreshAuth: { type: Function as PropType<() => void>, required: true },
   },
 
   setup(props) {
@@ -67,15 +69,20 @@ const LoginForm = defineComponent<{ onSuccess: () => void }>({
       }
       submitting.value = true
       error.value = null
-      const onSuccess = props.onSuccess
+      const refreshAuth = props.onRefreshAuth
       const timeout = createTimeoutAbortController(LOGIN_TIMEOUT_MS, `login timed out after ${LOGIN_TIMEOUT_MS}ms`)
       activeTimeout = timeout
       try {
         await postServerCommandJson('/api/login', { token: trimmed }, decodeWith(OkResponseSchema), {
           signal: timeout.signal,
         })
-        onSuccess()
+        refreshAuth()
       } catch (caught) {
+        if (hasErrorCode(caught, 'OUTCOME_UNCERTAIN')) {
+          toast.warning(t('error.operation-outcome-uncertain'))
+          refreshAuth()
+          return
+        }
         error.value = caught instanceof Error ? caught.message : t('auth.gate.error-failed')
       } finally {
         timeout.dispose()

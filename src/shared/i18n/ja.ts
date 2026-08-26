@@ -921,4 +921,7 @@ export const ja: Record<DictKey, string> = {
     'Goblin は認証状態を確認できませんでした。サーバーとネットワーク接続を確認してから、Goblin を開き直してください。',
   'lazy-restore.failed': 'ワークスペースを開けません',
   'workspace-restore.failed': 'ワークスペースを復元できません',
+  'runtime-recovery.failed-title': 'ワークスペースランタイムを復旧できません',
+  'runtime-recovery.failed-description':
+    '一部のワークスペース表示が古い可能性があります。現在の状態を確認するか、再試行してください。',
 }

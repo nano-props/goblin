@@ -65,7 +65,7 @@ describe('remote lifecycle command client', () => {
       lifecycle: { kind: 'ready', attemptId: 3, target },
       workspaceProbe: readyProbe,
     })
-    await expect(pending).resolves.toMatchObject({ kind: 'ready', workspaceId: workspaceId })
+    await expect(pending).resolves.toMatchObject({ kind: 'ready' })
   })
 
   test('applies the canonical terminal through the runtime projection acceptor', async () => {
@@ -102,9 +102,7 @@ describe('remote lifecycle command client', () => {
       runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toEqual({
       kind: 'failed',
-      workspaceId,
       reason: 'auth-failed',
-      target,
     })
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'auth-failed', target },
@@ -125,7 +123,7 @@ describe('remote lifecycle command client', () => {
 
     await expect(
       runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
-    ).resolves.toEqual({ kind: 'stale-runtime', workspaceId: workspaceId })
+    ).resolves.toEqual({ kind: 'stale-runtime' })
   })
 
   test('does not apply a response to a replaced runtime generation', async () => {
@@ -148,7 +146,7 @@ describe('remote lifecycle command client', () => {
       lifecycle: { kind: 'ready', attemptId: 1, target },
       workspaceProbe: readyProbe,
     })
-    await expect(pending).resolves.toEqual({ kind: 'stale-runtime', workspaceId: workspaceId })
+    await expect(pending).resolves.toEqual({ kind: 'stale-runtime' })
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
@@ -172,7 +170,6 @@ describe('remote lifecycle command client', () => {
       runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toEqual({
       kind: 'cancelled',
-      workspaceId: workspaceId,
     })
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
@@ -190,7 +187,7 @@ describe('remote lifecycle command client', () => {
       runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId, {
         signal: controller.signal,
       }),
-    ).resolves.toEqual({ kind: 'outcome-uncertain', workspaceId })
+    ).resolves.toEqual({ kind: 'outcome-uncertain' })
   })
 
   test('normalizes transport failure without synthesizing local lifecycle state', async () => {
@@ -199,7 +196,6 @@ describe('remote lifecycle command client', () => {
       runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toEqual({
       kind: 'transport-failed',
-      workspaceId: workspaceId,
       reason: 'unknown',
     })
     expect(remoteAdmission()).toMatchObject({
@@ -222,7 +218,7 @@ describe('remote lifecycle command client', () => {
       workspaceProbe: readyProbe,
     })
 
-    await expect(pending).resolves.toEqual({ kind: 'superseded', workspaceId })
+    await expect(pending).resolves.toEqual({ kind: 'superseded' })
     expect(requestRepoSnapshotRefresh).not.toHaveBeenCalled()
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },

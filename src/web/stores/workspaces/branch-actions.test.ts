@@ -6,7 +6,7 @@ import {
   createBranchSnapshot,
   createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
@@ -27,6 +27,12 @@ import type { GitRemoteInfo } from '#/shared/git-types.ts'
 import { repoSnapshotResponse } from '#/web/stores/workspaces/refresh-test-utils.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { CodedError } from '#/shared/coded-error.ts'
+
+const toastMocks = vi.hoisted(() => ({ warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: toastMocks }))
+
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-branch-actions-test-repo')
 const REPO_WORKTREE_PATH = '/tmp/goblin-branch-actions-test-repo'
 const refreshStoreAccess = { get: workspacesStore.getState, set: workspacesStore.setState }
@@ -61,6 +67,7 @@ function runRepoBranchActionForTest(action: RepoBranchAction) {
 }
 
 beforeEach(() => {
+  toastMocks.warning.mockClear()
   resetWorkspacesStore()
   seedRepoWithReadModelForTest({
     id: REPO_ID,
@@ -469,6 +476,54 @@ describe('runBranchAction', () => {
       target: null,
     })
   })
+
+  test('surfaces an uncertain branch command outcome with the actionable recovery message', async () => {
+    installGoblinTestBridge({
+      'repo.pull': async () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost after delivery' })
+      },
+    })
+
+    const result = await workspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+
+    expect(result).toBeNull()
+    expect(
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction,
+    ).toMatchObject({ phase: 'idle', target: null })
+    expect(toastMocks.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
+      id: `branch-action-outcome-uncertain:${REPO_ID}`,
+      duration: 10_000,
+    })
+  })
+
+  test.each(['replaced', 'removed'] as const)(
+    'keeps branch uncertainty visible when its runtime epoch is %s before settlement',
+    async (transition) => {
+      installGoblinTestBridge({
+        'repo.pull': async () => {
+          if (transition === 'replaced') {
+            seedRepoWithReadModelForTest({
+              id: REPO_ID,
+              workspaceRuntimeId: 'repo-runtime-replacement',
+              branches: [createRepoBranch('feature/a')],
+            })
+          } else {
+            workspacesStore.setState({ workspaces: {}, workspaceOrder: [] })
+          }
+          throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost after delivery' })
+        },
+      })
+
+      await expect(
+        workspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }),
+      ).resolves.toBeNull()
+
+      expect(toastMocks.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
+        id: `branch-action-outcome-uncertain:${REPO_ID}`,
+        duration: 10_000,
+      })
+    },
+  )
 
   test('runs branch network actions independently of snapshot reads', async () => {
     let pullCalls = 0

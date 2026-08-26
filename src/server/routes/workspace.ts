@@ -4,7 +4,6 @@ import {
   acquireWorkspaceRuntime,
   listWorkspaceRuntimes,
   releaseWorkspaceRuntime,
-  replaceWorkspaceRuntimeMembershipsForClient,
   runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
   withWorkspaceRuntimeAdmission,
@@ -38,6 +37,7 @@ import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tab
 import type { RuntimeWorkspacePaneTarget, WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { getLocalPathSuggestions } from '#/server/workspaces/local-path-suggestions.ts'
 import { workspaceLocatorFromNativeCommandInput } from '#/server/workspaces/native-input.ts'
+import { reconcileWorkspaceRuntimeMemberships } from '#/server/settings/source.ts'
 
 export function createWorkspaceRoutes(options: {
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
@@ -143,7 +143,8 @@ export function createWorkspaceRoutes(options: {
   app.post('/runtime-reconcile', async (c) => {
     const userId = requireUserId(userIdFromContext(c))
     const { clientId, workspaceIds } = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.runtimeReconcile, c)
-    return c.json({ runtimes: replaceWorkspaceRuntimeMembershipsForClient(userId, clientId, workspaceIds) })
+    const runtimes = await reconcileWorkspaceRuntimeMemberships({ userId, clientId, workspaceIds })
+    return c.json({ runtimes })
   })
 
   app.post('/runtime-close', async (c) => {

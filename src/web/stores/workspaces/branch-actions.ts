@@ -1,3 +1,4 @@
+import { toast } from 'vue-sonner'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
@@ -35,6 +36,9 @@ import {
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
+import { translate } from '#/web/stores/i18n-vue.ts'
+
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -224,9 +228,9 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       get().setLastResult(id, result, workspaceRuntimeId)
       return result
     }
-    const handleResult = async (result: Result) => {
-      if (!shouldSuppressBranchActionResultMessage(result, options)) {
-        get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
+    const handleResult = async (outcome: { kind: 'settled'; result: Result } | { kind: 'uncertain' }) => {
+      if (outcome.kind === 'settled' && !shouldSuppressBranchActionResultMessage(outcome.result, options)) {
+        get().setLastResult(id, outcome.result, workspaceRuntimeId, { action: branchActionEventAction(action) })
       }
     }
     const handleError = (message: string) => {
@@ -237,45 +241,60 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
     const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
       throwIfStale(get, id, workspaceRuntimeId)
       ctx.setPhase('running')
-      return execute(workspaceRuntimeId, signal)
+      try {
+        return { kind: 'settled' as const, result: await execute(workspaceRuntimeId, signal) }
+      } catch (error) {
+        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+          // This describes the user's command, not an epoch-owned repo
+          // projection, so publish it before stale settlement can discard it.
+          const messageKey = 'error.operation-outcome-uncertain'
+          toast.warning(translate(messageKey), {
+            id: `branch-action-outcome-uncertain:${id}`,
+            duration: 10_000,
+          })
+          return { kind: 'uncertain' as const }
+        }
+        throw error
+      }
     }
 
-    if (network) {
-      return runLatestOperation({
-        set,
-        get,
-        id,
-        workspaceRuntimeId,
-        lane: 'network',
-        operationKey: BRANCH_NETWORK_OPERATION_KEY,
-        priority: 100,
-        targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
-        task: runActionTask,
-        queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
-        queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
-        errorFromResult: branchActionErrorFromResult,
-        errorResult: failureResult,
-        onResult: handleResult,
-        onError: handleError,
-        onStale: handleStale,
-      })
-    }
-
-    return runExclusiveOperation({
-      set,
-      get,
-      id,
-      workspaceRuntimeId,
-      lane: 'write',
-      priority: 100,
-      targets: [branchActionTarget(action)],
-      busyResult: failureResult('cancelled'),
-      task: runActionTask,
-      errorFromResult: branchActionErrorFromResult,
-      errorResult: failureResult,
-      onResult: handleResult,
-      onError: handleError,
-    })
+    const outcome = network
+      ? await runLatestOperation({
+          set,
+          get,
+          id,
+          workspaceRuntimeId,
+          lane: 'network',
+          operationKey: BRANCH_NETWORK_OPERATION_KEY,
+          priority: 100,
+          targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
+          task: runActionTask,
+          queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
+          queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
+          errorFromResult: (outcome) =>
+            outcome.kind === 'settled' ? branchActionErrorFromResult(outcome.result) : null,
+          errorResult: (message) => ({ kind: 'settled' as const, result: failureResult(message) }),
+          onResult: handleResult,
+          onError: handleError,
+          onStale: handleStale,
+        })
+      : await runExclusiveOperation({
+          set,
+          get,
+          id,
+          workspaceRuntimeId,
+          lane: 'write',
+          priority: 100,
+          targets: [branchActionTarget(action)],
+          busyResult: { kind: 'settled', result: failureResult('cancelled') },
+          task: runActionTask,
+          errorFromResult: (currentOutcome) =>
+            currentOutcome.kind === 'settled' ? branchActionErrorFromResult(currentOutcome.result) : null,
+          errorResult: (message) => ({ kind: 'settled' as const, result: failureResult(message) }),
+          onResult: handleResult,
+          onError: handleError,
+        })
+    return outcome?.kind === 'settled' ? outcome.result : null
   }
 
   return {

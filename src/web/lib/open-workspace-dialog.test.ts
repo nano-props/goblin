@@ -90,15 +90,13 @@ describe('openWorkspaceFromDialog', () => {
     })
   })
 
-  test('surfaces an uncertain open without activating the established workspace', async () => {
+  test('surfaces an uncertain open without activating a workspace', async () => {
     installGoblinTestBridge({
       'workspace.openDialog': () => '/tmp/repo',
     })
-    const workspaceId = workspaceIdForTest('goblin+file:///tmp/repo')
     const openWorkspaceMembership = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: false,
       kind: 'uncertain',
-      workspaceId,
       message: 'error.operation-outcome-uncertain',
     }))
     const activateWorkspace = vi.fn()
