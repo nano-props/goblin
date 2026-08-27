@@ -34,7 +34,6 @@ import {
   TerminalRenderQueue,
   type RenderedOutputCheckpoint,
 } from '#/web/terminal/components/terminal-render-queue.ts'
-import { planTerminalComposerTextInput } from '#/web/terminal/components/terminal-composer-text-input.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
   createTerminalWriteFailureReporter,
@@ -313,20 +312,9 @@ export class TerminalSession {
     if (this.composerTextDeliveryPending || !text) return false
     const submittedBinding = this.currentWritableInputBinding()
     if (!submittedBinding) return false
-    // Foreground processName is an output-driven presentation projection, not
-    // an atomic input-admission token. It can briefly lag a same-generation
-    // foreground process transition until the next PTY output (normally the
-    // returning shell prompt). Accept that locally recoverable UI window; do
-    // not introduce a second foreground authority or coordination protocol.
-    // Runtime-generation replacement remains an enforced boundary below.
-    const inputPlan = planTerminalComposerTextInput({ text, processName: this.runtime.currentProcessName() })
     this.composerTextDeliveryPending = true
     try {
-      const bodyAcceptedByView =
-        inputPlan.method === 'typed'
-          ? this.view.sendTextAsInput(inputPlan.payload)
-          : this.view.pasteText(inputPlan.payload)
-      if (!bodyAcceptedByView) return false
+      if (!this.view.pasteText(text)) return false
       // The body must reach the PTY before this Composer action is accepted.
       // For submission, this also keeps the following Enter in a separate
       // ordered delivery step instead of letting input batching merge them.
