@@ -22,6 +22,15 @@ import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 
+type PackageJson = { engines: { bun: string } }
+
+const packageJson = (await Bun.file(new URL('./package.json', import.meta.url)).json()) as PackageJson
+const REQUIRED_BUN_VERSION = packageJson.engines.bun
+if (!Bun.semver.satisfies(Bun.version, REQUIRED_BUN_VERSION)) {
+  console.error(`Error: Bun ${REQUIRED_BUN_VERSION} is required, but found ${Bun.version}.`)
+  process.exit(1)
+}
+
 // npm mirror defaults — only applied when --npmmirror is passed (or the
 // matching env var is non-empty). Mirrors off by default so the user opts
 // in explicitly; matches build.ts's "use GitHub unless told otherwise".
