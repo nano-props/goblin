@@ -331,7 +331,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(session.snapshot().composer.historyEntries).toEqual(['first command'])
   })
 
-  test('submits safe Devin multiline text as normalized typed input followed by Enter', async () => {
+  test('submits Devin text through the same xterm paste semantics', async () => {
     const { session, term } = await startPresentedControllerGeneration()
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -342,55 +342,18 @@ describe('TerminalSession input, resize, and controller authority', () => {
       processName: 'devin',
     })
     term.modes.bracketedPasteMode = true
-    const bodyWrite = Promise.withResolvers<TerminalWriteResult>()
-    terminalCalls.write.mockImplementationOnce(() => bodyWrite.promise)
     const originalText = 'first line\r\nsecond line\rthird line 你好'
 
-    const submission = session.submitComposerText(originalText)
-    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+    await expect(session.submitComposerText(originalText)).resolves.toBe(true)
 
-    expect(term.paste).not.toHaveBeenCalled()
-    expect(term.input).toHaveBeenCalledTimes(1)
-    expect(term.input).toHaveBeenCalledWith('first line\nsecond line\nthird line 你好', true)
-    expect(terminalCalls.write).toHaveBeenNthCalledWith(1, {
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      data: 'first line\nsecond line\nthird line 你好',
-    })
-
-    bodyWrite.resolve({ status: 'accepted' })
-    await expect(submission).resolves.toBe(true)
-
-    expect(term.input).toHaveBeenNthCalledWith(2, '\r', true)
-    expect(terminalCalls.write).toHaveBeenNthCalledWith(2, {
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      data: '\r',
-    })
-    expect(session.snapshot().composer.historyEntries).toEqual([originalText])
-  })
-
-  test('falls back to paste submission for Devin text containing terminal controls', async () => {
-    const { session, term } = await startPresentedControllerGeneration()
-    session.handleOutput({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: descriptor.terminalSessionId,
-      data: '',
-      seq: 1,
-      processName: 'devin',
-    })
-    term.modes.bracketedPasteMode = true
-
-    await expect(session.submitComposerText('before\tafter')).resolves.toBe(true)
-
-    expect(term.paste).toHaveBeenCalledWith('before\tafter')
+    expect(term.paste).toHaveBeenCalledWith(originalText)
     expect(term.input).toHaveBeenCalledWith('\r', true)
     expect(terminalCalls.write).toHaveBeenNthCalledWith(1, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
-      data: '\x1b[200~before\tafter\x1b[201~',
+      data: '\x1b[200~first line\rsecond line\rthird line 你好\x1b[201~',
     })
+    expect(session.snapshot().composer.historyEntries).toEqual([originalText])
   })
 
   test('fast-fails a concurrent composed submission and records only accepted text in session history', async () => {
@@ -517,50 +480,6 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(replacementTerm.input).not.toHaveBeenCalled()
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
     expect(session.snapshot().composer.historyEntries).toEqual(['accepted by the old generation'])
-  })
-
-  test('does not send Devin typed submission Enter to a replacement generation', async () => {
-    const { session } = await startPresentedControllerGeneration()
-    session.handleOutput({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: descriptor.terminalSessionId,
-      data: '',
-      seq: 1,
-      processName: 'devin',
-    })
-    const bodyWrite = Promise.withResolvers<TerminalWriteResult>()
-    terminalCalls.write.mockReturnValueOnce(bodyWrite.promise)
-
-    const submission = session.submitComposerText('typed by the old generation')
-    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
-        terminalRuntimeGeneration: 2,
-        identityRevision: 3,
-      }),
-    )
-    session.hydrate({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 2,
-      identityRevision: 2,
-      phase: 'open',
-      message: null,
-      processName: 'zsh',
-      canonicalTitle: null,
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    await flushTerminalStart()
-    const replacementTerm = xtermMocks.terminals.at(-1)!
-
-    bodyWrite.resolve({ status: 'accepted' })
-
-    await expect(submission).resolves.toBe(true)
-    expect(replacementTerm.input).not.toHaveBeenCalled()
-    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-    expect(session.snapshot().composer.historyEntries).toEqual(['typed by the old generation'])
   })
 
   test('settles an accepted submission without waiting for the following Enter acknowledgement', async () => {
