@@ -78,8 +78,10 @@ function makeMemoryStorage(): Storage {
   }
 }
 
-globalThis.localStorage = makeMemoryStorage()
-globalThis.sessionStorage = makeMemoryStorage()
+Object.defineProperties(globalThis, {
+  localStorage: { configurable: true, writable: true, value: makeMemoryStorage() },
+  sessionStorage: { configurable: true, writable: true, value: makeMemoryStorage() },
+})
 
 const jsdomWindow = typeof window === 'undefined' ? null : window
 
