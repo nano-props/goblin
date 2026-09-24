@@ -525,6 +525,7 @@ export function resetTerminalSessionHarness() {
   Object.defineProperty(document, 'fonts', { configurable: true, value: mockFonts })
   Object.defineProperty(globalThis, 'requestAnimationFrame', {
     configurable: true,
+    writable: true,
     value: (cb: FrameRequestCallback) => window.setTimeout(() => cb(performance.now()), 0),
   })
   // The rAF mock hands out setTimeout handles, so cancelAnimationFrame must
@@ -533,6 +534,7 @@ export function resetTerminalSessionHarness() {
   // the session's `cancelScheduledAnimationFrame` working under fake timers.
   Object.defineProperty(globalThis, 'cancelAnimationFrame', {
     configurable: true,
+    writable: true,
     value: (handle: number) => window.clearTimeout(handle),
   })
   HTMLElement.prototype.getBoundingClientRect = vi.fn(() => terminalRect(800, 400))
