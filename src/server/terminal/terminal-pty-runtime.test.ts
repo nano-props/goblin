@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
 import { spawnTerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 import type { SpawnTerminalPtyRuntimeInput } from '#/server/terminal/terminal-pty-runtime.ts'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import type * as NodeOsModule from 'node:os'
 
 vi.mock('node:os', async (importOriginal) => ({
@@ -26,6 +27,10 @@ let kill: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.stubGlobal('Bun', { spawn })
   terminal = { closed: false, write: vi.fn(), resize: vi.fn(), close: vi.fn() }
+  terminal.close.mockImplementation(() => {
+    terminal.closed = true
+    callbacks.exit()
+  })
   kill = vi.fn()
   spawn.mockImplementation((_command, options) => {
     callbacks = options.terminal
@@ -42,6 +47,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Bun PTY adapter', () => {
+  beforeEach(() => useFakeTimers())
   test('passes shell arguments, geometry and environment to Bun', () => {
     const result = spawnTerminalPtyRuntime({ ...input, args: ['-l'], env: { TERM: 'bad', EXAMPLE: 'value' } }, observer)
     expect(result.ok).toBe(true)
@@ -70,6 +76,46 @@ describe('Bun PTY adapter', () => {
     expect(observer.onExit).toHaveBeenCalledOnce()
     callbacks.exit()
     expect(observer.onExit).toHaveBeenCalledOnce()
+  })
+  test('bounds output draining after shell exit even when the slave remains open', async () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    if (!result.ok) throw new Error(result.message)
+    resolveExit(0)
+    await advanceTimersAndFlush(199)
+    expect(observer.onExit).not.toHaveBeenCalled()
+    callbacks.data(terminal, new TextEncoder().encode('tail'))
+    // Flush an incomplete final code point exactly once when retiring output.
+    callbacks.data(terminal, new Uint8Array([0xe4]))
+    await advanceTimersAndFlush(1)
+    expect(observer.onData.mock.calls.map(([data]) => data)).toEqual(['tail', '\ufffd'])
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+    expect(() => result.runtime.write('late')).toThrow('Terminal has exited')
+    callbacks.data(terminal, new TextEncoder().encode('late'))
+    callbacks.exit()
+    expect(observer.onData).toHaveBeenCalledTimes(2)
+    expect(observer.onExit).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  test('EOF cancels the drain deadline and publishes exit only once', async () => {
+    spawnTerminalPtyRuntime(input, observer)
+    resolveExit(0)
+    await advanceTimersAndFlush(50)
+    callbacks.exit()
+    expect(vi.getTimerCount()).toBe(0)
+    await advanceTimersAndFlush(200)
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+  })
+  test('manual close completes draining immediately after shell exit', async () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    if (!result.ok) throw new Error(result.message)
+    resolveExit(0)
+    await advanceTimersAndFlush(50)
+    result.runtime.kill()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
   })
   test('also waits for process exit when EOF arrives first', async () => {
     spawnTerminalPtyRuntime(input, observer)

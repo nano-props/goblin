@@ -7,14 +7,14 @@ import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { serverDataDir } from '#/shared/data-dir.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 
-export interface StandaloneServerLayout {
+export interface ServerLaunchLayout {
   command: readonly string[]
   webRoot: string
   version: string
 }
 
-export async function launchStandaloneServer(
-  layout: StandaloneServerLayout,
+export async function launchServer(
+  layout: ServerLaunchLayout,
   args: string[] = process.argv.slice(2),
 ): Promise<BootstrappedServer> {
   if (process.platform !== 'linux' && process.platform !== 'darwin')

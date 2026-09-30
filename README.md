@@ -30,6 +30,9 @@ On macOS and Linux, `./serve.sh` runs the same build and accepts server options:
 ./serve.sh --host 127.0.0.1 --port 32100
 ```
 
+The canonical process entry is `src/server/main.ts`; it dispatches server startup,
+the internal PTY worker, and the `g` command.
+
 Build and run the standalone executable:
 
 ```sh

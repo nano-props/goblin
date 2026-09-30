@@ -104,6 +104,11 @@ happened.
 
 - Closing is an explicit server-owned business operation. Destroying a local
   view never closes the shell.
+- Shell process exit starts a bounded trailing-output drain. EOF ends the drain
+  early; otherwise the PTY is closed after at most 200 ms. Background descendants
+  retaining the terminal cannot keep an exited shell session interactive.
+  Output received during the drain precedes the single exit event; output after
+  retirement is discarded. Explicit close ends the drain immediately.
 - A requested close remains addressable until PTY termination is acknowledged.
   Concurrent close and cleanup paths join one idempotent retirement operation.
 - The client does not optimistically hide a session before close succeeds. On

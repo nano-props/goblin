@@ -31,7 +31,7 @@ vi.mock('qrcode', () => ({
   default: { toString: mocks.qrToString },
 }))
 
-import { launchStandaloneServer } from '#/server/standalone/standalone-launch.ts'
+import { launchServer } from '#/server/launch.ts'
 
 const layout = { command: ['/app/goblin'], webRoot: '/app/web', version: '0.0.0-test' }
 const originalCwd = process.cwd()
@@ -44,7 +44,7 @@ const environmentKeys = [
 ] as const
 let previousEnvironment: Partial<Record<(typeof environmentKeys)[number], string>>
 
-describe('standalone server launch boundary', () => {
+describe('server launch boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     previousEnvironment = {}
@@ -79,7 +79,7 @@ describe('standalone server launch boundary', () => {
   })
 
   test('projects CLI configuration into the shared worker-backed server bootstrap', async () => {
-    const server = await launchStandaloneServer(layout, [
+    const server = await launchServer(layout, [
       '--host',
       '127.0.0.1',
       '--port',
@@ -109,7 +109,7 @@ describe('standalone server launch boundary', () => {
   test('loads QR presentation only when the bound host has LAN URLs', async () => {
     mocks.getLanUrls.mockReturnValue(['http://192.0.2.10:43211'])
 
-    const server = await launchStandaloneServer(layout, [
+    const server = await launchServer(layout, [
       '--host',
       '0.0.0.0',
       '--port',
@@ -132,7 +132,7 @@ describe('standalone server launch boundary', () => {
   test('does not report missing web assets when the complete web build exists', async () => {
     mocks.fileExists.mockReturnValue(true)
 
-    const server = await launchStandaloneServer(layout, ['--host', '127.0.0.1', '--token', 'generic-explicit-token'])
+    const server = await launchServer(layout, ['--host', '127.0.0.1', '--token', 'generic-explicit-token'])
 
     await server.stop()
     expect(mocks.fileExists).toHaveBeenNthCalledWith(1, '/app/web/index.html')
@@ -141,7 +141,7 @@ describe('standalone server launch boundary', () => {
   })
   test('removes the launcher when bootstrap fails', async () => {
     mocks.bootstrapServer.mockRejectedValueOnce(new Error('bind failed'))
-    await expect(launchStandaloneServer(layout, ['--token', 'example-token'])).rejects.toThrow('bind failed')
+    await expect(launchServer(layout, ['--token', 'example-token'])).rejects.toThrow('bind failed')
     expect(mocks.dispose).toHaveBeenCalledOnce()
   })
 })

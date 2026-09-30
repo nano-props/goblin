@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import packageJson from '../../../package.json' with { type: 'json' }
+import packageJson from '../../package.json' with { type: 'json' }
 
 // Each mode has its own process and dependencies. In particular, a PTY worker
 // or `g` command must not initialize the server's repositories or schedulers.
@@ -23,12 +23,12 @@ async function main(): Promise<void> {
     )
     return
   }
-  const standalone = Bun.isStandaloneExecutable
-  const root = standalone ? import.meta.dirname : path.resolve(import.meta.dirname, '../../..')
-  const command = standalone ? [process.execPath] : [process.execPath, fileURLToPath(import.meta.url)]
-  const { launchStandaloneServer } = await import('#/server/standalone/standalone-launch.ts')
-  await launchStandaloneServer(
-    { command, webRoot: path.join(root, standalone ? 'web' : 'dist/web'), version: packageJson.version },
+  const compiled = Bun.isStandaloneExecutable
+  const root = compiled ? import.meta.dirname : path.resolve(import.meta.dirname, '../..')
+  const command = compiled ? [process.execPath] : [process.execPath, fileURLToPath(import.meta.url)]
+  const { launchServer } = await import('#/server/launch.ts')
+  await launchServer(
+    { command, webRoot: path.join(root, compiled ? 'web' : 'dist/web'), version: packageJson.version },
     args,
   )
 }

@@ -18,7 +18,7 @@
     "build": "bun run build:web && bun run build:server",
     "build:web": "vite build",
     "build:server": "bun scripts/build-server.ts",
-    "start:server": "bun src/server/entrypoints/standalone.ts",
+    "start:server": "bun src/server/main.ts",
     "reset-token": "bun scripts/reset-token.ts",
     "check:boundaries": "bun scripts/check-boundaries.ts",
     "check:no-html-injection": "bun scripts/check-no-html-injection.ts",

@@ -2,6 +2,9 @@ import path from 'node:path'
 import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
 import { readTerminalProcessName } from '#/system/terminal-process-name.ts'
 
+// Bound trailing-output delivery when descendants keep the PTY slave open.
+const EXIT_DRAIN_TIMEOUT_MS = 200
+
 export interface TerminalPtyRuntime {
   write(data: string): void
   resize(cols: number, rows: number): void
@@ -44,6 +47,7 @@ export function spawnTerminalPtyRuntime(
   let processExited = false
   let terminalEnded = false
   let exitDelivered = false
+  let drainTimer: NodeJS.Timeout | undefined
   const decoder = new TextDecoder()
   const disposeData = () => {
     dataOwned = false
@@ -76,12 +80,20 @@ export function spawnTerminalPtyRuntime(
     const finish = () => {
       if (!processExited || !terminalEnded || exitDelivered) return
       exitDelivered = true
+      clearTimeout(drainTimer)
+      drainTimer = undefined
       const notify = exitOwned
       dispose()
-      // EOF is a notification, not resource disposal. Release Bun’s PTY FDs
-      // only after all final output has been delivered.
-      child?.terminal?.close()
+      // EOF is a notification, not resource disposal. The adapter owns the FDs.
+      if (child?.terminal && !child.terminal.closed) child.terminal.close()
       if (notify) observer.onExit()
+    }
+    const endOutput = () => {
+      if (terminalEnded) return
+      terminalEnded = true
+      const data = decoder.decode()
+      if (dataOwned && data) observer.onData(data, processName())
+      finish()
     }
     child = Bun.spawn([shell.command, ...shell.args], {
       cwd: input.cwd,
@@ -91,25 +103,22 @@ export function spawnTerminalPtyRuntime(
         cols: input.cols,
         rows: input.rows,
         data(_terminal, bytes) {
+          if (terminalEnded) return
           const data = decoder.decode(bytes, { stream: true })
           if (dataOwned && data) observer.onData(data, processName())
         },
-        exit() {
-          terminalEnded = true
-          const data = decoder.decode()
-          if (dataOwned && data) observer.onData(data, processName())
-          finish()
-        },
+        exit: endOutput,
       },
     })
     const processHandle = child
     const terminal = processHandle.terminal
     if (!terminal) throw new Error('Bun did not create a PTY')
-    // Process exit can precede the last data/EOF callback. Retire only after
-    // both signals so fast commands cannot lose their final output.
+    // Process exit can precede final output. Drain until EOF or a fixed deadline:
+    // background descendants may retain the slave indefinitely after shell exit.
     void processHandle.exited.then(() => {
       processExited = true
-      finish()
+      if (terminalEnded) finish()
+      else drainTimer = setTimeout(endOutput, EXIT_DRAIN_TIMEOUT_MS)
     })
     const assertOpen = () => {
       if (terminalEnded || processExited || terminal.closed) throw new Error('Terminal has exited')
@@ -131,7 +140,8 @@ export function spawnTerminalPtyRuntime(
           try {
             processHandle.kill('SIGHUP')
           } finally {
-            terminal.close()
+            if (!terminal.closed) terminal.close()
+            endOutput()
           }
         },
         processName,

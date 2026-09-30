@@ -10,7 +10,7 @@ if (!existsSync('dist/web/index.html') || !existsSync('dist/web/boot.js'))
   throw new Error('Build the browser assets first: bun run build:web')
 mkdirSync('dist', { recursive: true })
 const result = await Bun.build({
-  entrypoints: ['src/server/entrypoints/standalone.ts'],
+  entrypoints: ['src/server/main.ts'],
   target: 'bun',
   minify: true,
   compile: { outfile: 'dist/goblin', assets: ['dist/web'], autoloadDotenv: false, autoloadBunfig: false },
