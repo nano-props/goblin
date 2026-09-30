@@ -62,8 +62,7 @@ export default defineConfig(({ mode }) => ({
     outDir: path.resolve(import.meta.dirname, 'dist/web'),
     emptyOutDir: true,
     sourcemap: mode === 'production' ? false : 'inline',
-    chunkSizeWarningLimit: 2048,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         index: path.resolve(import.meta.dirname, 'src/web/index.html'),
       },

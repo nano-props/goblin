@@ -8,8 +8,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const appMocks = vi.hoisted(() => ({ render: vi.fn(), layoutMounted: vi.fn(), layoutUnmounted: vi.fn() }))
 
-vi.mock('#/web/App.tsx', () => ({
-  App: defineComponent({
+vi.mock('#/web/components/WorkspacePage.tsx', () => ({
+  WorkspacePage: defineComponent({
     name: 'AppMock',
     inheritAttrs: false,
     props: {
@@ -35,6 +35,18 @@ vi.mock('#/web/App.tsx', () => ({
   }),
 }))
 
+vi.mock('#/web/components/EmptyWorkspaceView.tsx', () => ({
+  EmptyWorkspaceView: () => <div>empty workspace</div>,
+}))
+
+vi.mock('#/web/components/settings/pages/GeneralSettings.tsx', () => ({
+  GeneralSettings: defineComponent({ setup: () => () => <div>general settings</div> }),
+}))
+
+vi.mock('#/web/components/settings/pages/AboutSettings.tsx', () => ({
+  AboutSettings: defineComponent({ setup: () => () => <div>about settings</div> }),
+}))
+
 vi.mock('#/web/Layout.tsx', () => ({
   Layout: defineComponent({
     name: 'LayoutMock',
@@ -51,11 +63,9 @@ import {
   initialWorkspaceRouteSlugFromStore,
   workspaceRouteViewFromChildRoute,
   workspaceRouteViewFromSlugChildRoute,
-  appRouterCallbacks,
-  applyAppSettingsRouteChange,
-  AppRouterProvider,
-  appRouter,
-} from '#/web/app/navigation/router.tsx'
+} from '#/web/app/navigation/route-model.ts'
+import { AppRouterProvider, appRouter } from '#/web/app/navigation/router.tsx'
+import { workspaceRouterCallbacks } from '#/web/app/navigation/workspace-route-view.tsx'
 import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/app/navigation/workspace-route-slugs.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -80,6 +90,8 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
+import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 
 const WORKSPACE_A_ID = workspaceIdForTest('goblin+file:///workspace-a')
 const WORKSPACE_B_ID = workspaceIdForTest('goblin+file:///workspace-b')
@@ -89,6 +101,7 @@ const ROUTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///route-workspace')
 const DEEP_LINK_WORKSPACE_ID = workspaceIdForTest('goblin+file:///deep-link-workspace')
 
 beforeEach(async () => {
+  resetWorkspacesStore()
   navigateBrowser('/')
   await vi.waitFor(() => expect(appRouter.currentRoute.value.fullPath).toBe('/'))
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
@@ -170,7 +183,7 @@ describe('unmatched app routes', () => {
   test('keeps the root Layout owner mounted while navigating through an unmatched route', async () => {
     navigateBrowser('/settings/general')
     renderRouter()
-    await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('settings'))
+    await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('settings-general'))
     expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
 
     await appRouter.push('/unknown')
@@ -184,6 +197,94 @@ describe('unmatched app routes', () => {
     expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'BACK' })
     expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
     expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
+  })
+})
+
+describe('lazy route navigation', () => {
+  test('loads settings deep links and switches pages without remounting the layout', async () => {
+    navigateBrowser('/settings/about')
+    const view = renderRouter()
+
+    await waitFor(() => expect(view.container.textContent).toContain('about settings'))
+    expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+
+    await appRouter.push('/settings/general')
+
+    await waitFor(() => expect(view.container.textContent).toContain('general settings'))
+    expect(view.container.textContent).not.toContain('about settings')
+    expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+    expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
+  })
+
+  test('redirects an invalid settings page to general settings', async () => {
+    navigateBrowser('/settings/unknown')
+    const view = renderRouter()
+
+    await waitFor(() => expect(appRouter.currentRoute.value.fullPath).toBe('/settings/general'))
+    await waitFor(() => expect(view.container.textContent).toContain('general settings'))
+  })
+
+  test('keeps the admitted route and layout when a page fails to load and offers an explicit reload', async () => {
+    const loadPage = vi.fn().mockRejectedValue(new Error('Page download interrupted'))
+    const removeRoute = appRouter.addRoute('app-layout', {
+      path: 'lazy-page',
+      component: loadPage,
+    })
+    try {
+      navigateBrowser('/settings/general')
+      const view = renderRouter()
+      await waitFor(() => expect(view.container.textContent).toContain('general settings'))
+
+      await expect(appRouter.push('/lazy-page')).rejects.toThrow('Page download interrupted')
+
+      await waitFor(() => expect(view.getByRole('dialog').textContent).toContain('error.route-load-title'))
+      await waitFor(() => expect(document.activeElement).toBe(view.getByRole('link', { name: 'help.row.reload-page' })))
+      expect(isShortcutBlockingLayerOpen()).toBe(true)
+      expect(appRouter.currentRoute.value.fullPath).toBe('/settings/general')
+      expect(view.container.textContent).toContain('general settings')
+      expect(loadPage).toHaveBeenCalledTimes(1)
+      expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+      expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
+      expect(view.getByRole('link', { name: 'help.row.reload-page' }).getAttribute('href')).toBe('/lazy-page')
+
+      await appRouter.push('/settings/about')
+
+      await waitFor(() => expect(view.container.textContent).toContain('about settings'))
+      expect(view.queryByRole('dialog')).toBeNull()
+      expect(isShortcutBlockingLayerOpen()).toBe(false)
+      expect(loadPage).toHaveBeenCalledTimes(1)
+      expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+      expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
+    } finally {
+      removeRoute()
+    }
+  })
+
+  test('does not cover a newer committed page with an older route download failure', async () => {
+    const download = Promise.withResolvers<never>()
+    const loadPage = vi.fn(() => download.promise)
+    const removeRoute = appRouter.addRoute('app-layout', { path: 'slow-page', component: loadPage })
+    try {
+      navigateBrowser('/settings/general')
+      const view = renderRouter()
+      await waitFor(() => expect(view.container.textContent).toContain('general settings'))
+
+      const oldNavigation = appRouter.push('/slow-page')
+      const oldFailure = expect(oldNavigation).rejects.toThrow('Old download interrupted')
+      await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(1))
+      await appRouter.push('/settings/about')
+      await waitFor(() => expect(view.container.textContent).toContain('about settings'))
+
+      download.reject(new Error('Old download interrupted'))
+      await oldFailure
+
+      expect(appRouter.currentRoute.value.fullPath).toBe('/settings/about')
+      expect(view.queryByRole('dialog')).toBeNull()
+      expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+      expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
+    } finally {
+      removeRoute()
+    }
   })
 })
 
@@ -473,8 +574,15 @@ function navigateBrowser(pathname: string) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
+const RouterTestRoot = defineComponent({
+  setup() {
+    provideBootstrapLoadingPresentation()
+    return () => <AppRouterProvider />
+  },
+})
+
 function renderRouter() {
-  return renderInJsdom(AppRouterProvider, { global: { plugins: [appRouter] } })
+  return renderInJsdom(RouterTestRoot, { global: { plugins: [appRouter] } })
 }
 
 describe('workspace route context derivation', () => {
@@ -539,22 +647,20 @@ describe('app route callback facades', () => {
       cancelRepoNewWorktree: vi.fn(),
       workspaceSlugForId: vi.fn(),
     } as unknown as AppRouteNavigation
-    const routerCallbacks = appRouterCallbacks(routeActions)
+    const routerCallbacks = workspaceRouterCallbacks(routeActions)
     const layoutCallbacks = appLayoutRouteCallbacks(routeActions)
 
-    routerCallbacks.onRouteSettingsPageChange('general')
+    routerCallbacks.onOpenSettings()
     routerCallbacks.onOpenWorkspaceNavigator(ROUTE_WORKSPACE_ID)
     routerCallbacks.onOpenWorkspaceDashboard(ROUTE_WORKSPACE_ID)
     routerCallbacks.onOpenRepoNewWorktree(ROUTE_WORKSPACE_ID)
     routerCallbacks.onCancelRepoNewWorktree(ROUTE_WORKSPACE_ID)
     routerCallbacks.onReplaceRepoWorktree(ROUTE_WORKSPACE_ID, '/tmp/main-worktree', 1)
-    applyAppSettingsRouteChange(routeActions, null)
     layoutCallbacks.navigateToSettingsShortcuts()
     layoutCallbacks.navigateToIndex()
 
     expect(routeActions.openSettings).toHaveBeenNthCalledWith(1, 'general')
     expect(routeActions.openSettings).toHaveBeenNthCalledWith(2, 'shortcuts')
-    expect(routeActions.closeSettings).toHaveBeenCalledOnce()
     expect(routeActions.openWorkspaceNavigator).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID)
     expect(routeActions.openWorkspaceDashboard).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID)
     expect(routeActions.openRepoNewWorktree).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID)
@@ -571,7 +677,7 @@ describe('app route callback facades', () => {
       openRepoWorktree: vi.fn(() => true),
     } as unknown as AppRouteNavigation
 
-    appRouterCallbacks(routeActions).onReplaceRepoWorktree(ROUTE_WORKSPACE_ID, '/tmp/feature-new', 7)
+    workspaceRouterCallbacks(routeActions).onReplaceRepoWorktree(ROUTE_WORKSPACE_ID, '/tmp/feature-new', 7)
 
     expect(routeActions.openRepoWorktree).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID, '/tmp/feature-new', {
       replace: true,

@@ -1,344 +1,132 @@
-import { computed, defineComponent, watch } from 'vue'
-import { createRouter, createWebHistory, RouterView, useRoute, useRouter } from 'vue-router'
-import type { RouteLocationNormalized, RouteRecordRaw } from 'vue-router'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { isSettingsPage } from '#/shared/settings-pages.ts'
-import type { SettingsPage } from '#/shared/settings-pages.ts'
-import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import { defineComponent, shallowRef, watch } from 'vue'
+import { createRouter, createWebHistory, RouterView } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
+import { DialogRoot, DialogTitle, DialogDescription } from 'reka-ui'
 import { createAppHistoryPresentationHistory } from '#/web/app/navigation/history-presentation.ts'
-import { App } from '#/web/App.tsx'
-import type {
-  ParsedBranchWorkspacePaneRouteTarget,
-  ParsedWorkspacePaneRoute,
-  WorkspaceRouteView,
-} from '#/web/app/navigation/route-model.ts'
-import { Layout } from '#/web/Layout.tsx'
-import { WorkspaceOpenPage } from '#/web/components/WorkspaceOpenPage.tsx'
-import { EmptyState } from '#/web/components/EmptyState.tsx'
+import { settingsRoute } from '#/web/app/navigation/settings-routes.ts'
+import { useBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { Button } from '#/web/components/ui/button.tsx'
-import { useAppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
-import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
+import { DialogContent } from '#/web/components/ui/dialog.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import {
-  branchNameFromSlug,
-  workspaceIdFromSlug,
-  workspaceSlugFromId,
-  worktreePathFromSlug,
-} from '#/web/app/navigation/workspace-route-slugs.ts'
-import type { RuntimeCoherentWorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { navigationLog } from '#/web/logger.ts'
 
-const AppRouteView = defineComponent({
-  name: 'AppRouteView',
-  setup() {
-    const route = useRoute()
-    const routeAdmitted = useAppRouteAdmission(route)
-    const callbacks = appRouterCallbacks(useAppRouteNavigation())
-    return () => (
-      <App
-        routeSettingsPage={route.name === 'settings' ? settingsPageFromRoute(route) : null}
-        routeWorkspaceView={routeAdmitted.value ? workspaceRouteViewFromRoute(route) : null}
-        {...callbacks}
-      />
-    )
-  },
-})
-
-const AppNotFoundRouteView = defineComponent({
-  name: 'AppNotFoundRouteView',
-  setup() {
-    const t = useT()
-    const navigation = useAppRouteNavigation()
-    return () => (
-      <EmptyState
-        title={t('route.not-found-title')}
-        body={
-          <div class="pt-2">
-            <Button type="button" variant="outline" onClick={() => navigation.openHome()}>
-              {t('route.not-found-home')}
-            </Button>
-          </div>
-        }
-      />
-    )
-  },
-})
-
-const WorkspaceOpenRouteView = defineComponent({
-  name: 'WorkspaceOpenRouteView',
-  setup() {
-    const route = useRoute()
-    return () => <WorkspaceOpenPage key={route.fullPath} path={route.query.path} />
-  },
-})
+// These URLs share a mounted workspace page; lazy loading must not remount it on pane changes.
+const workspaceRouteView = () =>
+  import('#/web/app/navigation/workspace-route-view.tsx').then(({ WorkspaceRouteView }) => WorkspaceRouteView)
 
 const appRouteChildren: RouteRecordRaw[] = [
-  { path: '', name: 'home', component: AppRouteView },
-  { path: 'open', name: 'open-workspace', component: WorkspaceOpenRouteView },
-  { path: 'settings', redirect: '/settings/general' },
   {
-    path: 'settings/:page',
-    name: 'settings',
-    component: AppRouteView,
-    beforeEnter: (to: RouteLocationNormalized) =>
-      isSettingsPage(routeStringParam(to.params.page)) ? true : '/settings/general',
+    path: '',
+    name: 'home',
+    component: () => import('#/web/app/navigation/home-route-view.tsx').then(({ HomeRouteView }) => HomeRouteView),
   },
-  { path: 'workspace/:workspaceSlug', name: 'workspace', component: AppRouteView },
-  { path: 'workspace/:workspaceSlug/dashboard', name: 'workspace-dashboard', component: AppRouteView },
-  { path: 'workspace/:workspaceSlug/root', name: 'workspace-root', component: AppRouteView },
-  { path: 'workspace/:workspaceSlug/root/tab/:tabKey', name: 'workspace-root-tab', component: AppRouteView },
+  {
+    path: 'open',
+    name: 'open-workspace',
+    component: () =>
+      import('#/web/app/navigation/workspace-open-route-view.tsx').then(
+        ({ WorkspaceOpenRouteView }) => WorkspaceOpenRouteView,
+      ),
+  },
+  settingsRoute,
+  { path: 'workspace/:workspaceSlug', name: 'workspace', component: workspaceRouteView },
+  { path: 'workspace/:workspaceSlug/dashboard', name: 'workspace-dashboard', component: workspaceRouteView },
+  { path: 'workspace/:workspaceSlug/root', name: 'workspace-root', component: workspaceRouteView },
+  { path: 'workspace/:workspaceSlug/root/tab/:tabKey', name: 'workspace-root-tab', component: workspaceRouteView },
   {
     path: 'workspace/:workspaceSlug/root/terminal/:terminalSessionId',
     name: 'workspace-root-terminal',
-    component: AppRouteView,
+    component: workspaceRouteView,
   },
-  { path: 'workspace/:workspaceSlug/branch/:branchSlug', name: 'workspace-branch', component: AppRouteView },
+  { path: 'workspace/:workspaceSlug/branch/:branchSlug', name: 'workspace-branch', component: workspaceRouteView },
   {
     path: 'workspace/:workspaceSlug/branch/:branchSlug/tab/:tabKey',
     name: 'workspace-branch-tab',
-    component: AppRouteView,
+    component: workspaceRouteView,
   },
-  { path: 'workspace/:workspaceSlug/worktree/new', name: 'workspace-new-worktree', component: AppRouteView },
+  { path: 'workspace/:workspaceSlug/worktree/new', name: 'workspace-new-worktree', component: workspaceRouteView },
   {
     path: 'workspace/:workspaceSlug/worktree/:worktreeSlug',
     name: 'workspace-worktree',
-    component: AppRouteView,
+    component: workspaceRouteView,
   },
   {
     path: 'workspace/:workspaceSlug/worktree/:worktreeSlug/tab/:tabKey',
     name: 'workspace-worktree-tab',
-    component: AppRouteView,
+    component: workspaceRouteView,
   },
   {
     path: 'workspace/:workspaceSlug/worktree/:worktreeSlug/terminal/:terminalSessionId',
     name: 'workspace-worktree-terminal',
-    component: AppRouteView,
+    component: workspaceRouteView,
   },
-  { path: ':pathMatch(.*)*', name: 'not-found', component: AppNotFoundRouteView },
+  {
+    path: ':pathMatch(.*)*',
+    name: 'not-found',
+    component: () =>
+      import('#/web/app/navigation/not-found-route-view.tsx').then(({ AppNotFoundRouteView }) => AppNotFoundRouteView),
+  },
 ]
 
-const routes: RouteRecordRaw[] = [{ path: '/', component: Layout, children: appRouteChildren }]
-
-function useAppRouteAdmission(route: RouteLocationNormalized) {
-  const router = useRouter()
-  const workspaceState = useStoreSelector(
-    workspacesStore,
-    (state) => ({
-      restoredWorkspaceId: state.restoredWorkspaceId,
-      workspaceOrder: state.workspaceOrder,
-      workspaces: state.workspaces,
-      workspaceMembershipReady: state.workspaceMembershipReady,
-    }),
-    (left, right) =>
-      left.restoredWorkspaceId === right.restoredWorkspaceId &&
-      left.workspaceOrder === right.workspaceOrder &&
-      left.workspaces === right.workspaces &&
-      left.workspaceMembershipReady === right.workspaceMembershipReady,
-  )
-  const routeAdmitted = computed(() => {
-    const workspaceSlug = routeStringParam(route.params.workspaceSlug)
-    if (!workspaceSlug) return true
-    const workspaceId = workspaceIdFromSlug(workspaceSlug)
-    const workspace = workspaceId ? workspaceState.value.workspaces[workspaceId] : null
-    if (!workspace) return true
-    if (routeRequiresGitCapability(route)) return workspace.capability.kind !== 'filesystem'
-    if (routeRequiresFilesystemCapability(route)) return workspace.capability.kind !== 'git'
-    return true
-  })
-  const admittedPath = computed(() => {
-    if (route.name === 'home') {
-      const workspaceSlug = initialWorkspaceRouteSlugFromStore(workspaceState.value)
-      return workspaceSlug ? `/workspace/${workspaceSlug}/dashboard` : null
-    }
-
-    const workspaceSlug = routeStringParam(route.params.workspaceSlug)
-    return workspaceSlug && !routeAdmitted.value ? `/workspace/${workspaceSlug}/dashboard` : null
-  })
-
-  watch(
-    admittedPath,
-    (path) => {
-      if (path && path !== route.path) void router.replace(path)
-    },
-    { immediate: true },
-  )
-  return routeAdmitted
-}
-
-function routeRequiresGitCapability(route: RouteLocationNormalized): boolean {
-  const name = typeof route.name === 'string' ? route.name : ''
-  return (
-    name === 'workspace-new-worktree' || name.startsWith('workspace-branch') || name.startsWith('workspace-worktree')
-  )
-}
-
-function routeRequiresFilesystemCapability(route: RouteLocationNormalized): boolean {
-  const name = typeof route.name === 'string' ? route.name : ''
-  return name.startsWith('workspace-root')
-}
-
-function routeStringParam(value: string | string[]): string | null {
-  return typeof value === 'string' ? value : null
-}
-
-function settingsPageFromRoute(route: RouteLocationNormalized): SettingsPage {
-  const page = routeStringParam(route.params.page)
-  return isSettingsPage(page) ? page : 'general'
-}
+const routes: RouteRecordRaw[] = [
+  {
+    path: '/',
+    name: 'app-layout',
+    component: () => import('#/web/Layout.tsx').then(({ Layout }) => Layout),
+    children: appRouteChildren,
+  },
+]
 
 export const appRouter = createRouter({
   history: createAppHistoryPresentationHistory(createWebHistory()),
   routes,
 })
 
+const routeLoadFailure = shallowRef<{ error: unknown; fullPath: string } | null>(null)
+
+appRouter.onError((error, to, from) => {
+  navigationLog.error('route could not be loaded', { error, path: to.path })
+  // A late download failure must not cover a newer committed route.
+  if (appRouter.currentRoute.value !== from) return
+  routeLoadFailure.value = { error, fullPath: to.fullPath }
+})
+
+appRouter.afterEach((_to, _from, failure) => {
+  if (!failure) routeLoadFailure.value = null
+})
+
 export const AppRouterProvider = defineComponent({
   name: 'AppRouterProvider',
   setup() {
-    return () => <RouterView />
+    const t = useT()
+    const bootstrapLoading = useBootstrapLoadingPresentation()
+    watch(
+      routeLoadFailure,
+      (failure) => {
+        if (failure) bootstrapLoading.hide()
+      },
+      { immediate: true },
+    )
+    return () => (
+      <>
+        <RouterView />
+        {routeLoadFailure.value ? (
+          <DialogRoot open>
+            <DialogContent
+              showCloseButton={false}
+              onEscapeKeyDown={(event) => event.preventDefault()}
+              onPointerDownOutside={(event) => event.preventDefault()}
+            >
+              <DialogTitle class="text-sm font-semibold text-foreground">{t('error.route-load-title')}</DialogTitle>
+              <DialogDescription class="text-xs text-muted-foreground">{t('error.route-load-hint')}</DialogDescription>
+              {/* A document navigation also clears the browser's failed module cache. */}
+              <Button asChild variant="outline">
+                <a href={routeLoadFailure.value.fullPath}>{t('help.row.reload-page')}</a>
+              </Button>
+            </DialogContent>
+          </DialogRoot>
+        ) : null}
+      </>
+    )
   },
 })
-
-function workspaceRouteViewFromRoute(route: RouteLocationNormalized): WorkspaceRouteView | null {
-  const workspaceSlug = route.params.workspaceSlug
-  if (typeof workspaceSlug !== 'string') return null
-  const routeName = typeof route.name === 'string' ? route.name : ''
-
-  return workspaceRouteViewFromSlugChildRoute(workspaceSlug, {
-    dashboard: routeName === 'workspace-dashboard',
-    workspaceRoot: routeName.startsWith('workspace-root'),
-    workspaceRootTabKey: routeName === 'workspace-root-tab' ? routeStringParam(route.params.tabKey) : null,
-    workspaceRootTerminalSessionId:
-      routeName === 'workspace-root-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
-    branchSlug: routeName.startsWith('workspace-branch') ? routeStringParam(route.params.branchSlug) : null,
-    tabKey: routeName === 'workspace-branch-tab' ? routeStringParam(route.params.tabKey) : null,
-    worktreeSlug: routeName.startsWith('workspace-worktree') ? routeStringParam(route.params.worktreeSlug) : null,
-    worktreeTerminalSessionId:
-      routeName === 'workspace-worktree-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
-    worktreeTabKey: routeName === 'workspace-worktree-tab' ? routeStringParam(route.params.tabKey) : null,
-    newWorktree: routeName === 'workspace-new-worktree',
-  })
-}
-
-export function initialWorkspaceRouteSlugFromStore(state: InitialWorkspaceRouteState): string | null {
-  const restoredWorkspace = state.restoredWorkspaceId ? state.workspaces[state.restoredWorkspaceId] : null
-  if (restoredWorkspace) return workspaceSlugFromId(restoredWorkspace.id)
-  if (!state.workspaceMembershipReady) return null
-  const firstWorkspaceId = state.workspaceOrder[0]
-  const firstWorkspace = firstWorkspaceId ? state.workspaces[firstWorkspaceId] : null
-  return firstWorkspace ? workspaceSlugFromId(firstWorkspace.id) : null
-}
-
-interface InitialWorkspaceRouteState extends RuntimeCoherentWorkspaceState {
-  restoredWorkspaceId: WorkspaceId | null
-  workspaceOrder: WorkspaceId[]
-  workspaceMembershipReady: boolean
-}
-
-export function workspaceRouteViewFromSlugChildRoute(
-  workspaceSlug: string,
-  childRoute: WorkspaceChildRoute,
-): WorkspaceRouteView | null {
-  const workspaceId = workspaceIdFromSlug(workspaceSlug)
-  return workspaceId ? workspaceRouteViewFromChildRoute(workspaceId, childRoute) : null
-}
-
-interface WorkspaceChildRoute {
-  dashboard: boolean
-  workspaceRoot?: boolean
-  workspaceRootTabKey?: string | null
-  workspaceRootTerminalSessionId?: string | null
-  branchSlug: string | null
-  tabKey?: string | null
-  worktreeSlug?: string | null
-  worktreeTerminalSessionId?: string | null
-  worktreeTabKey?: string | null
-  newWorktree: boolean
-}
-
-export function workspaceRouteViewFromChildRoute(
-  workspaceId: WorkspaceId,
-  childRoute: WorkspaceChildRoute,
-): WorkspaceRouteView {
-  if (childRoute.worktreeSlug) {
-    const worktreePath = worktreePathFromSlug(childRoute.worktreeSlug)
-    if (!worktreePath) return { kind: 'empty', workspaceId }
-    return {
-      kind: 'worktree',
-      workspaceId,
-      worktreePath,
-      workspacePaneRoute: workspacePaneRouteFromParams(childRoute.worktreeTerminalSessionId, childRoute.worktreeTabKey),
-    }
-  }
-  if (childRoute.branchSlug) {
-    const branchName = branchNameFromSlug(childRoute.branchSlug)
-    if (!branchName) return { kind: 'empty', workspaceId }
-    return {
-      kind: 'branch',
-      workspaceId,
-      branchName,
-      workspacePaneRoute: workspacePaneStaticRouteFromTabKey(childRoute.tabKey),
-    }
-  }
-  if (childRoute.newWorktree) return { kind: 'newWorktree', workspaceId }
-  if (childRoute.dashboard) return { kind: 'dashboard', workspaceId }
-  if (childRoute.workspaceRoot) {
-    return {
-      kind: 'workspace-root',
-      workspaceId,
-      workspacePaneRoute: workspacePaneRouteFromParams(
-        childRoute.workspaceRootTerminalSessionId,
-        childRoute.workspaceRootTabKey,
-      ),
-    }
-  }
-  return { kind: 'empty', workspaceId }
-}
-
-function workspacePaneStaticRouteFromTabKey(tabKey: string | null | undefined): ParsedBranchWorkspacePaneRouteTarget {
-  if (!tabKey) return null
-  if (isWorkspacePaneStaticTabType(tabKey)) return { kind: 'static', tab: tabKey }
-  return { kind: 'invalid-static', tabKey }
-}
-
-function workspacePaneRouteFromParams(
-  terminalSessionId: string | null | undefined,
-  tabKey: string | null | undefined,
-): ParsedWorkspacePaneRoute | null {
-  if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
-  if (!tabKey) return null
-  if (isWorkspacePaneStaticTabType(tabKey)) return { kind: 'static', tab: tabKey }
-  return { kind: 'invalid-static', tabKey }
-}
-
-export function appRouterCallbacks(routeActions: AppRouteNavigation) {
-  return {
-    onRouteSettingsPageChange: (page: SettingsPage | null) => {
-      applyAppSettingsRouteChange(routeActions, page)
-    },
-    onOpenWorkspaceNavigator: (workspaceId: WorkspaceId) => routeActions.openWorkspaceNavigator(workspaceId),
-    onOpenWorkspaceRootPane: (workspaceId: WorkspaceId) => routeActions.openWorkspaceRootPane(workspaceId),
-    onOpenWorkspaceDashboard: (workspaceId: WorkspaceId) => routeActions.openWorkspaceDashboard(workspaceId),
-    onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
-    onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
-    onReplaceRepoWorktree: (
-      workspaceId: WorkspaceId,
-      worktreePath: string,
-      navigationGeneration: AppNavigationGeneration,
-    ) => routeActions.openRepoWorktree(workspaceId, worktreePath, { replace: true, navigationGeneration }),
-  }
-}
-
-export function applyAppSettingsRouteChange(
-  routeActions: AppSettingsRouteActions,
-  nextPage: SettingsPage | null,
-): void {
-  if (nextPage) routeActions.openSettings(nextPage)
-  else routeActions.closeSettings()
-}
-
-interface AppSettingsRouteActions {
-  openSettings: AppRouteNavigation['openSettings']
-  closeSettings: AppRouteNavigation['closeSettings']
-}

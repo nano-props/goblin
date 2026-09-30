@@ -584,6 +584,8 @@ export const zh: Record<DictKey, string> = {
   'error.finder-not-available': '访达仅在 macOS 上可用',
   'error.remote-editor-not-supported': '所选编辑器无法打开远程 SSH 工作区',
   'error.remote-terminal-not-supported': '所选终端无法打开远程 SSH 工作区',
+  'error.route-load-title': '无法加载此页面',
+  'error.route-load-hint': '请检查网络连接，然后重新加载页面再试。',
   'error.render-crash-title': '渲染该视图时出错',
   'error.render-crash-unknown': '未知渲染错误。',
   'error.try-again': '重试',

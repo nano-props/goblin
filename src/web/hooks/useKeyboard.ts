@@ -1,4 +1,4 @@
-// Global keyboard shortcuts. Mounted once in App.tsx — all bindings
+// Global keyboard shortcuts. Owned by the authenticated workspace shell — all bindings
 // live here so adding/removing one is a single-file change.
 //
 // Keyboard shortcuts use browser DOM events. Numbered workspace tab shortcuts

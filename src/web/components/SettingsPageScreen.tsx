@@ -1,25 +1,34 @@
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
+import { SettingsLayout } from '#/web/components/settings/SettingsLayout.tsx'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-
 export const SettingsPageScreen = defineComponent<{
   page: SettingsPage
-  onBack: () => void
-  onPageChange: (page: SettingsPage) => void
+  onBack?: () => void
+  onPageChange?: (page: SettingsPage) => void
+  topInset?: number
+  autoFocusSelected?: boolean
 }>({
   name: 'SettingsPageScreen',
   props: {
     page: { type: String as PropType<SettingsPage>, required: true },
-    onBack: { type: Function as PropType<() => void>, required: true },
-    onPageChange: { type: Function as PropType<(page: SettingsPage) => void>, required: true },
+    onBack: Function as PropType<() => void>,
+    onPageChange: Function as PropType<(page: SettingsPage) => void>,
+    topInset: Number,
+    autoFocusSelected: { type: Boolean, default: true },
   },
 
-  setup(props) {
+  setup(props, { slots }) {
     return () => (
-      <div class="flex h-full min-h-0 min-w-0 bg-background">
-        <SettingsSurface page={props.page} onBack={props.onBack} onPageChange={props.onPageChange} />
-      </div>
+      <SettingsLayout
+        page={props.page}
+        onBack={props.onBack}
+        onPageChange={props.onPageChange}
+        topInset={props.topInset}
+        autoFocusSelected={props.autoFocusSelected}
+      >
+        {slots.default?.()}
+      </SettingsLayout>
     )
   },
 })

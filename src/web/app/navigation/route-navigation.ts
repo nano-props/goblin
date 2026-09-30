@@ -148,7 +148,7 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
     openSettings(page, options) {
       const href = currentAppRouteHref(router)
       const query = routeReturnSearch(href, '/settings', '/settings')
-      runRouteNavigation(router, { name: 'settings', params: { page }, query }, options)
+      runRouteNavigation(router, { name: `settings-${page}`, query }, options)
     },
     closeSettings(options) {
       const href = returnToFromHref(currentAppRouteHref(router))

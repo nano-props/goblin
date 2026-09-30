@@ -1,11 +1,9 @@
 import { defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import type { WorkspaceRouteView } from '#/web/app/navigation/route-model.ts'
 import { EmptyWorkspaceView } from '#/web/components/EmptyWorkspaceView.tsx'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
-import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
 import { WorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -13,10 +11,9 @@ import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
-export interface AppProps {
-  routeSettingsPage?: SettingsPage | null
+export interface WorkspacePageProps {
   routeWorkspaceView?: WorkspaceRouteView | null
-  onRouteSettingsPageChange?: (page: SettingsPage | null) => void
+  onOpenSettings?: () => void
   onOpenWorkspaceNavigator?: (workspaceId: WorkspaceId) => void
   onOpenWorkspaceRootPane?: (workspaceId: WorkspaceId) => void
   onOpenWorkspaceDashboard?: (workspaceId: WorkspaceId) => void
@@ -29,12 +26,11 @@ export interface AppProps {
   ) => void
 }
 
-export const App = defineComponent<AppProps>({
-  name: 'App',
+export const WorkspacePage = defineComponent<WorkspacePageProps>({
+  name: 'WorkspacePage',
   props: [
-    'routeSettingsPage',
     'routeWorkspaceView',
-    'onRouteSettingsPageChange',
+    'onOpenSettings',
     'onOpenWorkspaceNavigator',
     'onOpenWorkspaceRootPane',
     'onOpenWorkspaceDashboard',
@@ -49,17 +45,6 @@ export const App = defineComponent<AppProps>({
     const uiMode = useResponsiveUiMode()
 
     return () => {
-      const settingsPage = props.routeSettingsPage ?? null
-      if (settingsPage) {
-        return (
-          <SettingsPageScreen
-            page={settingsPage}
-            onBack={() => props.onRouteSettingsPageChange?.(null)}
-            onPageChange={(page) => props.onRouteSettingsPageChange?.(page)}
-          />
-        )
-      }
-
       const routeWorkspaceView = props.routeWorkspaceView ?? null
       const bootWorkspaceBehavior = workspaceLayoutBehavior({
         compact: uiMode.value === 'compact',
@@ -72,7 +57,7 @@ export const App = defineComponent<AppProps>({
               <WorkspaceView
                 workspaceId={routeWorkspaceView.workspaceId}
                 routeView={routeWorkspaceView}
-                onOpenSettings={() => props.onRouteSettingsPageChange?.('general')}
+                onOpenSettings={props.onOpenSettings}
                 onOpenWorkspaceNavigator={props.onOpenWorkspaceNavigator}
                 onOpenWorkspaceRootPane={props.onOpenWorkspaceRootPane}
                 onOpenWorkspaceDashboard={props.onOpenWorkspaceDashboard}
@@ -87,7 +72,7 @@ export const App = defineComponent<AppProps>({
                 workspacePaneState="empty"
               />
             ) : (
-              <EmptyWorkspaceView onOpenSettings={() => props.onRouteSettingsPageChange?.('general')} />
+              <EmptyWorkspaceView onOpenSettings={props.onOpenSettings} />
             )}
           </ErrorBoundary>
         </main>

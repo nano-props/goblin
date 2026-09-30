@@ -157,9 +157,9 @@ const AuthenticatedAppShell = defineComponent({
     const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId: routedWorkspaceId })
     useClientWorkspacePersistence({ routedWorkspaceId })
     watch(
-      () => [route.name, bootstrap.state.value.status] as const,
-      ([routeName, status]) => {
-        if (routeName !== 'settings' && status === 'restoring-workspace') bootstrapLoading.show()
+      () => [route.matched.some(({ name }) => name === 'settings'), bootstrap.state.value.status] as const,
+      ([isSettingsRoute, status]) => {
+        if (!isSettingsRoute && status === 'restoring-workspace') bootstrapLoading.show()
         else bootstrapLoading.hide()
       },
       { immediate: true, flush: 'sync' },
@@ -183,7 +183,7 @@ const AuthenticatedAppShell = defineComponent({
     })
 
     const renderShellContent = (): VNode | null => {
-      if (route.name === 'settings') return <AuthenticatedSettingsShell />
+      if (route.matched.some(({ name }) => name === 'settings')) return <AuthenticatedSettingsShell />
 
       const bootstrapState = bootstrap.state.value
 

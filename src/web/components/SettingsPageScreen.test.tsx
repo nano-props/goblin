@@ -5,7 +5,11 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { QueryClient } from '@tanstack/vue-query'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
+import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
+import { GeneralSettings } from '#/web/components/settings/pages/GeneralSettings.tsx'
+import { NotificationSettings } from '#/web/components/settings/pages/NotificationSettings.tsx'
+import { GitHubSettings } from '#/web/components/settings/pages/GitHubSettings.tsx'
+import { SshRemoteSettings } from '#/web/components/settings/pages/SshRemoteSettings.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
@@ -109,9 +113,13 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('SettingsSurface', () => {
+describe('SettingsPageScreen', () => {
   test('focuses the selected settings row on initial mount', async () => {
-    const { container } = render(<SettingsSurface page="general" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="general" onPageChange={() => {}}>
+        <GeneralSettings />
+      </SettingsPageScreen>,
+    )
     const general = container.querySelector('button[aria-label="settings.group.general"]')
     if (!(general instanceof HTMLButtonElement)) throw new Error('missing general settings nav row')
 
@@ -119,7 +127,11 @@ describe('SettingsSurface', () => {
   })
 
   test('does not show the removed workspace layout selector on the general page', async () => {
-    const { container } = render(<SettingsSurface page="general" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="general" onPageChange={() => {}}>
+        <GeneralSettings />
+      </SettingsPageScreen>,
+    )
 
     expect(container.querySelector('#settings-workspace-layout')).toBeNull()
     expect(container.textContent).not.toContain('settings.workspace-layout')
@@ -129,7 +141,9 @@ describe('SettingsSurface', () => {
   test('keeps settings navigation selected state and page changes wired', async () => {
     const onPageChange = vi.fn()
     const { container } = render(
-      <SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />,
+      <SettingsPageScreen page="general" onPageChange={onPageChange} autoFocusSelected={false}>
+        <GeneralSettings />
+      </SettingsPageScreen>,
     )
 
     const general = container.querySelector('button[aria-label="settings.group.general"]')
@@ -145,7 +159,11 @@ describe('SettingsSurface', () => {
   })
 
   test('can trigger a test terminal notification from settings', async () => {
-    const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="notifications" onPageChange={() => {}}>
+        <NotificationSettings />
+      </SettingsPageScreen>,
+    )
 
     await flushTestUpdates(() => {
       buttonByText(container, 'settings.terminal-notifications-test-button').click()
@@ -163,7 +181,11 @@ describe('SettingsSurface', () => {
 
   test('shows an error toast when the test notification is blocked', async () => {
     sendTestNotification.mockResolvedValueOnce(false)
-    const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="notifications" onPageChange={() => {}}>
+        <NotificationSettings />
+      </SettingsPageScreen>,
+    )
 
     await flushTestUpdates(() => {
       buttonByText(container, 'settings.terminal-notifications-test-button').click()
@@ -197,13 +219,21 @@ describe('SettingsSurface', () => {
         json: async () => result,
       }
     })
-    const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="notifications" onPageChange={() => {}}>
+        <NotificationSettings />
+      </SettingsPageScreen>,
+    )
 
     await waitForSwitchState(container, 'settings-terminal-notifications', 'true')
   })
 
   test('shows GitHub CLI availability and version', async () => {
-    const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="github" onPageChange={() => {}}>
+        <GitHubSettings />
+      </SettingsPageScreen>,
+    )
 
     await waitForText(container, 'settings.github.status-available')
     expect(container.textContent).toContain('settings.github.status-available')
@@ -213,7 +243,11 @@ describe('SettingsSurface', () => {
   })
 
   test('refreshes GitHub CLI detection from settings', async () => {
-    const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="github" onPageChange={() => {}}>
+        <GitHubSettings />
+      </SettingsPageScreen>,
+    )
 
     await flushTestUpdates(() => {
       buttonByText(container, 'settings.github.refresh').click()
@@ -249,14 +283,22 @@ describe('SettingsSurface', () => {
         json: async () => result,
       }
     })
-    const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="github" onPageChange={() => {}}>
+        <GitHubSettings />
+      </SettingsPageScreen>,
+    )
 
     expect(container.textContent).toContain('settings.github.status-unavailable')
     expect(container.textContent).toContain('settings.github.hint-missing')
   })
 
   test('renders the SSH remotes settings page', async () => {
-    const { container } = render(<SettingsSurface page="ssh" onPageChange={() => {}} />)
+    const { container } = render(
+      <SettingsPageScreen page="ssh" onPageChange={() => {}}>
+        <SshRemoteSettings />
+      </SettingsPageScreen>,
+    )
 
     expect(container.textContent).toContain('settings.ssh.title')
     expect(container.textContent).toContain('settings.ssh.body')

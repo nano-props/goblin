@@ -621,6 +621,8 @@ export const ja: Record<DictKey, string> = {
   'error.finder-not-available': 'Finder は macOS でのみ利用できます',
   'error.remote-editor-not-supported': '選択したエディタはリモート SSH ワークスペースを開けません',
   'error.remote-terminal-not-supported': '選択したターミナルはリモート SSH ワークスペースを開けません',
+  'error.route-load-title': 'このページを読み込めませんでした',
+  'error.route-load-hint': '接続を確認してから、ページを再読み込みして再試行してください。',
   'error.render-crash-title': 'このビューの描画中にエラーが発生しました',
   'error.render-crash-unknown': '不明な描画エラー。',
   'error.try-again': '再試行',

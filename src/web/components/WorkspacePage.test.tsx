@@ -12,23 +12,19 @@ vi.mock('#/web/components/Skeleton.tsx', () => ({
   WorkspaceLayoutSkeleton: () => <div data-testid="workspace-layout-skeleton" />,
 }))
 
-vi.mock('#/web/components/SettingsPageScreen.tsx', () => ({
-  SettingsPageScreen: () => <div data-testid="settings-page-screen" />,
-}))
-
 vi.mock('#/web/components/WorkspaceView.tsx', () => ({
   WorkspaceView: () => <div data-testid="workspace-view" />,
 }))
 
-import { App } from '#/web/App.tsx'
+import { WorkspacePage } from '#/web/components/WorkspacePage.tsx'
 
-describe('App', () => {
+describe('WorkspacePage', () => {
   beforeEach(() => {
     resetWorkspacesStore()
   })
 
   test('renders through setup JSX and updates from the workspace store', async () => {
-    const view = renderInJsdom(<App />)
+    const view = renderInJsdom(<WorkspacePage />)
 
     expect(view.container.querySelector('[data-testid="workspace-layout-skeleton"]')).not.toBeNull()
     expect(view.container.querySelector('[data-testid="empty-workspace-view"]')).toBeNull()
@@ -42,7 +38,7 @@ describe('App', () => {
   })
 
   test('merges caller classes with the component root class', async () => {
-    const view = renderInJsdom(<App class="app-host" />)
+    const view = renderInJsdom(<WorkspacePage class="app-host" />)
     const root = view.container.firstElementChild
 
     expect(root?.classList.contains('app-host')).toBe(true)

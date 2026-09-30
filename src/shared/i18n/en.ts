@@ -611,6 +611,8 @@ export const en = {
   'error.finder-not-available': 'Finder is only available on macOS',
   'error.remote-editor-not-supported': 'The selected editor cannot open remote SSH workspaces',
   'error.remote-terminal-not-supported': 'The selected terminal cannot open remote SSH workspaces',
+  'error.route-load-title': 'Could not load this page',
+  'error.route-load-hint': 'Check your connection, then reload the page to try again.',
   'error.render-crash-title': 'Something broke while rendering this view',
   'error.render-crash-unknown': 'Unknown render error.',
   'error.try-again': 'Try again',
