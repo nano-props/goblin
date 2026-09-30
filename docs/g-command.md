@@ -15,9 +15,10 @@ The server sits between `g` and the client on the control plane. It does not int
 
 ## Why the server brokers intents
 
-In a typical desktop app, a CLI would talk to the native host directly. Goblin puts the broker in the server because:
+The server owns the CLI broker because:
 
-- The server is the only process that exists in both Electron mode and standalone (`serve.sh`) mode. Putting the broker in the server means `g` works the same way in either mode — the client subscribes the same way regardless of how the server was launched.
+- The server can identify the authenticated browser client attached to the
+  requesting terminal.
 - The client has one shared intent router. A new producer adds a subscription,
   not another routing model.
 - HTTP and WS share the same auth and lifecycle. Adding a separate IPC channel would mean a third transport with its own auth model and lifecycle.
@@ -51,18 +52,19 @@ The CLI exit codes are conventional: `0` for success, `1` for a server or transp
 
 ## Modes
 
-Two runtime modes, identical from `g`'s perspective:
+The server starts with `bun run start`, `serve.sh`, or the standalone `goblin`
+binary. Browser tabs connect over HTTP and WebSocket. The private terminal
+launcher invokes the same executable in CLI mode and forwards its arguments;
+it contains no credentials and is removed when the server exits.
 
-- **Electron** — the native host spawns the server as a child. Clients in BrowserWindows connect over HTTP + WS as usual.
-- **`serve.sh`** — a standalone server, no Electron process. Browser tabs (or a manually-launched Electron window) connect the same way.
-
-For a command that needs a client intent, no listening window produces the same clear "no client" error in either mode. Commands that operate only on server-owned state do not require a listening client.
+For a command that needs a client intent, no listening window produces the same clear "no client" error. Commands that operate only on server-owned state do not require a listening client.
 
 ## What this design is not
 
 - It is not a general CLI for repo operations. Server-owned capabilities stay behind their owning applications; `g` reaches them only through the consolidated command endpoint for user-facing terminal actions.
 - It is not a place for backend logic. Server-side operations stay in their owning repo, terminal, or settings applications behind the consolidated route. `g` is a wrapper, not a peer.
-- It is not the only path for client intents. Electron IPC still works for menu-driven commands. `g` is one of several producers feeding the same intent router.
+- The client intent router handles CLI view requests and terminal notification
+  clicks. Ordinary UI actions call their owning application commands directly.
 
 ## Adding a command
 

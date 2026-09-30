@@ -1,12 +1,10 @@
-// Web client bridge helpers for tests that simulate the embedded server.
+// Web client bridge helpers for tests that simulate the server.
 //
-// This module owns transport wiring only: IPC/HTTP dispatch, terminal
+// This module owns transport wiring only: HTTP and WebSocket dispatch, terminal
 // actions, workspace runtime events, and workspace-pane tab operations.
 // Repo/store fixtures live in #/web/test-utils/repo-store.ts.
-
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import type { RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import type {
   TerminalAttachResult,
@@ -28,7 +26,7 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 
-export type IpcTestHandler = (input: any) => unknown
+export type ServerTestHandler = (input: any) => unknown
 interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
   'terminal.restart': TerminalRestartResult
@@ -69,7 +67,7 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
   }
 }
 
-export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
+export function installGoblinTestBridge(handlers: Record<string, ServerTestHandler>): void {
   setClientBridgeForTests(null)
   const workspaceRuntimeState = new Map<
     string,
@@ -81,10 +79,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     }
   >()
   const sessionStorageValues = new Map<string, string>()
-  const hostOpenExternalUrl = handlers['app.openExternalUrl']
-  const hostOpenDirectoryDialog = handlers['workspace.openDialog']
-  const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
-  const hostOpenSettingsWindow = handlers['app.openSettingsWindow']
   const browserWindow = globalThis.window
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -93,52 +87,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       removeEventListener: browserWindow.removeEventListener.bind(browserWindow),
       dispatchEvent: browserWindow.dispatchEvent.bind(browserWindow),
       __GOBLIN_BOOTSTRAP__: {
-        runtime: {
-          kind: 'electron',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-        },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-      },
-      goblinNative: {
-        invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
-          const handler = handlers[path]
-          if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
-          return handler(input)
-        },
-        abortIpc: () => Promise.resolve(false),
-        notifyAppQuitDrained: () => Promise.resolve(true),
-        onAppQuitting: () => () => {},
-        onIntent: () => () => {},
-        pathForFile: () => '',
-        host: {
-          openSettingsWindow: (input: unknown) =>
-            hostOpenSettingsWindow ? Promise.resolve(hostOpenSettingsWindow(input)) : Promise.resolve(false),
-          openExternalUrl: (input: unknown) =>
-            hostOpenExternalUrl
-              ? Promise.resolve(hostOpenExternalUrl(input))
-              : Promise.resolve({ ok: false, message: 'error.invalid-url' }),
-          openDirectoryDialog: (input: { title?: string }) => {
-            const handler =
-              input?.title === 'Choose Clone Destination' && handlers['repo.cloneParentDialog']
-                ? handlers['repo.cloneParentDialog']
-                : hostOpenDirectoryDialog
-            return handler ? Promise.resolve(handler(input)) : Promise.resolve(null)
-          },
-          consumeExternalOpenPaths: () =>
-            hostConsumeExternalOpenPaths
-              ? Promise.resolve(hostConsumeExternalOpenPaths(undefined))
-              : Promise.resolve([]),
-        },
-        terminal: {
-          notifyBell: () => Promise.resolve(true),
-          sendTestNotification: () => Promise.resolve(true),
-          setBadge: () => {},
-        },
-        getAccessTokenProjection: () =>
-          Promise.resolve({ accessToken: 'test-access-token', activation: 'current' as const }),
-        rotateAccessToken: () =>
-          Promise.resolve({ accessToken: 'test-access-token', activation: 'after-restart' as const }),
       },
       location: {
         href: 'http://127.0.0.1:32100/',

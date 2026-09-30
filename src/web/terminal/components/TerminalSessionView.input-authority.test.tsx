@@ -85,8 +85,9 @@ describe('TerminalSessionView input authority', () => {
   test('drop on a controller session writes shell-escaped paths to the PTY', async () => {
     const writeInput = vi.fn()
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+    vi.mocked(shellClient.saveClipboardFiles).mockImplementation(async (files: File[]) =>
+      files.map((file) => `/resolved/${file.name}`),
+    )
     const view = await renderTerminalSession(
       { captureInputWriter: captureInputWriterForTest(writeInput) },
       { snapshot: CONTROLLER_SNAPSHOT },
@@ -107,7 +108,7 @@ describe('TerminalSessionView input authority', () => {
 
       expect(writeInput).toHaveBeenCalledTimes(1)
       expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/shot with space.png'")
-      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).toHaveBeenCalledWith([file])
     } finally {
       await view.cleanup()
     }
@@ -138,8 +139,9 @@ describe('TerminalSessionView input authority', () => {
   test('paste on a controller session writes shell-escaped paths to the PTY', async () => {
     const writeInput = vi.fn()
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+    vi.mocked(shellClient.saveClipboardFiles).mockImplementation(async (files: File[]) =>
+      files.map((file) => `/resolved/${file.name}`),
+    )
     const view = await renderTerminalSession(
       { captureInputWriter: captureInputWriterForTest(writeInput) },
       { snapshot: CONTROLLER_SNAPSHOT },
@@ -160,7 +162,7 @@ describe('TerminalSessionView input authority', () => {
 
       expect(writeInput).toHaveBeenCalledTimes(1)
       expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/weird name & space.png'")
-      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).toHaveBeenCalledWith([file])
     } finally {
       await view.cleanup()
     }

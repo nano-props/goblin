@@ -1,10 +1,11 @@
 import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import { defineConfig } from 'vitest/config'
 
 // Two projects, one per environment:
 //   - `node` (default) covers everything outside the web tree
-//     (`src/main`, `src/server`, `src/shared`, and `src/system`). It is
+//     (`src/server`, `src/shared`, and `src/system`). It is
 //     the cheap project: no DOM, no `ResizeObserver` shim, no `window`.
 //     Baseline `environment` was 38s because the jsdom startup was paid
 //     even when the worker was running a node-only file. Splitting by
@@ -44,14 +45,20 @@ export default defineConfig({
   test: {
     projects: [
       {
-        plugins: [vueJsx()],
+        plugins: [
+          vueJsx(),
+          {
+            name: 'shell-script-text',
+            load(id) {
+              if (id.endsWith('.sh')) return 'export default ' + JSON.stringify(readFileSync(id, 'utf8'))
+            },
+          },
+        ],
         test: {
           ...sharedTestOptions,
           name: 'node',
           environment: 'node',
           include: [
-            'src/main/**/*.test.ts',
-            'src/main/**/*.test.tsx',
             'src/server/**/*.test.ts',
             'src/server/**/*.test.tsx',
             'src/shared/**/*.test.ts',
@@ -70,7 +77,15 @@ export default defineConfig({
         },
       },
       {
-        plugins: [vueJsx()],
+        plugins: [
+          vueJsx(),
+          {
+            name: 'shell-script-text',
+            load(id) {
+              if (id.endsWith('.sh')) return 'export default ' + JSON.stringify(readFileSync(id, 'utf8'))
+            },
+          },
+        ],
         test: {
           ...sharedTestOptions,
           name: 'jsdom',

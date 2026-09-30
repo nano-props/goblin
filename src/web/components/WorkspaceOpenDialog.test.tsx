@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -14,8 +13,6 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceMembershipActions } from '#/web/stores/workspaces/types.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
-import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -26,7 +23,6 @@ vi.mock('vue-sonner', () => ({
 }))
 
 const testWindow = window as unknown as {
-  goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
 
@@ -34,28 +30,15 @@ beforeEach(() => {
   vi.clearAllMocks()
   resetWorkspacesStore()
   setClientBridgeForTests(null)
-  // The bootstrap is the source of truth for the tiny client
-  // payload (runtime kind, initial server handoff). The preload
-  // only exposes IPC. Host info (homeDir, platform) used to live
-  // in the bootstrap; it now lives on the public `/api/host`
-  // endpoint and the client-side `hostInfoStore` — seed
-  // that store directly so the dialog's tilde resolution and
-  // platform branching work without mocking `fetch`.
+  // Seed public host information so tilde resolution and platform-dependent
+  // presentation work without mocking the host-info request.
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: ELECTRON_CLIENT_CAPABILITIES,
-      },
       initialServer: null,
     },
   })
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: currentNativeBridge(),
-  })
+
   hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
@@ -64,7 +47,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   setClientBridgeForTests(null)
 })

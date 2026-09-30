@@ -1,5 +1,5 @@
 /**
- * Server backend for `saveClipboardFiles` in both browser and Electron clients. Posts a multipart body to
+ * Server backend for `saveClipboardFiles` in browser clients. Posts a multipart body to
  * the server's `/api/clipboard/files` route; the server writes blobs
  * under `<serverDataDir()>/clipboard-tmp-<pid>/` and returns absolute
  * paths the PTY can read.

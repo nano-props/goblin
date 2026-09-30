@@ -9,8 +9,7 @@ import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/
  * HTTP auth middleware for the access token. Cookie and header are the
  * only accepted channels; tokens in URLs are rejected.
  *
- * Cookie is the canonical channel for browser clients. Header is
- * the canonical channel for the embedded Electron client.
+ * Cookies authenticate browser clients; headers authenticate programmatic clients.
  * On success the middleware stashes an `userId` derived from the
  * token on the Hono context so downstream handlers can partition
  * in-memory state by token identity (rather than by per-page

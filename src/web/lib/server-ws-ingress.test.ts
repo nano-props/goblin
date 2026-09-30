@@ -1,7 +1,6 @@
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION, type ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
@@ -125,23 +124,6 @@ describe('server websocket ingress', () => {
     dispose()
     ingress.resetForTests()
   })
-
-  test('closes the active socket and suppresses reconnect when app shutdown starts', async () => {
-    useFakeTimers()
-    const ingress = await createIngress('/ws/example')
-    const dispose = ingress.subscribe(() => {})
-    const socket = wsMock.instances[0]
-    if (!socket) throw new Error('missing socket')
-    const { markAppQuitting } = await import('#/web/app/lifecycle.ts')
-
-    await markAppQuitting()
-    await advanceTimersAndFlush(300)
-
-    expect(socket.readyState).toBe(wsMock.CLOSED)
-    expect(wsMock.instances).toHaveLength(1)
-    dispose()
-    ingress.resetForTests()
-  })
 })
 
 async function createIngress(
@@ -156,7 +138,6 @@ function installBootstrap(initialServer: ClientBootstrapSnapshot['initialServer'
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
-      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer,
     } satisfies ClientBootstrapSnapshot,
   })

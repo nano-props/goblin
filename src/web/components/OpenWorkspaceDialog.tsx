@@ -1,6 +1,5 @@
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
-import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app/shell-client.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
@@ -15,7 +14,7 @@ import {
   reportOpenWorkspacePostOpenEffects,
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
-import { tildify, untildify } from '#/web/lib/paths.ts'
+import { untildify } from '#/web/lib/paths.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 interface Props {
@@ -37,14 +36,13 @@ export const OpenWorkspaceDialog = defineComponent<Props>({
     let dialogAbortController: AbortController | null = null
     const resolvedPath = computed(() => untildify(path.value))
     const canSubmit = computed(() => path.value.trim().length > 0 && !pending.value)
-    const canChoosePath = hasNativeDirectoryPicker()
     const pathSuggestions = useDirectoryPathSuggestions({
       enabled: () => props.open && !pending.value,
       source: { kind: 'local' },
       prefix: path,
     })
 
-    // The open dialog owns the chooser and open-workspace request lifetime.
+    // The open dialog owns the path suggestions and open-workspace request lifetime.
     watch(
       () => props.open,
       (open, _previous, onCleanup) => {
@@ -61,21 +59,6 @@ export const OpenWorkspaceDialog = defineComponent<Props>({
       },
       { immediate: true },
     )
-
-    async function choosePath(): Promise<void> {
-      if (pending.value || !canChoosePath) return
-      const signal = dialogAbortController?.signal
-      if (!signal) return
-      try {
-        const selected = await chooseLocalWorkspacePath({ signal })
-        if (!signal.aborted && selected) {
-          path.value = tildify(selected)
-          error.value = null
-        }
-      } catch (caught) {
-        if (!signal.aborted) error.value = caught instanceof Error ? caught.message : t('error.unknown')
-      }
-    }
 
     async function submit(): Promise<void> {
       if (!canSubmit.value) return
@@ -149,17 +132,6 @@ export const OpenWorkspaceDialog = defineComponent<Props>({
                   pathSuggestionsOpen.value = open
                 }}
               />
-              {canChoosePath ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending.value}
-                  class={cn('h-auto self-stretch px-3', compact.value && 'w-full')}
-                  onClick={() => void choosePath()}
-                >
-                  {t('workspace-picker.open-path-choose')}
-                </Button>
-              ) : null}
             </div>
             <DialogStatusRow message={error.value ?? ''} tone={error.value ? 'danger' : 'default'} />
           </Field>

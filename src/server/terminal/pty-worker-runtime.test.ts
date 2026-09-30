@@ -1,4 +1,4 @@
-// Tests for the worker-side runtime. We mock node-pty and exercise
+// Tests for the worker-side runtime. We mock the PTY adapter and exercise
 // the runtime's IPC message handling: spawn/write/resize/kill/shutdown
 // and the data/exit/process-name-changed emission paths.
 
@@ -18,53 +18,46 @@ interface MockPty {
 
 const mockPtys: MockPty[] = []
 
-vi.mock('node-pty', () => ({
-  spawn: vi.fn(() => {
-    let onData: ((data: string) => void) | null = null
-    let onExit: (() => void) | null = null
-    let processName = 'zsh'
-    const pty: MockPty = {
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      emitData: (data) => onData?.(data),
-      emitExit: () => onExit?.(),
-      setProcessName: (next) => {
-        processName = next
-      },
-      get process() {
-        return processName
-      },
-    }
-    mockPtys.push(pty)
-    // Spread does NOT preserve getter closures — it captures the
-    // current value at spread time. The worker wraps this object in
-    // NodePtyTerminalRuntime and reads `.process` later, so we have
-    // to expose the live pty directly. `onData`/`onExit` are layered
-    // on top of the same pty.
-    const wrapped: MockPty & {
-      onData: (cb: (data: string) => void) => { dispose(): void }
-      onExit: (cb: () => void) => { dispose(): void }
-    } = Object.assign(pty, {
-      onData: (cb: (data: string) => void) => {
-        onData = cb
-        return {
-          dispose: vi.fn(() => {
-            if (onData === cb) onData = null
-          }),
-        }
-      },
-      onExit: (cb: () => void) => {
-        onExit = cb
-        return {
-          dispose: vi.fn(() => {
-            if (onExit === cb) onExit = null
-          }),
-        }
-      },
-    })
-    return wrapped
-  }),
+vi.mock('#/server/terminal/terminal-pty-runtime.ts', () => ({
+  spawnTerminalPtyRuntime: vi.fn(
+    (_input: unknown, observer: { onData(data: string, processName: string): void; onExit(): void }) => {
+      let dataOwned = true
+      let exitOwned = true
+      let processName = 'zsh'
+      const pty = {
+        write: vi.fn(),
+        resize: vi.fn(),
+        kill: vi.fn(),
+        emitData: (data: string) => {
+          if (dataOwned) observer.onData(data, processName)
+        },
+        emitExit: () => {
+          if (exitOwned) observer.onExit()
+        },
+        setProcessName: (next: string) => {
+          processName = next
+        },
+        get process() {
+          return processName
+        },
+      }
+      mockPtys.push(pty)
+
+      return {
+        ok: true,
+        runtime: { write: pty.write, resize: pty.resize, kill: pty.kill, processName: () => processName },
+        events: {
+          disposeData: () => {
+            dataOwned = false
+          },
+          dispose: () => {
+            dataOwned = false
+            exitOwned = false
+          },
+        },
+      }
+    },
+  ),
 }))
 
 function buildRuntime(options: { spawnPty?: ConstructorParameters<typeof PtyWorkerRuntime>[0]['spawnPty'] } = {}) {
@@ -165,9 +158,7 @@ describe('PtyWorkerRuntime', () => {
       ok: true,
       ptySessionId: 'pty_req_1',
       // The initial processName is a placeholder; the real name is
-      // sampled on the first onData chunk so the macOS spawn-helper
-      // comm never leaks. See "samples the real process name on the
-      // first onData chunk" below.
+      // sampled on the first output chunk.
       processName: 'terminal',
     })
   })
@@ -204,22 +195,7 @@ describe('PtyWorkerRuntime', () => {
     expect(nameChanges).toHaveLength(1)
   })
 
-  test('pty-spawn surfaces a structured recoverable failure for posix_spawnp failures', () => {
-    const { runtime, emitted } = buildRuntime({
-      spawnPty: () => ({ ok: false, message: 'posix_spawnp failed' }),
-    })
-    runtime.handleMessage(spawnRequest('req'))
-    const result = emitted.find((m) => m.type === 'pty-spawn-result' && m.requestId === 'req')
-    expect(result).toEqual({
-      type: 'pty-spawn-result',
-      requestId: 'req',
-      ok: false,
-      error: 'posix_spawnp failed',
-      failure: { code: 'native-pty-spawn-failed', recoverable: true },
-    })
-  })
-
-  test('pty-spawn surfaces a structured nonrecoverable failure for unknown spawn failures', () => {
+  test('pty-spawn reports a failed spawn without publishing a PTY', () => {
     const { runtime, emitted } = buildRuntime({
       spawnPty: () => ({ ok: false, message: 'shell not found' }),
     })
@@ -230,7 +206,6 @@ describe('PtyWorkerRuntime', () => {
       requestId: 'req',
       ok: false,
       error: 'shell not found',
-      failure: { code: 'unknown', recoverable: false },
     })
   })
 

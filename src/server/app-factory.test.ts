@@ -5,8 +5,9 @@ import type * as NodeFsModule from 'node:fs'
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(async () => undefined),
-  readFile: vi.fn(
-    async () => `<!doctype html>
+  readFile: vi.fn(async (filePath: string) => {
+    if (!filePath.endsWith('/index.html')) throw Object.assign(new Error('Not found'), { code: 'ENOENT' })
+    return `<!doctype html>
 <html lang="en">
   <head>
     <script type="module" src="/boot.js"></script>
@@ -14,8 +15,8 @@ const mocks = vi.hoisted(() => ({
   <body>
     <div id="root"></div>
   </body>
-</html>`,
-  ),
+</html>`
+  }),
   existsSync: vi.fn(() => true),
   getUserSettings: vi.fn(async () => ({
     lang: 'auto',
@@ -24,9 +25,6 @@ const mocks = vi.hoisted(() => ({
     fetchIntervalSec: 120,
     terminalNotificationsEnabled: false,
     shortcutsDisabled: false,
-    globalShortcutDisabled: false,
-    globalShortcut: 'CommandOrControl+Shift+G',
-    lanEnabled: false,
   })),
   saveClipboardFiles: vi.fn(),
   pruneStaleClipboardTempDirs: vi.fn(),
@@ -271,7 +269,7 @@ describe('server app html static', () => {
     // no `<script id="goblin-bootstrap">` injection and no token in
     // the response. The client reads i18n from
     // `/api/i18n` and the access token either from the
-    // Electron preload's IPC or the `/api/login` cookie.
+    // `/api/login` cookie.
     expect(html).not.toContain('goblin-bootstrap')
     expect(html).not.toContain('"accessToken"')
     expect(html).not.toContain('"secret"')

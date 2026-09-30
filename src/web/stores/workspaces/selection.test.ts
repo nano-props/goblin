@@ -29,7 +29,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-selection-test-repo')
-const ipcHandlers: Record<string, (input: any) => unknown> = {}
+const serverHandlers: Record<string, (input: any) => unknown> = {}
 
 function seedRepo(options: {
   currentBranchName?: string | null
@@ -116,9 +116,9 @@ function staticTabs(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTabEnt
 
 beforeEach(() => {
   appQueryClient.clear()
-  for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
+  for (const key of Object.keys(serverHandlers)) delete serverHandlers[key]
   resetWorkspacesStore()
-  installGoblinTestBridge(ipcHandlers)
+  installGoblinTestBridge(serverHandlers)
 })
 
 describe('setBranchViewMode', () => {

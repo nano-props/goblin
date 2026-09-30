@@ -59,25 +59,16 @@ interface WorkspacePickerProps {
 interface WorkspaceSwitcherActionProps {
   icon: VNodeChild
   label: string
-  shortcut: string | null
   onSelect: () => void
 }
 
 const WorkspaceSwitcherAction: FunctionalComponent<WorkspaceSwitcherActionProps> = (props) => (
-  <MenuRowButton
-    leading={props.icon}
-    trailing={
-      props.shortcut ? (
-        <span class="min-w-6 pl-8 text-right text-xs tracking-widest text-muted-foreground">{props.shortcut}</span>
-      ) : null
-    }
-    onClick={props.onSelect}
-  >
+  <MenuRowButton leading={props.icon} onClick={props.onSelect}>
     {props.label}
   </MenuRowButton>
 )
 
-WorkspaceSwitcherAction.props = ['icon', 'label', 'shortcut', 'onSelect']
+WorkspaceSwitcherAction.props = ['icon', 'label', 'onSelect']
 
 interface WorkspaceMenuContentProps extends Omit<WorkspacePickerProps, 'surface' | 'onActivate'> {
   onSelectWorkspace: (id: WorkspaceId) => void
@@ -172,19 +163,16 @@ const WorkspaceMenuContent = defineComponent<WorkspaceMenuContentProps>({
             <WorkspaceSwitcherAction
               icon={<FolderOpen size={14} />}
               label={props.labels.openLocal}
-              shortcut={props.labels.openLocalShortcut}
               onSelect={() => props.onSelectAction(props.onOpenLocal)}
             />
             <WorkspaceSwitcherAction
               icon={<Server size={14} />}
               label={props.labels.openRemote}
-              shortcut={props.labels.openRemoteShortcut}
               onSelect={() => props.onSelectAction(props.onOpenRemote)}
             />
             <WorkspaceSwitcherAction
               icon={<Download size={14} />}
               label={props.labels.clone}
-              shortcut={props.labels.cloneShortcut}
               onSelect={() => props.onSelectAction(props.onClone)}
             />
           </div>

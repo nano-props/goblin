@@ -22,7 +22,4 @@ export interface UserSettings {
   fetchIntervalSec: number
   terminalNotificationsEnabled: boolean
   shortcutsDisabled: boolean
-  globalShortcutDisabled: boolean
-  globalShortcut: string
-  lanEnabled: boolean
 }

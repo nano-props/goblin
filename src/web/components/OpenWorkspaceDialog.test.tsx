@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
@@ -11,8 +10,6 @@ import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
-import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const mocks = vi.hoisted(() => ({
   getLocalDirectoryPathSuggestions: vi.fn(),
@@ -22,23 +19,15 @@ vi.mock('#/web/workspaces/client.ts', () => ({
   getLocalDirectoryPathSuggestions: mocks.getLocalDirectoryPathSuggestions,
 }))
 
-let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const testWindow = window as unknown as {
-  goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
 
 beforeEach(() => {
-  ipcCalls = []
   mocks.getLocalDirectoryPathSuggestions.mockReset()
   mocks.getLocalDirectoryPathSuggestions.mockResolvedValue([])
   setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'electron',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: ELECTRON_CLIENT_CAPABILITIES,
-    },
     initialServer: null,
   }
   // Host info used to live in the bootstrap payload; it now lives
@@ -51,49 +40,14 @@ beforeEach(() => {
     status: 'ready',
     error: null,
   })
-  testWindow.goblinNative = currentNativeBridge({
-    host: {
-      openSettingsWindow: async () => true,
-      openExternalUrl: async ({ url }) => ({ ok: true, message: url }),
-      openDirectoryDialog: async () => '/Users/tester/Developer/repo',
-      consumeExternalOpenPaths: async () => [],
-    },
-    invokeIpc: async (request: { path: string; input?: unknown }) => {
-      ipcCalls.push(request)
-      return null
-    },
-  })
 })
 
 afterEach(() => {
   setClientBridgeForTests(null)
-  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
 
 describe('OpenWorkspaceDialog', () => {
-  test('shows local directory suggestions while preserving the picker layout wrapper', async () => {
-    mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
-    await render(
-      <OpenWorkspaceDialog
-        open
-        onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({
-          ok: true as const,
-          workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer'),
-        }))}
-      />,
-    )
-
-    await setInputValue('#open-workspace-path', '/Users/tester/Dev')
-    await waitFor(() =>
-      expect(document.body.querySelector('[role="option"]')?.textContent).toContain('/Users/tester/Developer'),
-    )
-
-    expect(input('#open-workspace-path').parentElement?.className).toContain('min-w-0')
-    expect(mocks.getLocalDirectoryPathSuggestions).toHaveBeenCalledWith('/Users/tester/Dev', expect.any(AbortSignal))
-  })
-
   test('lets the popup own the first Escape before the dialog owns the second', async () => {
     const onClose = vi.fn()
     mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
@@ -188,87 +142,6 @@ describe('OpenWorkspaceDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
-  test('can fill the path from the native picker and keeps the dialog open on failure', async () => {
-    const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
-      ok: false,
-      kind: 'failed',
-      message: 'error.workspace-git-unavailable',
-    }))
-
-    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
-
-    await clickButtonByText('workspace-picker.open-path-choose')
-    await waitFor(() => expect(input('#open-workspace-path').value).toBe('~/Developer/repo'))
-    expect(testWindow.goblinNative).toEqual(
-      expect.objectContaining({
-        host: expect.objectContaining({ openDirectoryDialog: expect.any(Function) }),
-      }),
-    )
-
-    await click('button[type="submit"]')
-    await waitFor(() => {
-      expect(onClose).not.toHaveBeenCalled()
-      expect(document.body.textContent).toContain('error.workspace-git-unavailable')
-    })
-  })
-
-  test('does not apply a path selected for an earlier open cycle', async () => {
-    const selection = Promise.withResolvers<string | null>()
-    testWindow.goblinNative = currentNativeBridge({
-      host: {
-        openSettingsWindow: async () => true,
-        openExternalUrl: async ({ url }) => ({ ok: true, message: url }),
-        openDirectoryDialog: () => selection.promise,
-        consumeExternalOpenPaths: async () => [],
-      },
-    })
-    const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
-      ok: true,
-      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
-    }))
-    const { rerender } = await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
-
-    await clickButtonByText('workspace-picker.open-path-choose')
-    await rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
-    await rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
-    await flushTestUpdates(async () => {
-      selection.resolve('/tmp/old-selection')
-      await selection.promise
-    })
-
-    expect(input('#open-workspace-path').value).toBe('')
-  })
-
-  test('immediately revokes the open cycle when cancelled', async () => {
-    const selection = Promise.withResolvers<string | null>()
-    testWindow.goblinNative = currentNativeBridge({
-      host: {
-        openSettingsWindow: async () => true,
-        openExternalUrl: async ({ url }) => ({ ok: true, message: url }),
-        openDirectoryDialog: () => selection.promise,
-        consumeExternalOpenPaths: async () => [],
-      },
-    })
-    const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
-      ok: true,
-      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
-    }))
-    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
-
-    await clickButtonByText('workspace-picker.open-path-choose')
-    await clickButtonByText('dialog.cancel')
-    expect(onClose).toHaveBeenCalledTimes(1)
-
-    await flushTestUpdates(async () => {
-      selection.resolve('/tmp/old-selection')
-      await selection.promise
-    })
-    expect(input('#open-workspace-path').value).toBe('')
-  })
-
   test('allows retry after an unexpected open error', async () => {
     const onClose = vi.fn()
     const onOpen = vi
@@ -337,20 +210,6 @@ describe('OpenWorkspaceDialog', () => {
     await setInputValue('#open-workspace-path', '~/Developer/repo-next')
 
     expect(document.body.textContent).not.toContain('boom')
-  })
-
-  test('hides native picker button when no Electron bridge exists', async () => {
-    delete testWindow.goblinNative
-    setClientBridgeForTests(null)
-    const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
-      ok: true,
-      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
-    }))
-
-    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
-
-    expect(queryButtonByText('workspace-picker.open-path-choose')).toBeNull()
   })
 })
 

@@ -14,6 +14,7 @@ import type {
   WorkspaceRouteView,
 } from '#/web/app/navigation/route-model.ts'
 import { Layout } from '#/web/Layout.tsx'
+import { WorkspaceOpenPage } from '#/web/components/WorkspaceOpenPage.tsx'
 import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useAppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
@@ -65,8 +66,17 @@ const AppNotFoundRouteView = defineComponent({
   },
 })
 
+const WorkspaceOpenRouteView = defineComponent({
+  name: 'WorkspaceOpenRouteView',
+  setup() {
+    const route = useRoute()
+    return () => <WorkspaceOpenPage key={route.fullPath} path={route.query.path} />
+  },
+})
+
 const appRouteChildren: RouteRecordRaw[] = [
   { path: '', name: 'home', component: AppRouteView },
+  { path: 'open', name: 'open-workspace', component: WorkspaceOpenRouteView },
   { path: 'settings', redirect: '/settings/general' },
   {
     path: 'settings/:page',

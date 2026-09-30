@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { onClientLocalEventType, resetClientLocalEventsForTests } from '#/web/bridge/local-events.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal/notification-provider.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 let wsMock: WebSocketMockHandle
 
@@ -37,48 +35,9 @@ describe('terminal notification provider', () => {
     vi.restoreAllMocks()
     vi.resetModules()
     resetClientLocalEventsForTests()
-    delete (window as Partial<Window>).goblinNative
   })
 
-  test('uses the native notification provider when the preload exposes one', async () => {
-    const notifyBell = vi.fn(async () => true)
-    Object.defineProperty(window, 'goblinNative', {
-      configurable: true,
-      value: currentNativeBridge({
-        terminal: {
-          notifyBell,
-          sendTestNotification: async () => true,
-          setBadge: () => {},
-        },
-      }),
-    })
-
-    await expect(createTerminalNotificationProvider().notifyBell(bellInput)).resolves.toBe(true)
-
-    expect(notifyBell).toHaveBeenCalledWith(bellInput)
-    expect(wsMock.notificationInstances).toHaveLength(0)
-  })
-
-  test('returns a native rejection without issuing a browser notification', async () => {
-    const notifyBell = vi.fn(async () => false)
-    Object.defineProperty(window, 'goblinNative', {
-      configurable: true,
-      value: currentNativeBridge({
-        terminal: {
-          notifyBell,
-          sendTestNotification: async () => true,
-          setBadge: () => {},
-        },
-      }),
-    })
-
-    await expect(createTerminalNotificationProvider().notifyBell(bellInput)).resolves.toBe(false)
-
-    expect(notifyBell).toHaveBeenCalledWith(bellInput)
-    expect(wsMock.notificationInstances).toHaveLength(0)
-  })
-
-  test('uses browser notifications when the native provider is unavailable', async () => {
+  test('dispatches bell clicks from browser notifications', async () => {
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
 
@@ -92,66 +51,6 @@ describe('terminal notification provider', () => {
       session: bellInput.session,
     })
     dispose()
-  })
-
-  test('keeps the browser provider selected when a native bridge appears later', async () => {
-    const provider = createTerminalNotificationProvider()
-    const notifyBell = vi.fn(async () => true)
-    Object.defineProperty(window, 'goblinNative', {
-      configurable: true,
-      value: currentNativeBridge({
-        terminal: {
-          notifyBell,
-          sendTestNotification: async () => true,
-          setBadge: () => {},
-        },
-      }),
-    })
-
-    await expect(provider.notifyBell(bellInput)).resolves.toBe(true)
-
-    expect(wsMock.notificationInstances).toHaveLength(1)
-    expect(notifyBell).not.toHaveBeenCalled()
-  })
-
-  test('keeps the captured native provider when the global bridge is removed later', async () => {
-    const notifyBell = vi.fn(async () => true)
-    Object.defineProperty(window, 'goblinNative', {
-      configurable: true,
-      value: currentNativeBridge({
-        terminal: {
-          notifyBell,
-          sendTestNotification: async () => true,
-          setBadge: () => {},
-        },
-      }),
-    })
-    const provider = createTerminalNotificationProvider()
-    delete (window as Partial<Window>).goblinNative
-
-    await expect(provider.notifyBell(bellInput)).resolves.toBe(true)
-
-    expect(notifyBell).toHaveBeenCalledWith(bellInput)
-    expect(wsMock.notificationInstances).toHaveLength(0)
-  })
-
-  test('sends test notifications through the selected native provider', async () => {
-    const sendTestNotification = vi.fn(async () => true)
-    Object.defineProperty(window, 'goblinNative', {
-      configurable: true,
-      value: currentNativeBridge({
-        terminal: {
-          notifyBell: async () => true,
-          sendTestNotification,
-          setBadge: () => {},
-        },
-      }),
-    })
-
-    await expect(createTerminalNotificationProvider().sendTestNotification(testNotificationInput)).resolves.toBe(true)
-
-    expect(sendTestNotification).toHaveBeenCalledWith(testNotificationInput)
-    expect(wsMock.notificationInstances).toHaveLength(0)
   })
 
   test('uses caller-provided copy for browser test notifications', async () => {

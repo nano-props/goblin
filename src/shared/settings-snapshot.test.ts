@@ -14,16 +14,12 @@ const prefs = {
   fetchIntervalSec: 300,
   terminalNotificationsEnabled: true,
   shortcutsDisabled: true,
-  globalShortcutDisabled: false,
-  globalShortcut: 'CommandOrControl+Shift+K',
-  lanEnabled: true,
 }
 
 describe('settings snapshot partitions', () => {
   test('builds runtime settings without workspace restore state', () => {
-    expect(buildRuntimeSettingsSnapshot({ prefs, globalShortcutRegistered: true })).toEqual({
+    expect(buildRuntimeSettingsSnapshot({ prefs })).toEqual({
       ...prefs,
-      globalShortcutRegistered: true,
     })
   })
 
@@ -40,14 +36,12 @@ describe('settings snapshot partitions', () => {
   test('keeps workspace restore state out of the settings snapshot', () => {
     const snapshot = buildSettingsSnapshot({
       prefs,
-      globalShortcutRegistered: false,
+
       recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///tmp/repo-b') }],
       workspaceSettings: [],
     })
 
-    expect(runtimeSettingsSnapshotFromSettingsSnapshot(snapshot)).toMatchObject({
-      globalShortcutRegistered: false,
-    })
+    expect(runtimeSettingsSnapshotFromSettingsSnapshot(snapshot)).toEqual(prefs)
     expect(snapshot).not.toHaveProperty('session')
     expect(snapshot).not.toHaveProperty('workspace')
   })

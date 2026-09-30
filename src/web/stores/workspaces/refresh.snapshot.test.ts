@@ -6,7 +6,7 @@ import {
   REPO_ID,
   branch,
   cachedRepoSnapshot,
-  ipcHandlers,
+  serverHandlers,
   refreshStoreAccess,
   repoSnapshotResponse,
   resetRefreshTest,
@@ -19,7 +19,7 @@ describe('repository snapshot refresh', () => {
   test('replaces the runtime-scoped snapshot query without mirroring it into Zustand', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     const workspaceBefore = workspacesStore.getState().workspaces[REPO_ID]
-    ipcHandlers['repo.snapshot'] = () =>
+    serverHandlers['repo.snapshot'] = () =>
       repoSnapshotResponse({ branches: [branch('main'), branch('feature/a')], current: 'feature/a' })
 
     await requestRepoSnapshotRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
@@ -33,7 +33,7 @@ describe('repository snapshot refresh', () => {
 
   test('keeps accepted snapshot data mounted when a background refresh fails', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
-    ipcHandlers['repo.snapshot'] = () => {
+    serverHandlers['repo.snapshot'] = () => {
       throw new Error('snapshot unavailable')
     }
 
@@ -48,7 +48,7 @@ describe('repository snapshot refresh', () => {
   test('does not place a response for an old runtime into the reopened runtime query', async () => {
     const firstRuntimeId = seedRepo([branch('main')], 'repo-runtime-first')
     let resolveRead!: (value: ReturnType<typeof repoSnapshotResponse>) => void
-    ipcHandlers['repo.snapshot'] = () =>
+    serverHandlers['repo.snapshot'] = () =>
       new Promise((resolve) => {
         resolveRead = resolve
       })

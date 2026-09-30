@@ -64,7 +64,6 @@ export const AuthenticatedWorkspaceSideEffects = defineComponent<AuthenticatedWo
       isWorkspaceShortcutSuppressed: workspaceShortcutsSuppressed,
       isSettingsOpen: () => false,
       onExitSettings: () => props.navigateToIndex(),
-      openCreateWorktree: () => props.navigation.openCreateWorktree(),
     })
     useWorkspaceNavigationHistory({ routeContext: () => props.routeContext })
     useWorkspaceRuntimeInvalidationRefresh()

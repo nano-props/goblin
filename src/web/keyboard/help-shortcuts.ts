@@ -1,15 +1,9 @@
-import { acceleratorToKeyLabels } from '#/shared/accelerator.ts'
 import type { DictKey } from '#/shared/i18n/en.ts'
 import {
   APP_SHORTCUTS,
   BRANCH_ACTION_SHORTCUTS,
   CLIENT_APP_SHORTCUTS,
   CLIENT_NAVIGATION_SHORTCUTS,
-  SETTINGS_SHORTCUT_MAC,
-  SETTINGS_SHORTCUT_NON_MAC,
-  VIEW_SHORTCUTS,
-  WINDOW_REPO_SHORTCUTS,
-  CLOSE_WINDOW_SHORTCUT,
 } from '#/shared/shortcut-definitions.ts'
 export interface HelpShortcutRow {
   combos: string[][]
@@ -22,14 +16,11 @@ export interface HelpShortcutSection {
   rows: HelpShortcutRow[]
 }
 
-export function helpShortcutSections(globalShortcut: string, isMac = inferIsMacPlatform()): HelpShortcutSection[] {
+export function helpShortcutSections(isMac = inferIsMacPlatform()): HelpShortcutSection[] {
   return [
     {
       titleKey: 'help.section.nav',
-      rows: [
-        ...CLIENT_NAVIGATION_SHORTCUTS.map(helpRowFromKeyboardDefinition),
-        ...WINDOW_REPO_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
-      ],
+      rows: [...CLIENT_NAVIGATION_SHORTCUTS.map(helpRowFromKeyboardDefinition)],
     },
     {
       titleKey: 'help.section.branch-actions',
@@ -37,24 +28,12 @@ export function helpShortcutSections(globalShortcut: string, isMac = inferIsMacP
     },
     {
       titleKey: 'help.section.views',
-      rows: [
-        workspaceTabShortcutRow(isMac),
-        ...VIEW_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
-      ],
+      rows: [workspaceTabShortcutRow(isMac)],
     },
     {
       titleKey: 'help.section.app',
       rows: [
         ...APP_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
-        { combos: [acceleratorToKeyLabels(globalShortcut)], labelKey: 'help.row.activate-window' },
-        {
-          combos: [acceleratorToKeyLabelsForHelp(CLOSE_WINDOW_SHORTCUT, isMac)],
-          labelKey: 'help.row.close-window',
-        },
-        {
-          combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)],
-          labelKey: 'help.row.settings',
-        },
         ...CLIENT_APP_SHORTCUTS.map(helpRowFromKeyboardDefinition),
       ],
     },

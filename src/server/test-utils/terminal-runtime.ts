@@ -26,7 +26,7 @@ import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capab
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type * as PhysicalWorktreeIdentityResolverModule from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
-// No library test double spans node-pty, realtime sockets, runtime membership, and durable pane layout.
+// No library test double spans Bun PTY, realtime sockets, runtime membership, and durable pane layout.
 // Keep that integration fixture shared while each suite owns one observable runtime behavior.
 export const USER_1 = 'user_terminal_runtime'
 export const USER_2 = 'user_terminal_runtime_second'
@@ -171,55 +171,54 @@ export const mockPtys: Array<{
 }> = []
 let mockDataToEmitOnRegistration: string | null = null
 
-vi.mock('node-pty', () => ({
-  spawn: vi.fn(() => {
-    let onData: ((data: string) => void) | null = null
-    let onExit: (() => void) | null = null
-    let processName = 'zsh'
-    const pty = {
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(() => {
-        queueMicrotask(() => onExit?.())
-      }),
-      emitData: (data: string) => onData?.(data),
-      emitExit: () => onExit?.(),
-      setProcessName: (nextProcessName: string) => {
-        processName = nextProcessName
-      },
-      get process() {
-        return processName
-      },
-    }
-    mockPtys.push(pty)
-    return {
-      ...pty,
-      get process() {
-        return processName
-      },
-      onData: (cb: (data: string) => void) => {
-        onData = cb
-        if (mockDataToEmitOnRegistration !== null) {
-          const data = mockDataToEmitOnRegistration
-          mockDataToEmitOnRegistration = null
-          cb(data)
-        }
-        return {
-          dispose: vi.fn(() => {
-            if (onData === cb) onData = null
-          }),
-        }
-      },
-      onExit: (cb: () => void) => {
-        onExit = cb
-        return {
-          dispose: vi.fn(() => {
-            if (onExit === cb) onExit = null
-          }),
-        }
-      },
-    }
-  }),
+vi.mock('#/server/terminal/terminal-pty-runtime.ts', () => ({
+  spawnTerminalPtyRuntime: vi.fn(
+    (_input: unknown, observer: { onData(data: string, processName: string): void; onExit(): void }) => {
+      let dataOwned = true
+      let exitOwned = true
+      let processName = 'zsh'
+      const pty = {
+        write: vi.fn(),
+        resize: vi.fn(),
+        kill: vi.fn(() => {
+          queueMicrotask(() => pty.emitExit())
+        }),
+        emitData: (data: string) => {
+          if (dataOwned) observer.onData(data, processName)
+        },
+        emitExit: () => {
+          if (exitOwned) observer.onExit()
+        },
+        setProcessName: (next: string) => {
+          processName = next
+        },
+        get process() {
+          return processName
+        },
+      }
+      mockPtys.push(pty)
+
+      if (mockDataToEmitOnRegistration !== null) {
+        const data = mockDataToEmitOnRegistration
+        mockDataToEmitOnRegistration = null
+        pty.emitData(data)
+      }
+
+      return {
+        ok: true,
+        runtime: { write: pty.write, resize: pty.resize, kill: pty.kill, processName: () => processName },
+        events: {
+          disposeData: () => {
+            dataOwned = false
+          },
+          dispose: () => {
+            dataOwned = false
+            exitOwned = false
+          },
+        },
+      }
+    },
+  ),
 }))
 
 interface RuntimeHandle {

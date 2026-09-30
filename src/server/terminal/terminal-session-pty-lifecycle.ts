@@ -738,7 +738,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       'PTY binding observer failed',
     )
     try {
-      // Native callbacks cannot carry an exception back to node-pty/the worker
+      // Native callbacks cannot carry an exception back to Bun PTY/the worker
       // transport. Retire the binding synchronously and keep its handle owned
       // by the normal exit-completion path.
       this.disposeResources(session)

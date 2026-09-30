@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/bridge/types.ts'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -17,19 +15,6 @@ const executionTarget = {
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-    initialServer: null,
-    ...overrides,
-  }
-}
-
-function electronBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
-  return {
-    runtime: {
-      kind: 'electron',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-    },
     initialServer: null,
     ...overrides,
   }
@@ -53,21 +38,10 @@ function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
 
 function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
   return {
-    kind: () => 'web',
-    hasCapability: () => false,
-    getBootstrap: () => electronBootstrap(),
-    invokeIpc: vi.fn(),
-    abortIpc: vi.fn(async () => false),
-    onEffectIntent: () => () => {},
-    pathForFile: () => '',
+    getBootstrap: () => webBootstrap(),
+
     saveClipboardFiles: () => Promise.resolve([]),
-    getAccessTokenProjection: async () => {
-      throw new Error('unused token projection')
-    },
-    rotateAccessToken: async () => {
-      throw new Error('unused token rotation')
-    },
-    host: () => null,
+
     appRealtime: () => ({
       kickReconnect: () => {},
       onRecovered: () => () => {},
@@ -94,23 +68,15 @@ describe('repo-client', () => {
     setClientBridgeForTests(null)
   })
 
-  test('opens repository branch URLs through the native host bridge when available', async () => {
+  test('opens repository branch URLs in the browser', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    window.open = vi.fn(() => null)
     const bridgeModule = await import('#/web/bridge/client.ts')
-    const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
+    window.open = vi.fn(() => null)
     bridgeModule.setClientBridgeForTests(
       testBridge({
-        kind: () => 'electron',
         getBootstrap: () => ({
           ...webBootstrap(),
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
-        host: () => ({
-          openSettingsWindow: vi.fn(),
-          openExternalUrl,
-          openDirectoryDialog: vi.fn(),
-          consumeExternalOpenPaths: vi.fn(),
         }),
       }),
     )
@@ -125,11 +91,11 @@ describe('repo-client', () => {
       ok: true,
       message: '',
     })
-    expect(openExternalUrl).toHaveBeenCalledWith({
-      url: 'https://github.com/acme/repo/tree/feature/test',
-      allowHttp: true,
-    })
-    expect(window.open).not.toHaveBeenCalled()
+    expect(window.open).toHaveBeenCalledWith(
+      'https://github.com/acme/repo/tree/feature/test',
+      '_blank',
+      'noopener,noreferrer',
+    )
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/repo/open-url',
       expect.objectContaining({
@@ -144,22 +110,15 @@ describe('repo-client', () => {
     )
   })
 
-  test('opens repository commit URLs through the native host bridge when available', async () => {
+  test('opens repository commit URLs in the browser', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const bridgeModule = await import('#/web/bridge/client.ts')
-    const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' }))
+    window.open = vi.fn(() => null)
     bridgeModule.setClientBridgeForTests(
       testBridge({
-        kind: () => 'electron',
         getBootstrap: () => ({
           ...webBootstrap(),
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
-        host: () => ({
-          openSettingsWindow: vi.fn(),
-          openExternalUrl,
-          openDirectoryDialog: vi.fn(),
-          consumeExternalOpenPaths: vi.fn(),
         }),
       }),
     )
@@ -181,21 +140,20 @@ describe('repo-client', () => {
         body: JSON.stringify({ cwd: workspaceId, workspaceRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
       }),
     )
-    expect(openExternalUrl).toHaveBeenCalledWith({
-      url: 'https://github.com/acme/repo/commit/abcdef1',
-      allowHttp: true,
-    })
+    expect(window.open).toHaveBeenCalledWith(
+      'https://github.com/acme/repo/commit/abcdef1',
+      '_blank',
+      'noopener,noreferrer',
+    )
   })
 
-  test('clones repositories through the embedded server when no Electron bridge exists', async () => {
+  test('clones repositories through the server over HTTP', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'ok', path: '/tmp/repo' }),
     }))
     const { cloneRepository } = await import('#/web/repos/client.ts')
-    const { hasNativeDirectoryPicker } = await import('#/web/app/shell-client.ts')
-    expect(hasNativeDirectoryPicker()).toBe(false)
     await expect(
       cloneRepository({
         url: 'https://example.com/repo.git',
@@ -518,7 +476,7 @@ describe('repo-client', () => {
     )
   })
 
-  test('opens external workspace apps through embedded server routes even when a native host exists', async () => {
+  test('opens external workspace apps through server routes', async () => {
     const fetchMock = mockFetch(
       vi
         .fn()
@@ -529,14 +487,10 @@ describe('repo-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: webBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc: vi.fn(),
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',

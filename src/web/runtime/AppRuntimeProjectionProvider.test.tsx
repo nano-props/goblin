@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
@@ -9,8 +8,7 @@ import {
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalAttachResult,
@@ -41,7 +39,6 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
-import { advanceServerCommandGeneration } from '#/web/lib/server-command-generation.ts'
 import type { WorkspaceRuntimeMembershipRecoveryResult } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
 
 const projectionMocks = vi.hoisted(() => ({
@@ -122,11 +119,6 @@ describe('AppRuntimeProjectionProvider', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
-        runtime: {
-          kind: 'web',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [],
-        },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
     })
@@ -613,64 +605,6 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('restarts an in-flight projection recovery after the command generation advances', async () => {
-    const repo = seedCurrentRepo()
-    const interruptedRecovery = Promise.withResolvers<WorkspaceRuntimeMembershipRecoveryResult>()
-    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships
-      .mockReturnValueOnce(interruptedRecovery.promise)
-      .mockResolvedValueOnce({
-        kind: 'settled',
-        targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
-      })
-    const result = renderRuntimeProvider(REPO_ID)
-    try {
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
-      recoverSessionsMock.mockClear()
-      listWorkspaceTabsMock.mockClear()
-      projectionMocks.resyncActiveRepoReadQueries.mockClear()
-
-      await flushTestUpdates(() => recoveredHandler?.('client_sharedterminal'))
-      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
-
-      advanceServerCommandGeneration()
-      interruptedRecovery.reject(new Error('command generation advanced'))
-
-      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2))
-      await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
-      expect(recoverSessionsMock).toHaveBeenCalledOnce()
-      expect(listWorkspaceTabsMock).toHaveBeenCalledOnce()
-    } finally {
-      result.unmount()
-    }
-  })
-
-  test('does not recover membership after the provider releases its generation-advance subscription', async () => {
-    seedCurrentRepo()
-    const result = renderRuntimeProvider(REPO_ID)
-    await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
-    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
-
-    result.unmount()
-    advanceServerCommandGeneration()
-    await waitForNextMacrotask()
-
-    expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()
-  })
-
-  test('does not recover membership on generation advance before membership is authoritative', async () => {
-    seedCurrentRepo()
-    workspacesStore.setState({ workspaceMembershipReady: false })
-    const result = renderRuntimeProvider(REPO_ID)
-    try {
-      advanceServerCommandGeneration()
-      await waitForNextMacrotask()
-
-      expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).not.toHaveBeenCalled()
-    } finally {
-      result.unmount()
-    }
-  })
-
   test('does not publish a pending recovery after provider unmount', async () => {
     const repo = seedCurrentRepo()
     const recovery = Promise.withResolvers<TerminalSessionsSnapshot>()
@@ -787,20 +721,10 @@ function seedSecondRepo() {
 
 function testBridge(): ClientBridge {
   return {
-    kind: () => 'web',
-    hasCapability: () => false,
     getBootstrap: () => window.__GOBLIN_BOOTSTRAP__!,
-    invokeIpc: vi.fn(async () => null),
-    abortIpc: vi.fn(async () => false),
-    onEffectIntent: vi.fn(() => () => {}),
-    pathForFile: vi.fn(() => ''),
+
     saveClipboardFiles: vi.fn(async () => []),
-    getAccessTokenProjection: vi.fn(async () => ({ accessToken: 'test-access-token', activation: 'current' as const })),
-    rotateAccessToken: vi.fn(async () => ({
-      accessToken: 'test-access-token',
-      activation: 'after-restart' as const,
-    })),
-    host: () => null,
+
     appRealtime: () => ({
       kickReconnect: kickReconnectMock,
       onRecovered: vi.fn((cb: (clientId: string) => void) => {
@@ -830,7 +754,7 @@ function testBridge(): ClientBridge {
       recoverSessions: recoverSessionsMock,
       notifyBell: vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
-      setBadge: vi.fn(() => {}),
+
       onOutput: vi.fn(() => () => {}),
       onBell: vi.fn(() => () => {}),
       onTitle: vi.fn(() => () => {}),

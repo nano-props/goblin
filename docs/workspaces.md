@@ -5,9 +5,9 @@ Goblin's top-level object is a directory-backed workspace. A workspace is identi
 - `goblin+file:///absolute/path`
 - `goblin+ssh://ssh-alias/absolute/path`
 
-One shared workspace-locator boundary parses and formats these identifiers. OS
-folder pickers may return native paths, but the open boundary converts them
-immediately. Persisted membership, procedure payloads, and runtime projections
+One shared workspace-locator boundary parses and formats these identifiers.
+The browser path dialog accepts a server filesystem path; the open boundary
+converts it immediately. Persisted membership, procedure payloads, and runtime projections
 use locators; native paths exist only at filesystem, process, editor, terminal,
 and SSH command boundaries.
 

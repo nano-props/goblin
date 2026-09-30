@@ -47,7 +47,7 @@ interface GitWorkspacePaneProps {
   workspacePaneRouteContext: WorkspacePaneRouteContext
   workspacePaneId: string
   shortcutsEnabled: boolean
-  toolbarTrafficLightOffset: boolean
+  toolbarNavigationOffset: boolean
   onBackToGitWorkspaceNavigator?: () => void
 }
 
@@ -58,7 +58,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
     'workspacePaneRouteContext',
     'workspacePaneId',
     'shortcutsEnabled',
-    'toolbarTrafficLightOffset',
+    'toolbarNavigationOffset',
     'onBackToGitWorkspaceNavigator',
   ],
 
@@ -91,7 +91,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
         )
       }
       if (!snapshot) {
-        return <WorkspacePaneSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+        return <WorkspacePaneSkeleton toolbarNavigationOffset={props.toolbarNavigationOffset} />
       }
 
       const pullRequest = pullRequestProjection?.pullRequest
@@ -137,7 +137,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
               branch={detail.branch}
               workspacePaneId={props.workspacePaneId}
               shortcutsEnabled={props.shortcutsEnabled}
-              toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+              toolbarNavigationOffset={props.toolbarNavigationOffset}
               onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
             />
           ) : (
@@ -146,7 +146,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
               detail={detail}
               workspacePaneRouteContext={props.workspacePaneRouteContext}
               workspacePaneId={props.workspacePaneId}
-              toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+              toolbarNavigationOffset={props.toolbarNavigationOffset}
               onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
             />
           )}
@@ -234,7 +234,7 @@ interface GitWorkspacePaneSurfaceProps {
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneRouteContext: WorkspacePaneRouteContext
   workspacePaneId: string
-  toolbarTrafficLightOffset?: boolean
+  toolbarNavigationOffset?: boolean
   onBackToGitWorkspaceNavigator?: () => void
 }
 
@@ -245,7 +245,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
     'detail',
     'workspacePaneRouteContext',
     'workspacePaneId',
-    'toolbarTrafficLightOffset',
+    'toolbarNavigationOffset',
     'onBackToGitWorkspaceNavigator',
   ],
 
@@ -272,8 +272,8 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
         const worktreeRemovalLabelKey = repoBranchActionLoadingLabel('removeWorktree', worktreeRemovalPhase).labelKey
         return (
           <>
-            <WorkspaceToolbar draggable={!compact.value} trafficLightOffset={props.toolbarTrafficLightOffset ?? false}>
-              <WorkspaceToolbarLeadingSpacer reserve={props.toolbarTrafficLightOffset ?? false} />
+            <WorkspaceToolbar expanded={!compact.value} navigationOffset={props.toolbarNavigationOffset ?? false}>
+              <WorkspaceToolbarLeadingSpacer reserve={props.toolbarNavigationOffset ?? false} />
               <WorkspaceToolbarContent>
                 <WorkspaceToolbarPrimary>
                   <WorkspacePaneCompactBackButton onBackToNavigator={props.onBackToGitWorkspaceNavigator} />
@@ -294,7 +294,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
             detail={props.detail}
             workspacePaneId={props.workspacePaneId}
             workspacePaneRoute={currentWorkspacePaneRoute}
-            trafficLightOffset={props.toolbarTrafficLightOffset ?? false}
+            navigationOffset={props.toolbarNavigationOffset ?? false}
             workspacePaneTabModel={workspacePaneTabModel.value}
             onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
           />
@@ -325,7 +325,7 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
     'branch',
     'workspacePaneId',
     'shortcutsEnabled',
-    'toolbarTrafficLightOffset',
+    'toolbarNavigationOffset',
     'onBackToGitWorkspaceNavigator',
   ],
 
@@ -351,7 +351,7 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
           detail={props.detail}
           workspacePaneRouteContext={props.workspacePaneRouteContext}
           workspacePaneId={props.workspacePaneId}
-          toolbarTrafficLightOffset={props.toolbarTrafficLightOffset ?? false}
+          toolbarNavigationOffset={props.toolbarNavigationOffset ?? false}
           onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
         />
       </BranchActionSurfaceProvider>

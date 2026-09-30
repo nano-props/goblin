@@ -90,7 +90,7 @@ const ScrollBar: FunctionalComponent<ScrollBarProps> = (props, { slots }) => {
     <ScrollAreaScrollbar
       {...scrollbarProps}
       orientation={orientation}
-      data-title-bar-chrome-region="no-drag"
+      data-slot="scroll-area-scrollbar"
       class={cn(
         'flex touch-none select-none p-0.5 opacity-0 transition-opacity duration-200 ease-out data-[state=visible]:opacity-100',
         orientation === 'vertical' && 'h-full w-2 border-l border-l-transparent',

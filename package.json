@@ -1,31 +1,25 @@
 {
   "name": "goblin",
-  "productName": "Goblin",
   "version": "0.3.6",
   "description": "Goblin — Workspace Manager",
   "private": true,
   "type": "module",
-  "main": "src/main/main.ts",
   "imports": {
     "#/*": "./src/*",
     "#scripts/*": "./scripts/*"
   },
   "engines": {
-    "bun": ">=1.4.0",
+    "bun": ">=1.4.2",
     "node": "^24.15.0 || >=26.0.0"
   },
   "scripts": {
     "dev": "bun scripts/dev.ts",
-    "start": "bun run build:web && bun scripts/start-electron.ts",
-    "build": "bun scripts/build.ts",
-    "build:preload": "bun scripts/build-preload.ts",
+    "start": "bun run build && ./dist/goblin serve",
+    "build": "bun run build:web && bun run build:server",
     "build:web": "vite build",
     "build:server": "bun scripts/build-server.ts",
-    "build:standalone-server": "bun scripts/build-standalone-server.ts",
-    "start:server": "node scripts/start-server.ts",
+    "start:server": "bun src/server/main.ts serve",
     "reset-token": "bun scripts/reset-token.ts",
-    "build:electron": "electron-builder",
-    "install:app": "bun install.ts",
     "check:boundaries": "bun scripts/check-boundaries.ts",
     "check:no-html-injection": "bun scripts/check-no-html-injection.ts",
     "check:type-assertions": "bun scripts/check-type-assertions.ts",
@@ -36,9 +30,8 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "publish": "bun scripts/publish.ts",
     "count-lines": "bun scripts/count-lines.ts",
-    "clean": "rm -rf dist release"
+    "clean": "rm -rf dist"
   },
   "devDependencies": {
     "@babel/parser": "8.0.4",
@@ -55,8 +48,6 @@
     "@types/write-file-atomic": "4.0.3",
     "@types/ws": "8.18.1",
     "@vitejs/plugin-vue-jsx": "5.1.6",
-    "electron": "44.4.5",
-    "electron-builder": "26.15.3",
     "jsdom": "30.1.1",
     "prettier": "3.9.9",
     "tailwindcss": "4.3.3",
@@ -95,7 +86,6 @@
     "hono": "4.13.9",
     "immer": "11.1.18",
     "nanoid": "6.0.1",
-    "node-pty": "1.1.0",
     "p-queue": "9.3.3",
     "pino": "10.3.1",
     "qrcode": "1.5.4",

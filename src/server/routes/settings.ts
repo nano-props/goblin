@@ -4,12 +4,10 @@ import { getSettingsSnapshot } from '#/server/settings/snapshot.ts'
 import { addServerWorkspaceEntry, getUserSettings, removeServerWorkspaceEntry } from '#/server/settings/source.ts'
 import { restoreServerWorkspace } from '#/server/workspaces/restore/session.ts'
 import { restoreWorkspaceTabs } from '#/server/workspaces/restore/tabs.ts'
-import type { NativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import {
   handleSetFetchInterval,
-  handleSetGlobalShortcutRegistered,
   handleAddRecentWorkspace,
   handleClearRecentWorkspaces,
   handleSetWorkspaceExternalAppRecent,
@@ -26,15 +24,14 @@ import {
 } from '#/shared/procedure-schemas.ts'
 
 export function createSettingsRoutes(options: {
-  settingsState: NativeShortcutRegistrationState
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   serverHost: string
   serverPort: number
 }) {
-  const { settingsState, workspacePaneTabsHost, workspaceCapabilityTransitionHost } = options
+  const { workspacePaneTabsHost, workspaceCapabilityTransitionHost } = options
   const app = createRouteApp()
-  app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
+  app.get('/', async (c) => c.json(await getSettingsSnapshot()))
   app.post('/github-cli', async (c) => {
     const { hosts } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.githubCli, c)
     return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts))
@@ -66,10 +63,6 @@ export function createSettingsRoutes(options: {
         },
       ),
     )
-  })
-  app.post('/global-shortcut-state', async (c) => {
-    const { registered } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, c)
-    return c.json(handleSetGlobalShortcutRegistered({ registered }, settingsState))
   })
   app.post('/workspace/restore', async (c) => {
     const userId = userIdFromContext(c)

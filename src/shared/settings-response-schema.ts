@@ -1,5 +1,4 @@
 import * as v from 'valibot'
-import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
 import { LANG_PREF_VALUES, LANG_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
@@ -24,14 +23,6 @@ import {
 
 export const FetchIntervalSecSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0), v.maxValue(3600))
 
-export const GlobalShortcutSchema = v.pipe(
-  v.string(),
-  v.check(
-    (value) => parseAllowedGlobalShortcut(value) === value,
-    'Global shortcut must be an allowed canonical accelerator',
-  ),
-)
-
 export const UserSettingsSchema = v.strictObject({
   theme: v.picklist(THEME_PREF_VALUES),
   colorTheme: v.picklist(COLOR_THEMES),
@@ -39,9 +30,6 @@ export const UserSettingsSchema = v.strictObject({
   fetchIntervalSec: FetchIntervalSecSchema,
   terminalNotificationsEnabled: v.boolean(),
   shortcutsDisabled: v.boolean(),
-  globalShortcutDisabled: v.boolean(),
-  globalShortcut: GlobalShortcutSchema,
-  lanEnabled: v.boolean(),
 })
 
 const WorktreeBootstrapTrustSchema = v.strictObject({
@@ -74,7 +62,6 @@ export const WorkspaceSettingsEntrySchema = v.pipe(
 
 export const SettingsSnapshotSchema = v.strictObject({
   ...UserSettingsSchema.entries,
-  globalShortcutRegistered: v.boolean(),
   recentWorkspaces: v.array(WorkspaceSessionEntrySchema),
   workspaceSettings: v.array(WorkspaceSettingsEntrySchema),
 })
@@ -89,11 +76,6 @@ export const UserSettingsUpdateResponseSchema = v.strictObject({
   ok: v.literal(true),
   prefs: UserSettingsSchema,
   i18n: v.optional(I18nSnapshotSchema),
-})
-
-export const GlobalShortcutStateResponseSchema = v.strictObject({
-  ok: v.literal(true),
-  registered: v.boolean(),
 })
 
 export const WorkspaceSettingsStateSchema = v.strictObject({

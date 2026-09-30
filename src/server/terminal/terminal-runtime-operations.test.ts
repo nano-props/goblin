@@ -56,17 +56,17 @@ describe('server terminal runtime operations', () => {
 
     host.unregisterSocket('client_browser', USER_1, browserSocket)
 
-    const electronSocket = appRealtimeSocket()
-    host.registerSocket('client_electron', USER_1, electronSocket)
+    const returningSocket = appRealtimeSocket()
+    host.registerSocket('client_returning', USER_1, returningSocket)
 
-    const reopened = await createLocalWorktreeTerminal(host, 'client_electron', USER_1, 'primary')
+    const reopened = await createLocalWorktreeTerminal(host, 'client_returning', USER_1, 'primary')
     expect(reopened.ok).toBe(true)
     if (!reopened.ok) return
     expect(reopened.action).toBe('reused')
     expect(reopened.terminalSessionId).toBe(first.terminalSessionId)
     expect(reopened).toMatchObject({ controller: null, terminalRuntimeGeneration: 0, canonicalSize: null })
     await expect(
-      host.attach('client_electron', USER_1, {
+      host.attach('client_returning', USER_1, {
         terminalRuntimeSessionId: reopened.terminalRuntimeSessionId,
         terminalRuntimeGeneration: 0,
         cols: 102,
@@ -74,24 +74,24 @@ describe('server terminal runtime operations', () => {
       }),
     ).resolves.toMatchObject({ ok: true, frame: 'stream', canonicalSize: { cols: 102, rows: 33 } })
 
-    const sessions = await host.listSessions('client_electron', USER_1, {
+    const sessions = await host.listSessions('client_returning', USER_1, {
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessions).toEqual([
       expect.objectContaining({
         terminalSessionId: first.terminalSessionId,
-        controller: { clientId: 'client_electron', status: 'connected' },
+        controller: { clientId: 'client_returning', status: 'connected' },
         canonicalSize: { cols: 102, rows: 33 },
       }),
     ])
 
-    host.unregisterSocket('client_electron', USER_1, electronSocket)
+    host.unregisterSocket('client_returning', USER_1, returningSocket)
     shutdown()
   })
 
   test('a failed first attach keeps the prepared session addressable for retry', async () => {
-    const { spawn } = await import('node-pty')
+    const { spawnTerminalPtyRuntime: spawn } = await import('#/server/terminal/terminal-pty-runtime.ts')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty spawn failed')
     })
@@ -160,7 +160,7 @@ describe('server terminal runtime operations', () => {
   test('a failed restart keeps the session visible as error state', async () => {
     const { host, shutdown, socket, terminalRuntimeSessionId } = await startControlledTerminalRuntime()
 
-    const { spawn } = await import('node-pty')
+    const { spawnTerminalPtyRuntime: spawn } = await import('#/server/terminal/terminal-pty-runtime.ts')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty restart failed')
     })
@@ -238,7 +238,7 @@ describe('server terminal runtime operations', () => {
     // Stored controller intent still points at `client_a`, and `client_a`
     // is the effective controller; a subsequent restart from that client
     // must pass the authority check (here it fails later at spawn).
-    const { spawn } = await import('node-pty')
+    const { spawnTerminalPtyRuntime: spawn } = await import('#/server/terminal/terminal-pty-runtime.ts')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty restart failed')
     })

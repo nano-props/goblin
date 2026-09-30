@@ -37,7 +37,6 @@ describe('user settings patch policy', () => {
   test.each([
     [{ lang: 'unknown' }, 'invalid language'],
     [{ fetchIntervalSec: 1.5 }, 'invalid fetch interval'],
-    [{ globalShortcut: 'Control+O' }, 'invalid global shortcut'],
   ] as const)('rejects invalid patch %j at the command boundary', (patch, message) => {
     expect(() => validateUserSettingsPatch(patch as Partial<UserSettings>)).toThrow(message)
   })

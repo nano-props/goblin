@@ -4,8 +4,10 @@ One workspace for Git branches and worktrees.
 
 ## Requirements
 
-- Bun 1.4+
-- Node.js 24.15+ (LTS) or 26+
+- Linux or macOS
+- Bun 1.4.2+
+- Git; SSH for remote workspaces
+- Node.js 24.15+ (LTS) or 26+ for development checks and tests
 
 ## Core features
 
@@ -14,49 +16,45 @@ One workspace for Git branches and worktrees.
 - Local and SSH repos.
 - Built for branch flow.
 
-## Build & install
+## Start
 
 ```sh
-./install.ts                # mac / linux
-bun install.ts              # windows
-bun run install:app         # any platform
+bun install
+bun run start
 ```
 
-Installs a host-architecture `.app` to `~/Applications` (mac) or
-`%LOCALAPPDATA%\Programs\Goblin[-arm64]` (win). See `-h` for flags.
+Open `http://127.0.0.1:32100`. Sign in with the printed token.
 
-## Run server mode
-
-Install dependencies first, then start server mode:
+Or run from source:
 
 ```sh
-bun install # first run only
-./serve.sh
+bun run build:web
+bun run start:server
 ```
 
-Builds the web UI, then starts server mode. Default: `http://127.0.0.1:32100`.
-
-Use `--host` or `--port` to override the listen address:
+## Build
 
 ```sh
-./serve.sh --host 127.0.0.1 --port 32100
+bun run build
+./dist/goblin serve
 ```
 
-On first start the server writes a 25-char token to `<dataDir>/server-token`
-and prints it. Paste it once at the browser login gate.
-
-To rotate a generated token, stop the server, reset it, then restart:
-
-```sh
-bun run reset-token
-bun run reset-token -- --data-dir /path/to/data # custom data dir
-```
-
-Tokens supplied with `--token` are not file-backed and are unaffected.
+One binary. Runtime and web assets included. Built for your OS and architecture.
+See `./dist/goblin -h` for options.
 
 ## Develop
 
 ```sh
-bun install
 bun run dev
 ```
+
+Open `http://127.0.0.1:5173`. Reloads as you work.
+
+## Verify
+
+```sh
+bun run typecheck
+bun run test
+```
+
+See [the documentation index](docs/README.md) for details.

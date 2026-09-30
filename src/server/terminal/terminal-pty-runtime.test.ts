@@ -1,284 +1,181 @@
 import { userInfo } from 'node:os'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
-import {
-  spawnTerminalPtyRuntime as spawnTerminalPtyRuntimeWithEvents,
-  type SpawnTerminalPtyRuntimeInput,
-} from '#/server/terminal/terminal-pty-runtime.ts'
+import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
+import { spawnTerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import type { SpawnTerminalPtyRuntimeInput } from '#/server/terminal/terminal-pty-runtime.ts'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import type * as NodeOsModule from 'node:os'
 
-const { spawnMock } = vi.hoisted(() => ({
-  spawnMock: vi.fn(),
+vi.mock('node:os', async (importOriginal) => ({
+  ...(await importOriginal<typeof NodeOsModule>()),
+  userInfo: vi.fn(),
 }))
-
-vi.mock('node-pty', () => ({
-  spawn: spawnMock,
-}))
-
-vi.mock('node:os', async (importOriginal) => {
-  const actual = await importOriginal<typeof NodeOsModule>()
-  return {
-    ...actual,
-    userInfo: vi.fn(),
-  }
-})
-
-const originalShell = process.env.SHELL
-const terminalEventObserver = { onData: vi.fn(), onExit: vi.fn() }
-
-function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput) {
-  return spawnTerminalPtyRuntimeWithEvents(input, terminalEventObserver)
+vi.mock('#/system/terminal-process-name.ts', () => ({ readTerminalProcessName: () => 'zsh' }))
+const spawn = vi.fn()
+const input: SpawnTerminalPtyRuntimeInput = { command: '/bin/zsh', cwd: '/repo', cols: 80, rows: 24 }
+const observer = { onData: vi.fn(), onExit: vi.fn() }
+let callbacks: { data(terminal: unknown, bytes: Uint8Array): void; exit(): void }
+let resolveExit: (code: number) => void
+let terminal: {
+  closed: boolean
+  write: ReturnType<typeof vi.fn>
+  resize: ReturnType<typeof vi.fn>
+  close: ReturnType<typeof vi.fn>
 }
+let kill: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  spawnMock.mockReset()
-  terminalEventObserver.onData.mockReset()
-  terminalEventObserver.onExit.mockReset()
-  vi.mocked(userInfo).mockReset()
-  // Force a stable test env. Without this, a CI runner with SHELL=
-  // (or unset) would skip the inherited-SHELL branch and the test
-  // would race against the host environment.
-  process.env.SHELL = '/bin/zsh'
+  vi.stubGlobal('Bun', { spawn })
+  terminal = { closed: false, write: vi.fn(), resize: vi.fn(), close: vi.fn() }
+  terminal.close.mockImplementation(() => {
+    terminal.closed = true
+    callbacks.exit()
+  })
+  kill = vi.fn()
+  spawn.mockImplementation((_command, options) => {
+    callbacks = options.terminal
+    return {
+      pid: 123,
+      terminal,
+      kill,
+      exited: new Promise<number>((resolve) => {
+        resolveExit = resolve
+      }),
+    }
+  })
 })
+afterEach(() => vi.unstubAllGlobals())
 
-afterEach(() => {
-  if (originalShell === undefined) delete process.env.SHELL
-  else process.env.SHELL = originalShell
-})
-
-function ptyStub(processName = 'zsh') {
-  return {
-    process: processName,
-    write: vi.fn(),
-    resize: vi.fn(),
-    kill: vi.fn(),
-    onData: vi.fn((_listener: (data: string) => void) => ({ dispose: vi.fn() })),
-    onExit: vi.fn((_listener: () => void) => ({ dispose: vi.fn() })),
-  }
-}
-
-describe('spawnTerminalPtyRuntime', () => {
-  test('returns a trimmed process name when node-pty exposes a string', () => {
-    spawnMock.mockReturnValue({
-      process: ' zsh ',
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      onData: vi.fn(() => ({ dispose: vi.fn() })),
-      onExit: vi.fn(() => ({ dispose: vi.fn() })),
-    })
-
-    const result = spawnTerminalPtyRuntime({
-      cwd: '/repo',
-      cols: 80,
-      rows: 24,
-    })
-
+describe('Bun PTY adapter', () => {
+  beforeEach(() => useFakeTimers())
+  test('passes shell arguments, geometry and environment to Bun', () => {
+    const result = spawnTerminalPtyRuntime({ ...input, args: ['-l'], env: { TERM: 'bad', EXAMPLE: 'value' } }, observer)
     expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.runtime.processName()).toBe('zsh')
-  })
-
-  test('falls back to terminal when the process getter throws', () => {
-    spawnMock.mockReturnValue({
-      get process() {
-        throw new Error('process unavailable')
-      },
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      onData: vi.fn(() => ({ dispose: vi.fn() })),
-      onExit: vi.fn(() => ({ dispose: vi.fn() })),
-    })
-
-    const result = spawnTerminalPtyRuntime({
-      cwd: '/repo',
-      cols: 80,
-      rows: 24,
-    })
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.runtime.processName()).toBe('terminal')
-  })
-
-  test('reads the process getter only once per lookup', () => {
-    let reads = 0
-    spawnMock.mockReturnValue({
-      get process() {
-        reads += 1
-        return reads === 1 ? 'zsh' : undefined
-      },
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      onData: vi.fn(() => ({ dispose: vi.fn() })),
-      onExit: vi.fn(() => ({ dispose: vi.fn() })),
-    })
-
-    const result = spawnTerminalPtyRuntime({
-      cwd: '/repo',
-      cols: 80,
-      rows: 24,
-    })
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.runtime.processName()).toBe('zsh')
-    expect(reads).toBe(1)
-  })
-
-  test('honours an explicit command override without consulting env or passwd', () => {
-    vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
-    spawnMock.mockReturnValue(ptyStub())
-
-    spawnTerminalPtyRuntime({
-      command: '/usr/local/bin/fish',
-      args: ['--login'],
-      cwd: '/repo',
-      cols: 80,
-      rows: 24,
-    })
-
-    expect(spawnMock).toHaveBeenCalledWith(
-      '/usr/local/bin/fish',
-      ['--login'],
-      expect.objectContaining({ cwd: '/repo' }),
-    )
-    // Explicit override must short-circuit both env and userInfo lookups —
-    // otherwise a future regression that always polls userInfo would slow
-    // every explicit-override spawn by an os syscall.
-    expect(userInfo).not.toHaveBeenCalled()
-  })
-
-  test('uses the inherited SHELL on Unix when it is set, with -l for login mode', () => {
-    vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
-    spawnMock.mockReturnValue(ptyStub())
-
-    spawnTerminalPtyRuntime({
-      cwd: '/repo',
-      cols: 80,
-      rows: 24,
-    })
-
-    expect(spawnMock).toHaveBeenCalledWith('/bin/zsh', ['-l'], expect.objectContaining({ cwd: '/repo' }))
-    // Explicit env.SHELL must win — passwd fallback is only consulted when
-    // the inherited env is silent (CI / devcontainer scenarios).
-    expect(userInfo).not.toHaveBeenCalled()
-  })
-
-  test('runs a startup shell command through the login shell and returns to an interactive shell', () => {
-    vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
-
-    const resolved = resolveLocalShellWithStartupShellCommand("  bat '/repo/README.md'\r", { SHELL: '/bin/zsh' })
-
-    expect(resolved).toEqual({
-      command: '/bin/zsh',
-      args: ['-ilc', "  bat '/repo/README.md'\nexec '/bin/zsh' -l"],
-    })
-    expect(userInfo).not.toHaveBeenCalled()
-  })
-
-  test('startup shell command resolution falls back to normal shell resolution for blank commands', () => {
-    vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
-
-    expect(resolveLocalShellWithStartupShellCommand(' \r\n ', { SHELL: '/bin/zsh' })).toEqual({
-      command: '/bin/zsh',
-      args: ['-l'],
-    })
-  })
-
-  test('rejects mixing startup shell command with explicit process command', () => {
-    const result = spawnTerminalPtyRuntime({
-      command: '/bin/zsh',
-      startupShellCommand: "bat '/repo/README.md'",
-      cwd: '/repo',
-      cols: 80,
-      rows: 24,
-    })
-
-    expect(result).toEqual({ ok: false, message: 'startupShellCommand cannot be combined with command or args' })
-    expect(spawnMock).not.toHaveBeenCalled()
-  })
-
-  test('installs data ownership before returning the runtime capability', () => {
-    const term = ptyStub()
-    term.onData.mockImplementation((listener: (data: string) => void) => {
-      listener('early output')
-      return { dispose: vi.fn() }
-    })
-    spawnMock.mockReturnValue(term)
-
-    const result = spawnTerminalPtyRuntime({ cwd: '/repo', cols: 80, rows: 24 })
-
-    expect(result.ok).toBe(true)
-    expect(terminalEventObserver.onData).toHaveBeenCalledWith('early output', 'zsh')
-  })
-
-  test('fails spawn and kills the candidate when data observer installation throws', () => {
-    const term = ptyStub()
-    term.onData.mockImplementation(() => {
-      throw new Error('data observer unavailable')
-    })
-    spawnMock.mockReturnValue(term)
-
-    expect(spawnTerminalPtyRuntime({ cwd: '/repo', cols: 80, rows: 24 })).toEqual({
-      ok: false,
-      message: 'data observer unavailable',
-    })
-    expect(term.kill).toHaveBeenCalledOnce()
-    expect(term.onExit).not.toHaveBeenCalled()
-  })
-
-  test('releases data ownership and kills the candidate when exit observer installation throws', () => {
-    const dataDisposable = { dispose: vi.fn() }
-    const term = ptyStub()
-    term.onData.mockReturnValue(dataDisposable)
-    term.onExit.mockImplementation(() => {
-      throw new Error('exit observer unavailable')
-    })
-    spawnMock.mockReturnValue(term)
-
-    expect(spawnTerminalPtyRuntime({ cwd: '/repo', cols: 80, rows: 24 })).toEqual({
-      ok: false,
-      message: 'exit observer unavailable',
-    })
-    expect(dataDisposable.dispose).toHaveBeenCalledOnce()
-    expect(term.kill).toHaveBeenCalledOnce()
-  })
-
-  test('merges caller env into the spawned PTY environment while keeping terminal TERM', () => {
-    spawnMock.mockReturnValue(ptyStub())
-
-    spawnTerminalPtyRuntime({
-      cwd: '/repo',
-      cols: 80,
-      rows: 24,
-      env: {
-        PATH: '/g/bin:/usr/bin',
-        GOBLIN_TERMINAL: '1',
-        TERM: 'bad-term',
-        ELECTRON_RUN_AS_NODE: '1',
-        ELECTRON_NO_ASAR: '1',
-      },
-    })
-
-    expect(spawnMock).toHaveBeenCalledWith(
-      '/bin/zsh',
-      ['-l'],
+    expect(spawn).toHaveBeenCalledWith(
+      ['/bin/zsh', '-l'],
       expect.objectContaining({
-        env: expect.objectContaining({
-          PATH: '/g/bin:/usr/bin',
-          GOBLIN_TERMINAL: '1',
-          TERM: 'xterm-256color',
-        }),
+        cwd: '/repo',
+        env: expect.objectContaining({ TERM: 'xterm-256color', EXAMPLE: 'value' }),
+        terminal: expect.objectContaining({ cols: 80, rows: 24 }),
       }),
     )
-    const spawnOptions = spawnMock.mock.calls[0]![2]
-    expect(spawnOptions.env).not.toHaveProperty('ELECTRON_RUN_AS_NODE')
-    expect(spawnOptions.env).not.toHaveProperty('ELECTRON_NO_ASAR')
   })
-
+  test('decodes UTF-8 across chunks and delivers trailing output before exit', async () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    expect(result.ok).toBe(true)
+    const bytes = new TextEncoder().encode('中文')
+    callbacks.data(terminal, bytes.subarray(0, 2))
+    expect(observer.onData).not.toHaveBeenCalled()
+    resolveExit(0)
+    await Promise.resolve()
+    expect(observer.onExit).not.toHaveBeenCalled()
+    callbacks.data(terminal, bytes.subarray(2))
+    expect(observer.onData).toHaveBeenCalledWith('中文', 'zsh')
+    callbacks.exit()
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+    callbacks.exit()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+  })
+  test('bounds output draining after shell exit even when the slave remains open', async () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    if (!result.ok) throw new Error(result.message)
+    resolveExit(0)
+    await advanceTimersAndFlush(199)
+    expect(observer.onExit).not.toHaveBeenCalled()
+    callbacks.data(terminal, new TextEncoder().encode('tail'))
+    // Flush an incomplete final code point exactly once when retiring output.
+    callbacks.data(terminal, new Uint8Array([0xe4]))
+    await advanceTimersAndFlush(1)
+    expect(observer.onData.mock.calls.map(([data]) => data)).toEqual(['tail', '\ufffd'])
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+    expect(() => result.runtime.write('late')).toThrow('Terminal has exited')
+    callbacks.data(terminal, new TextEncoder().encode('late'))
+    callbacks.exit()
+    expect(observer.onData).toHaveBeenCalledTimes(2)
+    expect(observer.onExit).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  test('EOF cancels the drain deadline and publishes exit only once', async () => {
+    spawnTerminalPtyRuntime(input, observer)
+    resolveExit(0)
+    await advanceTimersAndFlush(50)
+    callbacks.exit()
+    expect(vi.getTimerCount()).toBe(0)
+    await advanceTimersAndFlush(200)
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+  })
+  test('manual close completes draining immediately after shell exit', async () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    if (!result.ok) throw new Error(result.message)
+    resolveExit(0)
+    await advanceTimersAndFlush(50)
+    result.runtime.kill()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  test('also waits for process exit when EOF arrives first', async () => {
+    spawnTerminalPtyRuntime(input, observer)
+    callbacks.exit()
+    expect(observer.onExit).not.toHaveBeenCalled()
+    resolveExit(0)
+    await Promise.resolve()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+  })
+  test('writes each input once and resizes the terminal', () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    if (!result.ok) throw new Error(result.message)
+    terminal.write.mockReturnValue(1)
+    result.runtime.write('abc')
+    result.runtime.resize(100, 40)
+    expect(terminal.write).toHaveBeenCalledExactlyOnceWith('abc')
+    expect(terminal.resize).toHaveBeenCalledWith(100, 40)
+    callbacks.exit()
+    expect(() => result.runtime.write('late')).toThrow('Terminal has exited')
+  })
+  test('data disposal retains the exit observer needed by kill-and-wait', async () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    if (!result.ok) throw new Error(result.message)
+    result.events.disposeData()
+    callbacks.data(terminal, new TextEncoder().encode('ignored'))
+    result.runtime.kill()
+    expect(kill).toHaveBeenCalledWith('SIGHUP')
+    expect(terminal.close).toHaveBeenCalledOnce()
+    callbacks.exit()
+    resolveExit(0)
+    await Promise.resolve()
+    expect(observer.onData).not.toHaveBeenCalled()
+    expect(observer.onExit).toHaveBeenCalledOnce()
+  })
+  test('full disposal releases both observers', async () => {
+    const result = spawnTerminalPtyRuntime(input, observer)
+    if (!result.ok) throw new Error(result.message)
+    result.events.dispose()
+    callbacks.data(terminal, new TextEncoder().encode('ignored'))
+    callbacks.exit()
+    resolveExit(0)
+    await Promise.resolve()
+    expect(observer.onData).not.toHaveBeenCalled()
+    expect(observer.onExit).not.toHaveBeenCalled()
+  })
+  test('reports spawn failure without publishing a runtime', () => {
+    spawn.mockImplementationOnce(() => {
+      throw new Error('missing shell')
+    })
+    expect(spawnTerminalPtyRuntime(input, observer)).toEqual({ ok: false, message: 'missing shell' })
+  })
+  test('rejects ambiguous shell startup configuration before spawning', () => {
+    expect(spawnTerminalPtyRuntime({ ...input, startupShellCommand: 'echo ready' }, observer)).toEqual({
+      ok: false,
+      message: 'startupShellCommand cannot be combined with command or args',
+    })
+    expect(spawn).not.toHaveBeenCalled()
+  })
+})
+describe('local shell fallback', () => {
   test('falls back to os.userInfo().shell when SHELL is not set (CI / devcontainer)', () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/usr/bin/zsh' } as ReturnType<typeof userInfo>)
 

@@ -1,8 +1,8 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { FunctionalComponent } from 'vue'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
-import { TitleBarInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
+import { InteractiveRegion } from '#/web/components/interactive-region.tsx'
 
 interface ZenModeSidebarRevealTriggerProps {
   workspaceId?: WorkspaceId
@@ -19,7 +19,7 @@ export const ZenModeSidebarRevealTriggerLayer: FunctionalComponent<ZenModeSideba
     <div
       data-testid="zen-mode-toggle-overlay"
       class="goblin-zen-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
-      style={{ height: `${TITLE_BAR_HEIGHT_PX}px` }}
+      style={{ height: `${WORKSPACE_TOOLBAR_HEIGHT_PX}px` }}
     >
       <ZenModeSidebarRevealTrigger
         workspaceId={workspaceId}
@@ -38,13 +38,13 @@ const ZenModeSidebarRevealTrigger: FunctionalComponent<ZenModeSidebarRevealTrigg
   onZenRevealTriggerEnter,
 }) => {
   return (
-    <TitleBarInteractiveRegion>
+    <InteractiveRegion>
       <WorkspaceNavigationControls
         workspaceId={workspaceId}
         zenRevealTriggerEnabled={zenRevealTriggerEnabled}
         onZenRevealTriggerEnter={onZenRevealTriggerEnter}
       />
-    </TitleBarInteractiveRegion>
+    </InteractiveRegion>
   )
 }
 ZenModeSidebarRevealTrigger.props = ['workspaceId', 'zenRevealTriggerEnabled', 'onZenRevealTriggerEnter']

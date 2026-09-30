@@ -1,7 +1,7 @@
 import { computed, defineComponent, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
-import { chooseCloneParentPath, hasNativeDirectoryPicker, homeDirectory } from '#/web/app/shell-client.ts'
+import { homeDirectory } from '#/web/app/shell-client.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
@@ -60,9 +60,8 @@ export const CloneRepositoryDialog = defineComponent<Props>({
         !directoryError.value &&
         !pending.value,
     )
-    const canChooseParentPath = hasNativeDirectoryPicker()
 
-    // The open dialog owns one abort scope for chooser and clone requests.
+    // The open dialog owns one abort scope for clone requests.
     watch(
       () => props.open,
       (open, _previous, onCleanup) => {
@@ -82,18 +81,6 @@ export const CloneRepositoryDialog = defineComponent<Props>({
       },
       { immediate: true },
     )
-
-    async function chooseParentPath(): Promise<void> {
-      if (pending.value || !canChooseParentPath) return
-      const signal = dialogAbortController?.signal
-      if (!signal) return
-      try {
-        const selected = await chooseCloneParentPath({ signal })
-        if (!signal.aborted && selected) parentPath.value = tildify(selected)
-      } catch (caught) {
-        if (!signal.aborted) error.value = caught instanceof Error ? caught.message : t('error.unknown')
-      }
-    }
 
     async function submit(): Promise<void> {
       if (!canSubmit.value || !dialogAbortController) return
@@ -190,17 +177,6 @@ export const CloneRepositoryDialog = defineComponent<Props>({
                 class="h-10 min-w-0 flex-1 font-mono text-sm"
                 disabled={pending.value}
               />
-              {canChooseParentPath ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending.value}
-                  class={cn('h-10 self-stretch px-3', compact.value && 'w-full')}
-                  onClick={() => void chooseParentPath()}
-                >
-                  {t('workspace-picker.clone-parent-choose')}
-                </Button>
-              ) : null}
             </div>
             <FieldDescription reserveHeight aria-hidden="true" />
           </Field>

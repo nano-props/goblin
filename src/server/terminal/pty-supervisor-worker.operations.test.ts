@@ -100,7 +100,7 @@ describe('WorkerBackedPtySupervisor PTY operations', () => {
     const workerB = new FakeWorker()
     const workers = [workerA, workerB]
     const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
+      workerCommand: ['bun', '/tmp/pty-worker.js'],
       spawnWorker: () => workers.shift() as never,
     })
     const handle = await spawnSession(supervisor, workerA)
@@ -202,7 +202,7 @@ describe('WorkerBackedPtySupervisor PTY operations', () => {
     const workerB = new FakeWorker()
     const workers = [workerA, workerB]
     const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
+      workerCommand: ['bun', '/tmp/pty-worker.js'],
       spawnWorker: () => workers.shift() as never,
     })
     const handle = await spawnSession(supervisor, workerA)
@@ -230,7 +230,7 @@ describe('WorkerBackedPtySupervisor PTY operations', () => {
   test('retires an indeterminate worker when a write acknowledgement times out', async () => {
     useFakeTimers()
     const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
+      workerCommand: ['bun', '/tmp/pty-worker.js'],
       spawnWorker: () => worker as never,
       writeAckTimeoutMs: 25,
     })

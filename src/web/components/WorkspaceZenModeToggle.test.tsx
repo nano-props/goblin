@@ -44,12 +44,11 @@ describe('WorkspaceZenModeToggle', () => {
     const { container } = renderInJsdom(
       <WorkspaceZenModeToggle
         data-interactive
-        data-title-bar-chrome-region="interactive"
+
         class="pointer-events-auto"
       />,
     )
 
-    expect(zenModeToggle(container)?.dataset.titleBarChromeRegion).toBe('interactive')
     expect(zenModeToggle(container)?.hasAttribute('data-interactive')).toBe(true)
     expect(zenModeToggle(container)?.dataset.size).toBe('icon-lg')
     expect(zenModeToggle(container)?.className).toContain('pointer-events-auto')

@@ -3,7 +3,7 @@
 ## Why this document exists
 
 A long-running terminal session in Goblin can outlive any single
-window. The user may be on a desktop Electron app, a laptop browser
+window. The user may be on a desktop browser, a laptop browser
 tab, or a server browser tab — and they will move between them
 while the same shell keeps running in the background. The product
 has to decide, at every moment, **which window is allowed to type**.
@@ -118,7 +118,7 @@ case is a small but real race:
 2. A's network drops. Broker presence marks A offline, so A's
    stored controller intent no longer projects to an effective
    controller (no grace period).
-3. Window B — a sibling tab, an Electron window on another
+3. Window B — a sibling tab, a browser window on another
    machine, anything the user opened while A was away — attaches
    first. B auto-claims because no effective controller is present
    and the user has touched this session before.

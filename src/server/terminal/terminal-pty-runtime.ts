@@ -1,5 +1,9 @@
-import * as pty from 'node-pty'
+import path from 'node:path'
 import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
+import { readTerminalProcessName } from '#/system/terminal-process-name.ts'
+
+// Bound trailing-output delivery when descendants keep the PTY slave open.
+const EXIT_DRAIN_TIMEOUT_MS = 200
 
 export interface TerminalPtyRuntime {
   write(data: string): void
@@ -37,95 +41,126 @@ export function spawnTerminalPtyRuntime(
   input: SpawnTerminalPtyRuntimeInput,
   observer: TerminalPtyRuntimeEventObserver,
 ): SpawnTerminalPtyRuntimeResult {
-  let term: pty.IPty | null = null
-  let dataDisposable: { dispose(): void } | null = null
-  let exitDisposable: { dispose(): void } | null = null
-  let exited = false
-  const disposeData = (): void => {
-    dataDisposable?.dispose()
-    dataDisposable = null
+  let child: ReturnType<typeof Bun.spawn> | null = null
+  let dataOwned = true
+  let exitOwned = true
+  let processExited = false
+  let terminalEnded = false
+  let exitDelivered = false
+  let drainTimer: NodeJS.Timeout | undefined
+  const decoder = new TextDecoder()
+  const disposeData = () => {
+    dataOwned = false
   }
-  const dispose = (): void => {
-    disposeData()
-    exitDisposable?.dispose()
-    exitDisposable = null
+  const dispose = () => {
+    dataOwned = false
+    exitOwned = false
   }
   try {
-    if (input.startupShellCommand && (input.command?.trim() || (input.args?.length ?? 0) > 0)) {
+    if (input.startupShellCommand && (input.command?.trim() || (input.args?.length ?? 0) > 0))
       return { ok: false, message: 'startupShellCommand cannot be combined with command or args' }
-    }
+    if (process.platform !== 'linux' && process.platform !== 'darwin')
+      return { ok: false, message: 'Bun PTY requires Linux or macOS' }
     const shell = input.startupShellCommand
       ? resolveLocalShellWithStartupShellCommand(input.startupShellCommand)
       : resolveLocalShell(input)
-    const env = userShellEnvironment(input.env)
-    term = pty.spawn(shell.command, shell.args, {
-      name: 'xterm-256color',
-      cols: input.cols,
-      rows: input.rows,
-      cwd: input.cwd,
-      env,
-    })
-    const runtime = new NodePtyTerminalRuntime(term)
-    // Native event ownership is installed before the control capability can
-    // cross a supervisor or process boundary.
-    dataDisposable = term.onData((data) => {
-      if (!exited) observer.onData(data, readTerminalProcessName(term!))
-    })
-    const nextExitDisposable = term.onExit(() => {
-      if (exited) return
-      exited = true
+    const launchName = path.basename(shell.command) || 'terminal'
+    let label = launchName
+    let lastLabelRead = -Infinity
+    const processName = () => {
+      // Foreground names are presentation only. Bound OS queries during large
+      // output bursts, especially macOS where ps supplies this information.
+      const now = performance.now()
+      if (child && now - lastLabelRead >= 250) {
+        lastLabelRead = now
+        label = readTerminalProcessName(child.pid, launchName)
+      }
+      return label
+    }
+    const finish = () => {
+      if (!processExited || !terminalEnded || exitDelivered) return
+      exitDelivered = true
+      clearTimeout(drainTimer)
+      drainTimer = undefined
+      const notify = exitOwned
       dispose()
-      observer.onExit()
+      // EOF is a notification, not resource disposal. The adapter owns the FDs.
+      if (child?.terminal && !child.terminal.closed) child.terminal.close()
+      if (notify) observer.onExit()
+    }
+    const endOutput = () => {
+      if (terminalEnded) return
+      terminalEnded = true
+      const data = decoder.decode()
+      if (dataOwned && data) observer.onData(data, processName())
+      finish()
+    }
+    child = Bun.spawn([shell.command, ...shell.args], {
+      cwd: input.cwd,
+      env: { ...process.env, ...input.env, TERM: 'xterm-256color' },
+      terminal: {
+        name: 'xterm-256color',
+        cols: input.cols,
+        rows: input.rows,
+        data(_terminal, bytes) {
+          if (terminalEnded) return
+          const data = decoder.decode(bytes, { stream: true })
+          if (dataOwned && data) observer.onData(data, processName())
+        },
+        exit: endOutput,
+      },
     })
-    if (exited) nextExitDisposable.dispose()
-    else exitDisposable = nextExitDisposable
-    return { ok: true, runtime, events: { disposeData, dispose } }
+    const processHandle = child
+    const terminal = processHandle.terminal
+    if (!terminal) throw new Error('Bun did not create a PTY')
+    // Process exit can precede final output. Drain until EOF or a fixed deadline:
+    // background descendants may retain the slave indefinitely after shell exit.
+    void processHandle.exited.then(() => {
+      processExited = true
+      if (terminalEnded) finish()
+      else drainTimer = setTimeout(endOutput, EXIT_DRAIN_TIMEOUT_MS)
+    })
+    const assertOpen = () => {
+      if (terminalEnded || processExited || terminal.closed) throw new Error('Terminal has exited')
+    }
+    return {
+      ok: true,
+      runtime: {
+        write(data) {
+          assertOpen()
+          terminal.write(data)
+        },
+        resize(cols, rows) {
+          assertOpen()
+          terminal.resize(cols, rows)
+        },
+        kill() {
+          // Closing the master sends HUP to the foreground job as well as
+          // releasing the PTY. Signal the tracked shell so exited can settle.
+          try {
+            processHandle.kill('SIGHUP')
+          } finally {
+            if (!terminal.closed) terminal.close()
+            endOutput()
+          }
+        },
+        processName,
+      },
+      events: { disposeData, dispose },
+    }
   } catch (error) {
     dispose()
+    // A partially created candidate must not survive failed admission.
     try {
-      term?.kill()
-    } catch {}
+      child?.kill('SIGHUP')
+    } catch {
+      /* already exited */
+    }
+    try {
+      child?.terminal?.close()
+    } catch {
+      /* already closed */
+    }
     return { ok: false, message: error instanceof Error ? error.message : 'error.unknown' }
-  }
-}
-
-function userShellEnvironment(overrides: Record<string, string> | undefined): NodeJS.ProcessEnv {
-  const environment = { ...process.env, ...overrides, TERM: 'xterm-256color' }
-  return Object.fromEntries(
-    Object.entries(environment).filter(([name]) => name !== 'ELECTRON_RUN_AS_NODE' && name !== 'ELECTRON_NO_ASAR'),
-  )
-}
-
-class NodePtyTerminalRuntime implements TerminalPtyRuntime {
-  private readonly term: pty.IPty
-
-  constructor(term: pty.IPty) {
-    this.term = term
-  }
-
-  write(data: string): void {
-    this.term.write(data)
-  }
-
-  resize(cols: number, rows: number): void {
-    this.term.resize(cols, rows)
-  }
-
-  kill(): void {
-    this.term.kill()
-  }
-
-  processName(): string {
-    return readTerminalProcessName(this.term)
-  }
-}
-
-function readTerminalProcessName(term: pty.IPty): string {
-  try {
-    const processName = term.process
-    if (typeof processName !== 'string') return 'terminal'
-    return processName.trim() || 'terminal'
-  } catch {
-    return 'terminal'
   }
 }

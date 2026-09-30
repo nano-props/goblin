@@ -13,20 +13,14 @@ export interface TerminalBellState {
   handleBell: (descriptor: TerminalDescriptor, event: TerminalBellPolicyEvent) => void
 }
 
-export function createTerminalBellState(
-  notify: (terminalSessionId?: string) => void,
-  onBadgeChange: (count: number) => void,
-): TerminalBellState {
+export function createTerminalBellState(notify: (terminalSessionId?: string) => void): TerminalBellState {
   // Client-local UI state only. Server bell events are not replayed or
   // persisted, and this unread set is rebuilt from live realtime events.
   const unreadSessionIds = new Set<string>()
   const lastSystemNotificationAtByTerminalSessionId = new Map<string, number>()
 
-  onBadgeChange(unreadSessionIds.size)
-
-  function notifyAndBadge(terminalSessionId?: string) {
+  function notifyChanged(terminalSessionId?: string) {
     notify(terminalSessionId)
-    onBadgeChange(unreadSessionIds.size)
   }
 
   return {
@@ -35,27 +29,27 @@ export function createTerminalBellState(
     },
     clear(terminalSessionId) {
       const changed = unreadSessionIds.delete(terminalSessionId)
-      if (changed) notifyAndBadge(terminalSessionId)
+      if (changed) notifyChanged(terminalSessionId)
       return changed
     },
     remove(terminalSessionId) {
       const had = unreadSessionIds.has(terminalSessionId)
       unreadSessionIds.delete(terminalSessionId)
       lastSystemNotificationAtByTerminalSessionId.delete(terminalSessionId)
-      if (had) notifyAndBadge(terminalSessionId)
+      if (had) notifyChanged(terminalSessionId)
     },
     reset() {
       const had = unreadSessionIds.size > 0
       unreadSessionIds.clear()
       lastSystemNotificationAtByTerminalSessionId.clear()
-      if (had) notifyAndBadge()
+      if (had) notifyChanged()
     },
     handleBell(descriptor, event) {
       const windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true
       if (event.visible && windowFocused) return
       const changed = !unreadSessionIds.has(descriptor.terminalSessionId)
       unreadSessionIds.add(descriptor.terminalSessionId)
-      if (changed) notifyAndBadge(descriptor.terminalSessionId)
+      if (changed) notifyChanged(descriptor.terminalSessionId)
       if (!getRuntimeFetchSettings().terminalNotificationsEnabled) return
       const now = Date.now()
       const lastNotifiedAt = lastSystemNotificationAtByTerminalSessionId.get(descriptor.terminalSessionId) ?? 0

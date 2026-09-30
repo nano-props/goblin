@@ -1,17 +1,12 @@
 // Global keyboard shortcuts. Mounted once in App.tsx — all bindings
 // live here so adding/removing one is a single-file change.
 //
-// Shortcuts wired through the Electron application menu are forwarded
-// as typed IPC events. Numbered workspace tab shortcuts are handled
-// here in the capture phase so terminal focus cannot swallow them;
-// Cmd/Ctrl+T (new terminal tab), Cmd/Ctrl+N (create worktree) and
-// Cmd/Ctrl+W (close workspace tab) use this DOM path only in
-// the web runtime.
+// Keyboard shortcuts use browser DOM events. Numbered workspace tab shortcuts
+// run in the capture phase so terminal focus cannot swallow them.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
 // is suppressed — including `?`, otherwise pressing it with Settings
 // open would stack the Help modal on top.
-
 import { onScopeDispose, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -28,24 +23,13 @@ import { gitBranchPaneTargetLease } from '#/web/workspace-pane/workspace-pane-ta
 import { getRuntimeShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
-  runCloseCurrentWorkspacePaneTabCommand,
   runMoveWorkspacePaneTabCommand,
-  runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { getClientBridge } from '#/web/bridge/client.ts'
-import { translate } from '#/web/stores/i18n-vue.ts'
-import { toast } from 'vue-sonner'
-import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
-import {
-  workspacePaneCommandCoordinates,
-  type WorkspacePaneCommandTarget,
-} from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
-import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
-import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   gitWorkspaceNavigatorRowMatchesIdentity,
   gitWorkspaceNavigatorRows,
@@ -66,7 +50,6 @@ interface Options {
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void
-  openCreateWorktree: () => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -108,14 +91,6 @@ function workspaceHistoryNavigationDirection(event: KeyboardEvent): MoveDirectio
 function digitShortcutIndex(event: KeyboardEvent): number | null {
   if (!/^Digit[1-9]$/.test(event.code)) return null
   return Number(event.code.slice('Digit'.length))
-}
-
-function hasNativeMenuAccelerators(): boolean {
-  try {
-    return getClientBridge().kind() === 'electron'
-  } catch {
-    return false
-  }
 }
 
 function nextIndex(current: number, length: number, direction: MoveDirection): number {
@@ -187,60 +162,11 @@ export function useKeyboard(options: Options) {
     if (primaryModifierPressed(e) && !e.altKey) {
       const workspaceId = toValue(options.currentWorkspaceId)
       const paneTarget = toValue(options.currentWorkspacePaneCommandTarget)
-      const menuBackedShortcut = hasNativeMenuAccelerators()
       const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
-      const rendererOwnedShortcut =
-        tabIndex !== null ||
-        (!menuBackedShortcut && !e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
-      if (rendererOwnedShortcut) {
+      if (tabIndex !== null) {
         e.preventDefault()
         e.stopPropagation()
         if (workspaceShortcutsSuppressed) return
-      }
-      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
-        if (!paneTarget) return
-        const workspace = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
-        if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
-          return
-        // Cmd+T is a generic entry → new terminal appends to the end.
-        void runNewTerminalTabCommand({
-          workspaceId,
-          target: paneTarget,
-          navigation,
-          t: translate,
-        })
-        return
-      }
-      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
-        const repo = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
-        if (
-          !repo ||
-          !workspaceCanExecute(repo) ||
-          repo.capability.kind !== 'git' ||
-          !workspaceWorktreesAvailable(repo.capability.probe)
-        )
-          return
-        const branchAction = projectBranchActionOperation(
-          repo.capability.git.operations.branchAction,
-          getRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId)?.operations,
-        )
-        if (branchAction.phase === 'idle') {
-          options.openCreateWorktree()
-        } else {
-          toast.error(translate('action.create-worktree-busy'))
-        }
-        return
-      }
-      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
-        if (!paneTarget) return
-        void runCloseCurrentWorkspacePaneTabCommand({
-          workspaceId,
-          target: paneTarget,
-          navigation,
-        })
-        return
-      }
-      if (tabIndex !== null) {
         if (!paneTarget) return
         void runSelectWorkspacePaneTabByIndexCommand({
           workspaceId,

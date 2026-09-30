@@ -2,7 +2,6 @@ import * as v from 'valibot'
 import { describe, expect, test } from 'vitest'
 import { defaultSettingsSnapshot, defaultUserSettings } from '#/shared/settings-defaults.ts'
 import {
-  GlobalShortcutStateResponseSchema,
   SettingsSnapshotSchema,
   UserSettingsSchema,
   UserSettingsUpdateResponseSchema,
@@ -12,20 +11,15 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('settings response schemas', () => {
   test('accepts current settings response contracts', () => {
-    const prefs = defaultUserSettings({ globalShortcut: 'Alt+K' })
+    const prefs = defaultUserSettings({})
     expect(v.parse(UserSettingsSchema, prefs)).toEqual(prefs)
     expect(v.parse(SettingsSnapshotSchema, defaultSettingsSnapshot(prefs))).toEqual(defaultSettingsSnapshot(prefs))
     expect(v.parse(UserSettingsUpdateResponseSchema, { ok: true, prefs })).toEqual({ ok: true, prefs })
-    expect(v.parse(GlobalShortcutStateResponseSchema, { ok: true, registered: true })).toEqual({
-      ok: true,
-      registered: true,
-    })
   })
 
   test.each([
     ['missing field', { ...defaultUserSettings(), lang: undefined }],
     ['invalid fetch interval', { ...defaultUserSettings(), fetchIntervalSec: 1.5 }],
-    ['invalid shortcut', { ...defaultUserSettings(), globalShortcut: 'not a shortcut' }],
     ['unknown field', { ...defaultUserSettings(), legacyTheme: 'dark' }],
   ])('rejects %s in user settings', (_name, input) => {
     expect(v.safeParse(UserSettingsSchema, input).success).toBe(false)
@@ -57,10 +51,6 @@ describe('settings response schemas', () => {
         externalApps: {},
       }).success,
     ).toBe(false)
-    expect(v.safeParse(GlobalShortcutStateResponseSchema, { ok: true }).success).toBe(false)
-    expect(v.safeParse(GlobalShortcutStateResponseSchema, { ok: true, registered: true, legacy: true }).success).toBe(
-      false,
-    )
   })
 
   test('accepts a deferred Git workspace stub without a repo projection', () => {

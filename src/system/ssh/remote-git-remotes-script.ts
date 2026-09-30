@@ -1,11 +1,8 @@
-import { readFileSync } from 'node:fs'
+import script from '#/system/ssh/remote-git-remotes.sh' with { type: 'text' }
 import { shellQuote } from '#/system/remote-shell.ts'
 
-let cachedScript: string | undefined
-
 function loadRemoteGitRemotesScript(): string {
-  cachedScript ??= readFileSync(new URL('./remote-git-remotes.sh', import.meta.url), 'utf8')
-  return cachedScript
+  return script
 }
 
 export function remoteGitRemotesScript(repoPath: string): string {

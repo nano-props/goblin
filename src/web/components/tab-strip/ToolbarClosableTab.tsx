@@ -37,7 +37,7 @@ export const ToolbarClosableTab: FunctionalComponent<ToolbarClosableTabProps> = 
   <div
     ref={toDivVNodeRef(props.containerRef)}
     {...props.containerProps}
-    data-title-bar-chrome-region="interactive"
+
     class={props.containerClass}
   >
     {props.overlay}

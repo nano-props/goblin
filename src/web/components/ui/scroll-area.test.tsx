@@ -6,14 +6,14 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 
 describe('ScrollArea', () => {
-  test('marks scrollbars as no-drag window chrome regions', async () => {
+  test('renders a horizontal scrollbar', async () => {
     const { container } = renderInJsdom(
       <ScrollArea orientation="horizontal" type="always">
         <div class="w-[1000px]">wide content</div>
       </ScrollArea>,
     )
 
-    const scrollBar = container.querySelector('[data-title-bar-chrome-region="no-drag"]')
+    const scrollBar = container.querySelector('[data-slot="scroll-area-scrollbar"]')
 
     expect(scrollBar).not.toBeNull()
     expect(scrollBar?.className).toContain('h-2')
@@ -42,12 +42,8 @@ describe('ScrollArea', () => {
       </ScrollArea>,
     )
 
-    const horizontalThumb = horizontal.container.querySelector(
-      '[data-title-bar-chrome-region="no-drag"]',
-    )?.firstElementChild
-    const verticalThumb = vertical.container.querySelector(
-      '[data-title-bar-chrome-region="no-drag"]',
-    )?.firstElementChild
+    const horizontalThumb = horizontal.container.querySelector('[data-slot="scroll-area-scrollbar"]')?.firstElementChild
+    const verticalThumb = vertical.container.querySelector('[data-slot="scroll-area-scrollbar"]')?.firstElementChild
     expect(horizontalThumb?.className).toContain('transition-[background-color,height]')
     expect(horizontalThumb?.className).not.toContain('transition-[background-color,width]')
     expect(verticalThumb?.className).toContain('transition-[background-color,width]')

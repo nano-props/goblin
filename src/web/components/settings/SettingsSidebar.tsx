@@ -6,7 +6,7 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
@@ -54,7 +54,7 @@ export const SettingsSidebar = defineComponent<{
 
     return () => {
       const compact = uiMode.value === 'compact'
-      const chromeHeight = (props.topInset ?? 0) > 0 ? props.topInset : TITLE_BAR_HEIGHT_PX
+      const chromeHeight = (props.topInset ?? 0) > 0 ? props.topInset : WORKSPACE_TOOLBAR_HEIGHT_PX
       return (
         <aside
           class={cn(
@@ -62,7 +62,7 @@ export const SettingsSidebar = defineComponent<{
             compact ? 'w-16 px-2' : 'w-64 px-3',
           )}
         >
-          <div class="app-drag-region shrink-0" aria-hidden style={{ height: `${chromeHeight}px` }} />
+          <div class="shrink-0" aria-hidden style={{ height: `${chromeHeight}px` }} />
           {props.onBack ? (
             <Button
               type="button"

@@ -8,9 +8,9 @@ import { readFileSync } from 'node:fs'
 const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf8')) as {
   version: string
 }
-const embeddedServerHost = process.env.GOBLIN_SERVER_HOST?.trim() || '127.0.0.1'
-const embeddedServerPort = process.env.GOBLIN_SERVER_PORT?.trim() || '32100'
-const embeddedServerTarget = `http://${embeddedServerHost}:${embeddedServerPort}`
+const serverHost = process.env.GOBLIN_SERVER_HOST?.trim() || '127.0.0.1'
+const serverPort = process.env.GOBLIN_SERVER_PORT?.trim() || '32100'
+const serverTarget = `http://${serverHost}:${serverPort}`
 
 // Best-effort short commit hash. Failing silently (no git, shallow clone,
 // build server without git) yields an empty string; the settings panel
@@ -48,11 +48,11 @@ export default defineConfig(({ mode }) => ({
       : {
           proxy: {
             '/api': {
-              target: embeddedServerTarget,
+              target: serverTarget,
               changeOrigin: false,
             },
             '/ws': {
-              target: embeddedServerTarget,
+              target: serverTarget,
               changeOrigin: false,
               ws: true,
             },

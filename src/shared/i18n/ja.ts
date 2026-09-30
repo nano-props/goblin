@@ -1,84 +1,17 @@
 // 日本語辞書。キーは en.ts と完全に一致させること。
 // スタイル：ボタン/メニューは短く、ヒント文は句点で終わる。
 // ブランド名（Goblin / GitHub / Finder / Ghostty）は翻訳しない。
-
 import type { DictKey } from '#/shared/i18n/en.ts'
 
 export const ja: Record<DictKey, string> = {
-  // ---- Menu --------------------------------------------------------------
-  'menu.file': 'ファイル',
-  'menu.edit': '編集',
-  'menu.view': '表示',
-  'menu.window': 'ウインドウ',
-  'menu.help': 'ヘルプ',
-
-  // ---- Menu — App (macOS) ------------------------------------------------
-  'menu.app.about': '{name} について',
-  'menu.app.services': 'サービス',
-  'menu.app.hide': '{name} を隠す',
-  'menu.app.hide-others': 'ほかを隠す',
-  'menu.app.show-all': 'すべてを表示',
-  'menu.app.quit': '{name} を終了',
-  'menu.app.settings': '設定…',
-
-  // ---- Menu — Window (macOS) ---------------------------------------------
-  'menu.window.minimize': 'しまう',
-  'menu.window.zoom': '拡大/縮小',
-  'menu.window.front': 'すべてを手前に移動',
-
-  // ---- Menu — File -------------------------------------------------------
-  'menu.file.open-local-workspace': 'ワークスペースを開く…',
-  'menu.file.open-local-workspace-path': 'パスでワークスペースを開く…',
-  'menu.file.open-remote-workspace': 'リモートワークスペースを開く…',
-  'menu.file.clone-repo': 'リポジトリをクローン…',
-  'menu.file.create-worktree': '新しいワークツリー…',
-  'menu.file.open-recent': '最近使った項目を開く',
-  'menu.file.no-recent': '最近使ったワークスペースはありません',
-  'menu.file.clear-recent': 'メニューを消去',
-  'menu.file.open-in-browser': 'ブラウザで開く',
-  'menu.file.open-data-folder': 'データフォルダを開く',
-  'menu.file.open-data-folder.mac': 'Finderでデータフォルダを開く',
-  'menu.file.open-data-folder.win': 'エクスプローラーでデータフォルダを開く',
-  'menu.file.close-window': 'ウィンドウを閉じる',
-  'menu.file.close-workspace-tab': 'ワークスペースタブを閉じる',
-  'menu.file.close-workspace': 'ワークスペースを閉じる',
-  'menu.file.settings': '設定…',
-  'menu.file.quit': '終了',
-  'menu.client-intent-delivery-failed':
-    'アプリウィンドウが変更されたか読み込みに失敗したため、操作を送信できませんでした。もう一度お試しください。',
-
-  // ---- Menu — Edit -------------------------------------------------------
-  'menu.edit.undo': '取り消す',
-  'menu.edit.redo': 'やり直す',
-  'menu.edit.cut': 'カット',
-  'menu.edit.copy': 'コピー',
-  'menu.edit.paste': 'ペースト',
-  'menu.edit.paste-match-style': 'スタイルを合わせてペースト',
   'menu.edit.delete': '削除',
-  'menu.edit.select-all': 'すべてを選択',
 
-  // ---- Menu — View -------------------------------------------------------
-  'menu.view.status': 'ステータス',
-  'menu.view.history': '履歴',
-  'menu.view.changes': '変更',
-  'menu.view.terminal': 'ターミナル',
   'menu.view.refresh': 'ワークスペースを更新',
-  'menu.view.reload-page': 'ページを再読み込み',
-  'menu.view.toggle-full-screen': 'フルスクリーンを切り替え',
-  'menu.view.toggle-dev-tools': '開発者ツールを切替',
-
-  // ---- Menu — Window (goblin-specific) --------------------------------------
-  'menu.window.next-workspace': '次のワークスペース',
-  'menu.window.prev-workspace': '前のワークスペース',
-  'menu.window.reset-window': 'ウィンドウをリセット',
-
-  // ---- Menu — Help -------------------------------------------------------
-  'menu.help.shortcuts': 'キーボードショートカット',
 
   // ---- アプリトップバー ------------------------------------------------------------
   'app-chrome.open': '開く',
   'app-chrome.menu': 'メニュー',
-  'app-chrome.settings': '設定 (⌘,)',
+  'app-chrome.settings': '設定',
   'app-chrome.settings-tooltip': '設定',
   'app-chrome.notifications': '通知',
 
@@ -90,14 +23,15 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.placeholder': 'ワークスペースを選択',
   'workspace-picker.open-local': 'ワークスペースを開く…',
   'workspace-picker.open-remote': 'リモートワークスペースを開く…',
+  'workspace-open.invalid-path': 'リンクには絶対ディレクトリパスを 1 つ指定してください（最大 4096 文字）。',
+  'workspace-open.retry': '再試行',
   'workspace-picker.open-title': 'ワークスペースを開く',
-  'workspace-picker.open-description': 'ローカルパスを入力するか、フォルダを選択します。',
+  'workspace-picker.open-description': 'サーバー上のディレクトリパスを入力してください。',
   'workspace-picker.open-path-label': 'フォルダのパス',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
   'workspace-picker.open-path-no-matches': '一致するフォルダがありません',
   'workspace-picker.open-presentation-failed':
     'ワークスペースを開きましたが、画面をそのワークスペースに切り替えられませんでした',
-  'workspace-picker.open-path-choose': '選択…',
   'workspace-picker.open-local-confirm': 'ワークスペースを開く',
   'workspace-picker.open-opening': '開いています…',
   'workspace-picker.clone': 'リポジトリをクローン…',
@@ -106,7 +40,6 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.clone-url-label': 'リポジトリ URL',
   'workspace-picker.clone-url-placeholder': 'https://github.com/owner/repo.git',
   'workspace-picker.clone-parent-label': '保存先',
-  'workspace-picker.clone-parent-choose': '選択…',
   'workspace-picker.clone-directory-label': 'フォルダ名',
   'workspace-picker.clone-directory-placeholder': 'repo',
   'workspace-picker.clone-directory-invalid': 'フォルダ名は 1 つだけ指定し、/、\\、: は使えません。',
@@ -125,7 +58,6 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.open-remote-port-label': 'ポート',
   'workspace-picker.open-remote-username-label': 'ユーザー名',
   'workspace-picker.open-remote-private-key-label': '秘密鍵',
-  'workspace-picker.open-remote-private-key-choose': '秘密鍵を選択',
   'workspace-picker.open-remote-path-label': 'リモートパス',
   'workspace-picker.open-remote-path-placeholder': '/home/user/repo または ~/repo',
   'workspace-picker.open-remote-test-connection': '接続をテスト',
@@ -204,15 +136,12 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': 'ワークスペースが開かれていません',
-  'empty.body': 'サイドバーからワークスペースを選択するか、フォルダをドラッグしてください。',
+  'empty.body': 'サイドバーからワークスペースを開いてください。',
   'route.not-found-title': 'ページが見つかりません',
   'route.not-found-home': 'ホームに戻る',
   'workspace-route.not-found-title': 'ワークスペースが見つかりません',
 
   // ---- Drag and drop -----------------------------------------------------
-  'drop.title': 'ドロップしてワークスペースを開く',
-  'drop.body': 'フォルダを Goblin のどこにでもドロップできます。',
-  'drop.open-failed': 'ワークスペースを開けませんでした',
   'workspace-picker.recent-save-failed': 'ワークスペースは開きましたが、最近使った項目は更新されませんでした',
 
   // ---- Workspace pane tabs ------------------------------------------------
@@ -588,6 +517,13 @@ export const ja: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.workspace-git-unavailable': 'このワークスペースでは Git 機能を利用できません',
   'error.workspace-operation-failed': 'ワークスペースの操作に失敗しました',
+  'error.workspace-locator-malformed': 'ワークスペースのパスが無効です。',
+  'error.workspace-transport-unsupported': 'このワークスペースの接続方式はサポートされていません。',
+  'error.workspace-path-not-found': 'ディレクトリが存在しません。サーバー上のパスを確認してください。',
+  'error.workspace-path-not-directory': '指定されたパスはディレクトリではありません。',
+  'error.workspace-permission-denied': 'アクセスが拒否されました。サーバー上のディレクトリの権限を確認してください。',
+  'error.workspace-transport-unavailable':
+    'ワークスペースを利用できません。サーバーとディレクトリを確認して再試行してください。',
   'error.workspace-open-failed': 'ワークスペースを開けませんでした',
   'error.workspace-close-failed': 'ワークスペースを閉じられませんでした',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
@@ -754,9 +690,7 @@ export const ja: Record<DictKey, string> = {
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': '更新',
   'settings.nav.shortcuts': 'ショートカット',
-  'settings.lan.enabled': 'LANアクセスを許可',
-  'settings.lan.enabled-hint': 'ローカルネットワーク上の他のデバイスからGoblinへのアクセスを許可します。',
-  'settings.lan.restart-hint': 'この設定はGoblinを再起動後に有効になります。',
+
   'settings.web.title': 'リモートアクセス',
   'settings.nav.web': 'リモートアクセス',
   'settings.web.server': 'サーバー',
@@ -772,19 +706,14 @@ export const ja: Record<DictKey, string> = {
   'settings.web.token-copy': 'トークンをコピー',
   'settings.web.token-copied': 'トークンをクリップボードにコピーしました。',
   'settings.web.token-copy-failed': 'クリップボードへのコピーに失敗しました。',
-  'settings.web.token-read-failed': 'トークン状態を読み取れませんでした。設定を開き直して再試行してください。',
-  'settings.web.token-rotate': 'トークンを再生成',
-  'settings.web.token-rotated': '新しいトークンを保存しました。Goblin の次回起動後に有効になります。',
-  'settings.web.token-rotate-failed': 'トークンの再生成に失敗しました。',
-  'settings.web.token-rotation-hint':
-    '下のQRコードには現在有効なトークンが含まれています。スキャンすると対象デバイスのゲートに自動入力されます。',
-  'settings.web.token-pending-restart-hint':
-    '表示されたトークンとQRコードは Goblin の次回起動時に有効になります。それまでは現在のトークンが有効です。',
+
+  'settings.web.token-sharing-hint':
+    'QR コードには現在有効なアクセストークンが含まれます。別の端末でスキャンしてログインできます。',
   'settings.web.lan': 'ネットワーク',
   'settings.web.lan-urls': 'LANアドレス',
   'settings.web.lan-urls-hint':
     '同じローカルネットワーク上の他のデバイスは、これらのアドレスでGoblinにアクセスできます。',
-  'settings.lan.local-only': '現在、このデバイスからのみアクセスできます。',
+
   'settings.web.qr': 'QRコード',
   'settings.web.qr-scan': 'QRコード',
   'settings.about': '情報',
@@ -809,10 +738,6 @@ export const ja: Record<DictKey, string> = {
   'settings.apps.status.not-detected': '未検出',
   'settings.fetch': '自動 fetch',
   'settings.fetch-hint': 'アクティブなリポジトリをバックグラウンドで fetch します。',
-  'settings.general.open-from-terminal-title': 'Terminal から開く',
-  'settings.general.open-from-terminal-body':
-    'macOS では、Terminal やスクリプトからローカルリポジトリのパスを Goblin に直接渡して開けます。',
-  'settings.general.open-from-terminal-command': 'open -b goblin.app /path/to/repo',
   'settings.fetch.off': 'オフ',
   'settings.fetch.30s': '30 秒',
   'settings.fetch.1m': '1 分',
@@ -837,17 +762,7 @@ export const ja: Record<DictKey, string> = {
     '  IdentityFile ~/.ssh/id_ed25519\n',
   'settings.shortcuts': 'キーボードショートカット',
   'settings.shortcuts-disable-app': 'アプリのショートカットを無効化',
-  'settings.shortcuts-disable-global': 'グローバルショートカットを無効化',
-  'settings.global-shortcut': 'グローバルショートカット',
-  'settings.global-shortcut-hint': '新しい組み合わせを押してください。Esc でキャンセル。',
-  'settings.global-shortcut-disabled-hint': '保存済み、現在はオフ。',
-  'settings.global-shortcut-record': 'グローバルショートカットを変更',
-  'settings.global-shortcut-recording': 'キーを押してください…',
-  'settings.global-shortcut-reset': 'リセット',
-  'settings.global-shortcut-conflict': '登録できません。使用中の可能性があります。',
-  'settings.global-shortcut-projection-failed':
-    '設定は保存されましたが、アプリのショートカットを更新できませんでした。適用するにはアプリを開き直してください。',
-  'settings.global-shortcut-invalid': 'Command、Control、Option とキーを組み合わせてください。',
+
   'settings.open-github': 'GitHub でプロジェクトを開く',
   'about.app': 'Goblin',
   'about.version': 'バージョン',
@@ -865,33 +780,13 @@ export const ja: Record<DictKey, string> = {
   'help.section.app': 'アプリ',
   'help.row.next-branch': '次のブランチ / コミット',
   'help.row.prev-branch': '前のブランチ / コミット',
-  'help.row.next-workspace': '次のワークスペース',
-  'help.row.prev-workspace': '前のワークスペース',
-  'help.row.view-status': 'ステータス',
-  'help.row.view-changes': '変更',
-  'help.row.view-log': 'ログ',
-  'help.row.view-terminal': 'ターミナル',
-  'help.row.new-terminal': '新しいターミナルタブ',
-  'help.row.create-worktree': '新しいワークツリー',
   'help.row.select-workspace-tab': 'タブを選択',
   'help.row.switch-workspace-pane-tab': '前 / 次のワークスペースタブ',
-  'help.row.open-local-workspace': 'ワークスペースを開く',
-  'help.row.clone-repo': 'リポジトリをクローン',
-  'help.row.activate-window': 'Goblin ウィンドウを表示',
-  'help.row.close-workspace-tab': 'ワークスペースタブを閉じる',
-  'help.row.close-window': 'ウィンドウを閉じる',
-  'help.row.refresh': 'ワークスペースを更新',
   'help.row.reload-page': 'ページを再読み込み',
-  'help.row.settings': '設定',
   'help.row.this-help': 'このヘルプ',
   'help.row.dismiss': 'オーバーレイを閉じる / フォーカス中の非テキストコントロールを抜ける',
 
-  // ---- Embedded server -----------------------------------------------------
-  'embedded-server.fatal-exit.title': 'Goblin サーバーが停止しました',
-  'embedded-server.fatal-exit.body':
-    '組み込みサーバーが予期せず停止しました ({exitDetail})。Goblin を再起動してください。',
-  'embedded-server.fatal-exit.body-with-detail':
-    '組み込みサーバーが予期せず停止しました ({exitDetail})。Goblin を再起動してください。\n\nサーバーエラー:\n{stderr}',
+  // ---- Server -----------------------------------------------------
 
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': 'キャンセル',

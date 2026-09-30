@@ -1,13 +1,5 @@
-// PTY-only worker runtime. Runs in a dedicated subprocess and owns a
-// pool of `node-pty` instances. The worker knows nothing about
-// sessions, sockets, or business state — it translates the wire
-// protocol into node-pty calls and emits data/exit events.
-//
-// Process-name is sampled on every onData chunk (cheap property
-// read from node-pty) so the native host always has a fresh view
-// of the foreground process — even after a child exits without
-// emitting a title-OSC.
-
+// Dedicated Bun PTY subprocess; owns handles and forwards data/exit events.
+// Foreground labels are best-effort OS observations, separate from terminal titles.
 import {
   spawnTerminalPtyRuntime,
   type SpawnTerminalPtyRuntimeResult,
@@ -16,11 +8,7 @@ import {
   type TerminalPtyRuntimeEventOwnership,
 } from '#/server/terminal/terminal-pty-runtime.ts'
 import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
-import type {
-  PtyWorkerMessage,
-  PtyWorkerRequest,
-  PtyWorkerSpawnFailureCode,
-} from '#/server/terminal/pty-worker-protocol.ts'
+import type { PtyWorkerMessage, PtyWorkerRequest } from '#/server/terminal/pty-worker-protocol.ts'
 
 /** The return shape from a PtySupervisor-style spawn call. The worker
  *  runtime's spawnPty fn returns this same shape so the failure path
@@ -31,11 +19,11 @@ type PtySpawnOutcome = SpawnTerminalPtyRuntimeResult
 export interface PtyWorkerRuntimeOptions {
   emit(message: PtyWorkerMessage): void
   /**
-   * Injectable spawn implementation. Defaults to a real `pty.spawn`
+   * Injectable spawn implementation. Defaults to the Bun PTY adapter
    * call wrapped in a try/catch so the worker surfaces a structured
    * `pty-spawn-result { ok: false }` on every failure path rather
    * than dying. Tests pass a stub to exercise the failure path
-   * without faking `node-pty` at the module level.
+   * without faking Bun at the module level.
    */
   spawnPty?: (input: PtySpawnInput, observer: TerminalPtyRuntimeEventObserver) => PtySpawnOutcome
 }
@@ -131,15 +119,10 @@ export class PtyWorkerRuntime {
         requestId,
         ok: false,
         error: result.message,
-        failure: classifyPtySpawnFailure(result.message),
       })
       return
     }
-    // Defer the initial sample to the first onData chunk: node-pty's
-    // macOS spawn-helper briefly holds the PTY before exec'ing the
-    // shell, so term.process read in the same tick as pty.spawn returns
-    // the helper's comm. By the time the shell has produced output,
-    // the helper is gone and the comm is the real name.
+    // Output carries the foreground process label; keep the initial label neutral.
     if (!exited) this.ptys.set(ptySessionId, { runtime: result.runtime, events: result.events })
     this.options.emit({
       type: 'pty-spawn-result',
@@ -163,11 +146,4 @@ export class PtyWorkerRuntime {
 
 function defaultSpawnPty(input: PtySpawnInput, observer: TerminalPtyRuntimeEventObserver): PtySpawnOutcome {
   return spawnTerminalPtyRuntime(input, observer)
-}
-
-function classifyPtySpawnFailure(message: string): { code: PtyWorkerSpawnFailureCode; recoverable: boolean } {
-  if (message.toLowerCase().includes('posix_spawnp failed')) {
-    return { code: 'native-pty-spawn-failed', recoverable: true }
-  }
-  return { code: 'unknown', recoverable: false }
 }

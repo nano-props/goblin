@@ -28,12 +28,11 @@ describe('terminalCreateErrorKey', () => {
     ['send-failed', 'not-sent', 'error.terminal-connection-unavailable'],
     ['disconnected', 'indeterminate', 'error.operation-outcome-uncertain'],
     ['invalid-response', 'indeterminate', 'error.operation-outcome-uncertain'],
-    ['app-quitting', 'indeterminate', 'error.terminal-create-failed'],
   ] as const)('maps structured %s failures without inspecting message text', (kind, delivery, expectedKey) => {
     const error = new ClientRealtimeRequestError('arbitrary transport detail', {
       kind,
       delivery,
-      outageId: kind === 'app-quitting' ? null : 1,
+      outageId: 1,
     })
 
     expect(terminalCreateErrorKey(error)).toBe(expectedKey)

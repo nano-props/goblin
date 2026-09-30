@@ -221,9 +221,7 @@ describe('server runtime', () => {
       serverHost: '0.0.0.0',
       serverPort: 32100,
       ptySupervisor,
-      gCommandEntry: '/app/dist/server/g-command.js',
       gCommandBinDir: '/app/terminal-bin',
-      gCommandNodePath: '/app/electron',
     })
 
     expect(mocks.createServerTerminalRuntime).toHaveBeenCalledWith({
@@ -231,9 +229,7 @@ describe('server runtime', () => {
       gCommand: {
         serverUrl: 'http://127.0.0.1:32100',
         accessToken: 'secret',
-        entryPath: '/app/dist/server/g-command.js',
         binDir: '/app/terminal-bin',
-        nodePath: '/app/electron',
       },
     })
   })

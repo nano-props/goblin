@@ -179,6 +179,6 @@ describe('WorkspaceView branch and page routes', () => {
     expect(workspaceLayout(container)?.dataset.mode).toBe('split')
     expect(workspaceLayout(container)?.dataset.sidebarCollapsed).toBe('true')
     expect(workspacePane(container)).not.toBeNull()
-    expect(workspacePane(container)?.dataset.trafficLightOffset).toBe('true')
+    expect(workspacePane(container)?.dataset.navigationOffset).toBe('true')
   })
 })

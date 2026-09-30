@@ -1,15 +1,8 @@
 // Client-side view of server-backed theme settings. Hydrate reads
-// `{pref, colorTheme}` from the embedded server snapshot and derives
+// `{pref, colorTheme}` from the server snapshot and derives
 // the resolved browser theme locally. When `pref === 'auto'`, the
 // client also listens for `(prefers-color-scheme: dark)` changes so
-// OS appearance flips propagate without a server round-trip —
-// Chromium's matchMedia tracks `nativeTheme` in Electron, so this
-// covers both the desktop and plain-browser runtimes. Electron main
-// still projects the server-owned preference into native host state,
-// but it is not the business source of truth.
-// Theme hydration can read the transport snapshot directly; theme writes go
-// through `#/web/settings/actions.ts`.
-
+// OS appearance flips propagate without a server round-trip.
 import { createStore } from 'zustand/vanilla'
 import type { StoreApi } from 'zustand/vanilla'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
@@ -56,12 +49,7 @@ function colorThemeFromHtmlAttr(): ColorTheme {
 }
 
 function resolveOsTheme(): ResolvedTheme | null {
-  // matchMedia is the only signal the client has for the OS
-  // appearance — in Electron it tracks `nativeTheme` because the
-  // client shares Chromium's media-query implementation with the
-  // host process; in a plain browser it tracks the OS via the
-  // browser's own plumbing. Either way the listener below covers
-  // both runtimes.
+  // Browser media queries track the OS appearance.
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null
   return window.matchMedia(PREFERS_DARK_MEDIA_QUERY).matches ? 'dark' : 'light'
 }
@@ -92,10 +80,7 @@ function installMediaQueryListener(set: ThemeSet, get: ThemeGet): void {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
   const mql = window.matchMedia(PREFERS_DARK_MEDIA_QUERY)
   if (!mql || typeof mql.addEventListener !== 'function') return
-  // `addListener` / `removeListener` were deprecated in favor of
-  // `addEventListener` on MediaQueryList a decade ago. Electron's
-  // bundled Chromium and every browser this app ships to support
-  // the modern API, so the legacy fallback isn't worth carrying.
+  // Supported browsers implement the modern MediaQueryList event API.
   const handleOsThemeChange = () => syncOsThemeIntoStore(set, get)
   mql.addEventListener('change', handleOsThemeChange)
   mediaQueryListenerDisposer = () => mql.removeEventListener('change', handleOsThemeChange)

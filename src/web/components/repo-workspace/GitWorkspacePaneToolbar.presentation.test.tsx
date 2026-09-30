@@ -49,18 +49,15 @@ describe('GitWorkspacePaneToolbar presentation', () => {
       terminalCount: 0,
       worktree: false,
       navigation: navigationWith({}),
-      trafficLightOffset: true,
+      navigationOffset: true,
     })
 
     const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
-    expect(toolbarClassName).toContain('goblin-workspace-toolbar--traffic-offset')
+    expect(toolbarClassName).toContain('goblin-workspace-toolbar--navigation-offset')
     expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
     )
-    expect(
-      c.querySelector<HTMLElement>('[data-testid="workspace-toolbar-leading-no-drag"]')?.dataset.titleBarChromeRegion,
-    ).toBe('no-drag')
   })
 
   test('keeps the leading spacer mounted when the focus offset is inactive', () => {
@@ -68,18 +65,17 @@ describe('GitWorkspacePaneToolbar presentation', () => {
       terminalCount: 0,
       worktree: false,
       navigation: navigationWith({}),
-      trafficLightOffset: false,
+      navigationOffset: false,
     })
 
     const toolbarClassName = c.querySelector('.goblin-workspace-toolbar')?.className ?? ''
     expect(toolbarClassName).not.toContain('title-bar-chrome')
-    expect(toolbarClassName).not.toContain('goblin-workspace-toolbar--non-draggable')
+    expect(toolbarClassName).not.toContain('goblin-workspace-toolbar--compact')
     expect(toolbarClassName).toContain('gap-0')
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')).not.toBeNull()
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-spacer"]')?.className).not.toContain(
       'goblin-workspace-toolbar__leading-spacer--reserved',
     )
-    expect(c.querySelector('[data-testid="workspace-toolbar-leading-no-drag"]')).toBeNull()
   })
 
   test('does not opt compact toolbar chrome into window dragging', () => {
@@ -90,9 +86,8 @@ describe('GitWorkspacePaneToolbar presentation', () => {
       navigation: navigationWith({}),
     })
 
-    expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('app-drag-region')
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).not.toContain('title-bar-chrome')
-    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('goblin-workspace-toolbar--non-draggable')
+    expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('goblin-workspace-toolbar--compact')
   })
 
   test('renders status and terminal affordance without a default changes tab', () => {

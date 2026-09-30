@@ -4,50 +4,36 @@
 
 Terminal paste and drag-and-drop are two gestures for supplying the same
 external content. They share one resolution contract so equivalent input has
-equivalent behavior in Electron and web clients.
+consistent behavior across supported browsers.
 
 ## Goal
 
-Make paste and drop symmetric on Electron and web runtimes.
+Make paste and drop symmetric in browser clients.
 
 ## Non-goals
 
 - Mobile toolbar paste button — separate UX change.
 - Remote terminal targets.
 - Image preview / iTerm2 image protocol — write the path, the user opens it.
-- Platform-specific clipboard path formats beyond the runtime's standard file
-  path capability.
+- Reading browser-local files by an OS path instead of uploading their contents.
 - Multi-line paste confirmation dialog — xterm.js's native handler + bracketed paste mode is sufficient.
 
 ## User-facing behavior
 
-|                  | Electron                            | Web         |
-| ---------------- | ----------------------------------- | ----------- |
-| Drag-and-drop    | native path attempt + HTTP fallback | HTTP upload |
-| Paste (Cmd+V)    | native path attempt + HTTP fallback | HTTP upload |
-| Composer Upload  | native path attempt + HTTP fallback | HTTP upload |
-| Mobile paste btn | unsupported                         | unsupported |
+| Gesture                      | Browser behavior                                       |
+| ---------------------------- | ------------------------------------------------------ |
+| Paste, drop, Composer Upload | Upload files to the server, then insert returned paths |
 
-Both runtimes use the same classification, authority, upload, and error
-contract. The resulting path may differ because path resolution depends on the
-runtime filesystem boundary. A proven native path does not upload file content
-and therefore is not subject to upload size limits.
+Files are uploaded to the server because a browser cannot supply an authoritative
+server filesystem path. Upload limits apply to every file.
 
 ## Resolver
 
-Two-tier, runtime-agnostic:
-
-1. **Path attempt** — use a native absolute path only when the runtime can prove
-   that the PTY can read the same filesystem location.
-2. **Blob save** — persist unresolved file blobs through the runtime backend and
-   return bounded temporary paths accessible to the PTY.
-
-If a native path-attempt result contains terminal control bytes, the resolver
-treats that file as a blob-save candidate instead of dropping it. This keeps
-legitimate filenames usable through a sanitized temporary path.
-
-The session writes the shell-escaped path list through the normal terminal input
-boundary.
+Validate file count, per-file size, and total batch size before uploading to
+`POST /api/clipboard/files`. The server returns one temporary absolute path per
+file, in input order. Incomplete responses and upload failures reject the whole
+resolution. The session writes the shell-escaped path list through the normal
+terminal input boundary only after resolution succeeds.
 
 ## Path-aware decision matrix
 
@@ -79,8 +65,7 @@ xterm.js's descendant textarea listener.
 ## Size cap
 
 Each uploaded blob is capped at 25 MiB. The client uses approximately 32 MiB of
-uploaded blob content as the normal batch target after native path resolution,
-so directly readable native paths do not contribute to it. The encoded
+uploaded file content as the normal batch target. The encoded
 multipart request has a 34 MiB hard limit that bounds memory use and tolerates
 modest multipart overhead or small differences from clients. The server
 independently enforces the per-file limit before writing.
@@ -89,18 +74,16 @@ independently enforces the per-file limit before writing.
 
 - Upload success requires exactly one returned path for every requested file.
   Missing, empty, or malformed results reject the complete action.
-- Unsafe returned paths reject the complete action even after temporary-file
-  fallback; no partial path list is written.
+- Unsafe returned paths reject the complete action; no partial path list is written.
 - Per-file, per-batch content, and 256-blob upload-count violations are
-  reported before transfer with an actionable limit-specific error. Native
-  paths do not consume this upload allowance. The authenticated server route
+  reported before transfer with an actionable limit-specific error. The authenticated server route
   independently validates the decoded batch before creating temporary storage
   or writing any file. Access-token admission occurs before body parsing, and
   the encoded request cap bounds each accepted request; the server-side count
   check protects persistence and inode usage rather than treating an authorised
   caller as an anonymous hostile transport peer.
 - Remote terminal targets do not offer Composer Upload. File paste and drop are
-  rejected before native-path resolution or upload because neither result is
+  rejected before upload because server-local temporary files are not
   readable by the remote shell.
 - Composer resolution, upload, limit, and concurrent-draft failures leave the
   existing draft unchanged. A concurrent-draft failure asks the user to retry;
@@ -117,8 +100,8 @@ independently enforces the per-file limit before writing.
   resolution, so event suppression occurs during the capture-phase tick.
 - **Controller gate**: paste and drop apply the same authority rule. Viewers
   silently ignore file input; native text paste retains xterm semantics.
-- **Shared resolution contract**: Electron and web backends differ only behind
-  the file-resolution boundary.
+- **Resolution contract**: browser File objects are uploaded through the bounded server endpoint. Local paths are never inferred from client file names.
+
 - **Ordered, complete resolution**: returned paths preserve input order and are
   written only after every input has exactly one safe path.
 - **User-controlled, non-blocking completion**: asynchronous file paste and drop
@@ -132,15 +115,12 @@ independently enforces the per-file limit before writing.
 
 ## Acceptance
 
-Manual matrix (each gesture, on each runtime, with an oversized blob to confirm
-the upload cap and an oversized native file to confirm path-only resolution):
+Manual matrix:
 
-- Electron: drop, paste, and Composer Upload from Finder / Explorer / Nautilus;
-  paste an image from a browser (blob-save path).
-- Web: drop, paste, and Composer Upload via the OS file manager; paste an image.
-- Composer: confirm an oversized blob rejection preserves the existing draft;
-  on Electron, an oversized native file inserts its path without uploading.
-- Remote terminal: confirm Composer Upload is absent, while paste and drop reject
-  before file resolution and leave terminal input and Composer draft unchanged.
-- Linux: paste a file from Nautilus — confirms URI list is dropped, not written as literal `file://`.
-- Excel: paste a single cell value, a single row, and a multi-row range — text wins in all three cases, no `/tmp/...png` path appears.
+- Browser: drop, paste, and Composer Upload via the OS file manager; paste an image.
+- Verify per-file, batch-size, and file-count limits before upload.
+- Composer: oversized uploads preserve the existing draft and report the error.
+- Remote terminal: Composer Upload is absent; paste and drop reject before file
+  resolution and leave terminal input and Composer draft unchanged.
+- Linux: file-manager URI lists are not written as literal `file://` text.
+- Spreadsheet clipboard text takes precedence over generated preview images.

@@ -38,7 +38,7 @@ describe('WorkerBackedPtySupervisor spawn admission', () => {
 
   test('settles and releases a spawn when worker creation throws synchronously', async () => {
     const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
+      workerCommand: ['bun', '/tmp/pty-worker.js'],
       spawnWorker: () => {
         throw new Error('worker unavailable')
       },
@@ -102,7 +102,6 @@ describe('WorkerBackedPtySupervisor spawn admission', () => {
       requestId: request.requestId,
       ok: false,
       error: 'spawn failed',
-      failure: { code: 'unknown', recoverable: false },
     } satisfies PtyWorkerMessage)
 
     await expect(promise).resolves.toEqual({ ok: false, message: 'spawn failed' })
@@ -114,7 +113,7 @@ describe('WorkerBackedPtySupervisor spawn admission', () => {
     const workerB = new FakeWorker()
     const workers = [workerA, workerB]
     const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
+      workerCommand: ['bun', '/tmp/pty-worker.js'],
       spawnWorker: () => workers.shift() as never,
       spawnAckTimeoutMs: 10_000,
     })
@@ -204,13 +203,16 @@ describe('WorkerBackedPtySupervisor spawn admission', () => {
       requestId: failedRequest.requestId,
       ok: false,
       error: 'spawn failed',
-      failure: { code: 'unknown', recoverable: false },
     } satisfies PtyWorkerMessage)
     await expect(failed).resolves.toEqual({ ok: false, message: 'spawn failed' })
 
     await vi.advanceTimersByTimeAsync(25)
     expect(worker.killed).toBe(false)
-    expect(supervisor.getDiagnostics()).toMatchObject({ workerRunning: true, pendingRequests: 0, lastFailure: null })
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      workerRunning: true,
+      pendingRequests: 0,
+      lastFailure: { kind: 'spawn-failed', detail: 'spawn failed' },
+    })
     expect(vi.getTimerCount()).toBe(0)
   })
 
@@ -265,7 +267,7 @@ describe('WorkerBackedPtySupervisor spawn admission', () => {
     const workerB = new FakeWorker()
     const workers = [workerA, workerB]
     const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
+      workerCommand: ['bun', '/tmp/pty-worker.js'],
       spawnWorker: () => workers.shift() as never,
     })
     const first = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
@@ -308,125 +310,46 @@ describe('WorkerBackedPtySupervisor spawn admission', () => {
     await expect(retry).resolves.toMatchObject({ ok: true })
   })
 
-  test('fails a recoverable spawn candidate and gives an explicit retry a fresh worker transaction', async () => {
-    const workerA = new FakeWorker()
-    const workerB = new FakeWorker()
-    const workers = [workerA, workerB]
-    const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
-      spawnWorker: () => workers.shift() as never,
-    })
-    const first = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
-
-    const firstRequest = workerA.sent[0] as SpawnRequest
-    expect(firstRequest?.type).toBe('pty-spawn')
-    if (!firstRequest || firstRequest.type !== 'pty-spawn') return
-    workerA.emit('message', {
+  test('a failed spawn preserves other candidates and allows an explicit retry', async () => {
+    const supervisor = buildSupervisor(worker)
+    const first = supervisor.spawn({ cwd: '/repo/one', cols: 80, rows: 24 })
+    const second = supervisor.spawn({ cwd: '/repo/two', cols: 80, rows: 24 })
+    const firstRequest = worker.sent[0] as SpawnRequest
+    const secondRequest = worker.sent[1] as SpawnRequest
+    worker.emit('message', {
       type: 'pty-spawn-result',
       requestId: firstRequest.requestId,
       ok: false,
-      error: 'posix_spawnp failed',
-      failure: { code: 'native-pty-spawn-failed', recoverable: true },
+      error: 'shell not found',
     } satisfies PtyWorkerMessage)
-
-    await expect(first).resolves.toEqual({ ok: false, message: 'posix_spawnp failed' })
-    expect(workerA.killed).toBe(true)
-    expect(workerB.sent).toEqual([])
-
-    const second = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
-    const secondRequest = workerB.sent[0] as SpawnRequest
-    expect(secondRequest?.type).toBe('pty-spawn')
-    expect(secondRequest?.requestId).not.toBe(firstRequest.requestId)
-    expect(secondRequest?.ptySessionId).not.toBe(firstRequest.ptySessionId)
-    expect(secondRequest?.input).toEqual({ cwd: '/repo', cols: 80, rows: 24 })
-    workerB.emit('message', {
+    await expect(first).resolves.toEqual({ ok: false, message: 'shell not found' })
+    expect(worker.killed).toBe(false)
+    worker.emit('message', {
       type: 'pty-spawn-result',
       requestId: secondRequest.requestId,
       ok: true,
       ptySessionId: secondRequest.ptySessionId,
-      processName: 'zsh',
+      processName: 'sh',
     } satisfies PtyWorkerMessage)
-
-    await expect(second).resolves.toEqual({
-      ok: true,
-      handle: { ptySessionId: secondRequest.ptySessionId },
-      processName: 'zsh',
-      events: expect.any(Object),
-    })
-    expect(supervisor.getDiagnostics().lastFailure).toEqual(
-      expect.objectContaining({ kind: 'spawn-failed', detail: 'posix_spawnp failed' }),
-    )
-  })
-
-  test('retires every candidate lease owned by a failed idle worker before an explicit retry', async () => {
-    const workerA = new FakeWorker()
-    const workerB = new FakeWorker()
-    const workers = [workerA, workerB]
-    const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
-      spawnWorker: () => workers.shift() as never,
-    })
-    const first = supervisor.spawn({ cwd: '/repo/one', cols: 80, rows: 24 })
-    const second = supervisor.spawn({ cwd: '/repo/two', cols: 100, rows: 30 })
-    const firstRequest = workerA.sent[0] as SpawnRequest
-    const secondRequest = workerA.sent[1] as SpawnRequest
-    if (firstRequest?.type !== 'pty-spawn') throw new Error('expected pty-spawn')
-    if (secondRequest?.type !== 'pty-spawn') throw new Error('expected pty-spawn')
-
-    // The second candidate has already produced events. Its completion and
-    // buffered event lease must not be reset or adopted by a replacement PTY.
-    workerA.emit('message', {
-      type: 'pty-data',
-      ptySessionId: secondRequest.ptySessionId,
-      data: 'old candidate output',
-    } satisfies PtyWorkerMessage)
-    workerA.emit('message', {
-      type: 'pty-exit',
-      ptySessionId: secondRequest.ptySessionId,
-      code: 1,
-      signal: null,
-    } satisfies PtyWorkerMessage)
-
-    workerA.emit('message', {
-      type: 'pty-spawn-result',
-      requestId: firstRequest.requestId,
-      ok: false,
-      error: 'posix_spawnp failed',
-      failure: { code: 'native-pty-spawn-failed', recoverable: true },
-    } satisfies PtyWorkerMessage)
-
-    await expect(first).resolves.toEqual({ ok: false, message: 'posix_spawnp failed' })
-    await expect(second).resolves.toEqual({ ok: false, message: 'posix_spawnp failed' })
-    expect(workerA.killed).toBe(true)
-    expect(workerB.sent).toEqual([])
-
-    const retry = supervisor.spawn({ cwd: '/repo/two', cols: 100, rows: 30 })
-    const retryRequest = workerB.sent[0] as SpawnRequest
-    if (retryRequest?.type !== 'pty-spawn') throw new Error('expected pty-spawn')
-    expect(retryRequest.ptySessionId).not.toBe(secondRequest.ptySessionId)
-    workerB.emit('message', {
+    await expect(second).resolves.toMatchObject({ ok: true })
+    const retry = supervisor.spawn({ cwd: '/repo/one', cols: 80, rows: 24 })
+    const retryRequest = worker.sent[2] as SpawnRequest
+    expect(retryRequest.ptySessionId).not.toBe(firstRequest.ptySessionId)
+    worker.emit('message', {
       type: 'pty-spawn-result',
       requestId: retryRequest.requestId,
       ok: true,
       ptySessionId: retryRequest.ptySessionId,
-      processName: 'zsh',
+      processName: 'sh',
     } satisfies PtyWorkerMessage)
-    const retried = await retry
-    if (!retried.ok) throw new Error(retried.message)
-
-    supervisor.kill(retried.handle)
-    expect(workerB.sent).toContainEqual({ type: 'pty-kill', ptySessionId: retryRequest.ptySessionId })
-
-    workerA.emit('exit', 1, null)
-    workerA.emit('error', new Error('stale worker exploded'))
-    expect(supervisor.getDiagnostics()).toMatchObject({
-      state: 'running',
-      workerPid: 4242,
-      pendingRequests: 0,
+    await expect(retry).resolves.toMatchObject({ ok: true })
+    expect(supervisor.getDiagnostics().lastFailure).toMatchObject({
+      kind: 'spawn-failed',
+      detail: 'shell not found',
     })
   })
 
-  test('does not restart a worker with active sessions after a recoverable pty spawn failure', async () => {
+  test('does not restart a worker with active sessions after a PTY spawn failure', async () => {
     const supervisor = buildSupervisor(worker)
     const firstSpawn = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
     const firstRequest = worker.sent[0] as SpawnRequest
@@ -447,11 +370,10 @@ describe('WorkerBackedPtySupervisor spawn admission', () => {
       type: 'pty-spawn-result',
       requestId: secondRequest.requestId,
       ok: false,
-      error: 'posix_spawnp failed',
-      failure: { code: 'native-pty-spawn-failed', recoverable: true },
+      error: 'shell not found',
     } satisfies PtyWorkerMessage)
 
-    await expect(secondSpawn).resolves.toEqual({ ok: false, message: 'posix_spawnp failed' })
+    await expect(secondSpawn).resolves.toEqual({ ok: false, message: 'shell not found' })
     expect(worker.killed).toBe(false)
   })
 })

@@ -1,14 +1,11 @@
-import { Copy, RefreshCw } from '@lucide/vue'
+import { Copy } from '@lucide/vue'
 import { defineComponent, onMounted, onScopeDispose, ref, watch } from 'vue'
-import type { FunctionalComponent, PropType } from 'vue'
+import type { FunctionalComponent } from 'vue'
 import { toast } from 'vue-sonner'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { Switch } from '#/web/components/ui/switch.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { getInitialBootstrap } from '#/web/app/bootstrap/initial-snapshot.ts'
-import { getClientBridge } from '#/web/bridge/client.ts'
 import { useLanInfoQuery } from '#/web/settings/queries.ts'
-import { useLanSettingsController, useLanSettings } from '#/web/settings/runtime-lan.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 import { decodeWith } from '#/shared/http-response-schema.ts'
@@ -19,11 +16,7 @@ export const WebSettings = defineComponent({
   name: 'WebSettings',
   setup() {
     const t = useT()
-    const bridge = getClientBridge()
-    const isElectron = bridge.kind() === 'electron'
-    const lanSettings = useLanSettings()
     const { data: lanInfo } = useLanInfoQuery()
-    const { setLanEnabled } = useLanSettingsController()
 
     const currentUrl = window.location.origin
 
@@ -31,26 +24,9 @@ export const WebSettings = defineComponent({
     // token for copy/QR; HttpOnly is not an XSS boundary for this renderer.
     const bootstrapToken = getInitialBootstrap().initialServer?.accessToken
     const accessToken = ref<string | null>(bootstrapToken ?? null)
-    const accessTokenActivation = ref<'current' | 'after-restart'>('current')
     const accessTokenController = new AbortController()
     onMounted(() => {
       void (async () => {
-        if (isElectron) {
-          const projectionResult = await bridge.getAccessTokenProjection().then(
-            (projection) => ({ ok: true as const, projection }),
-            () => ({ ok: false as const }),
-          )
-          if (!projectionResult.ok) {
-            if (!accessTokenController.signal.aborted) toast.error(t('settings.web.token-read-failed'))
-            return
-          }
-          const projection = projectionResult.projection
-          if (accessTokenController.signal.aborted) return
-          if (accessTokenActivation.value === 'after-restart' && projection.activation === 'current') return
-          accessToken.value = projection.accessToken
-          accessTokenActivation.value = projection.activation
-          return
-        }
         if (bootstrapToken) return
         const currentToken = await fetchServerJson('/api/access-token', decodeWith(AccessTokenResponseSchema), {
           signal: accessTokenController.signal,
@@ -86,32 +62,14 @@ export const WebSettings = defineComponent({
       return copySettingValue(url, 'settings.web.url-copied', 'settings.web.url-copy-failed')
     }
 
-    const handleRotate = async () => {
-      if (!isElectron) return
-      try {
-        const { accessToken: next, activation } = await bridge.rotateAccessToken()
-        accessToken.value = next
-        accessTokenActivation.value = activation
-        toast.success(t('settings.web.token-rotated'))
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : t('settings.web.token-rotate-failed'))
-      }
-    }
-
     return () => {
       const currentLanInfo = lanInfo.value
-      const lanEnabled = lanSettings.value.lanEnabled
       const lanUrls = currentLanInfo?.lanUrls ?? []
-      const accessTokenHintKey =
-        accessTokenActivation.value === 'after-restart'
-          ? 'settings.web.token-pending-restart-hint'
-          : 'settings.web.token-rotation-hint'
       const currentAccessToken = accessToken.value
       const qrTargets = currentAccessToken
         ? lanUrls.map((url) => `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(currentAccessToken)}`)
         : []
-      const showNetworkGroup = isElectron || lanUrls.length > 0
-      const lanStatusKey = isElectron && currentLanInfo ? currentLanStatusKey(lanEnabled, currentLanInfo.host) : null
+      const showNetworkGroup = lanUrls.length > 0
       return (
         <>
           <SettingsGroup label={t('settings.web.server')}>
@@ -148,42 +106,16 @@ export const WebSettings = defineComponent({
                     >
                       <Copy class="h-4 w-4" />
                     </Button>
-                    {isElectron ? (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={handleRotate}
-                        aria-label={t('settings.web.token-rotate')}
-                      >
-                        <RefreshCw class="h-4 w-4" />
-                      </Button>
-                    ) : null}
                   </div>
                 }
               />
             </SettingsList>
-            <div class="px-4 py-2 text-sm text-muted-foreground">{t(accessTokenHintKey)}</div>
+            <div class="px-4 py-2 text-sm text-muted-foreground">{t('settings.web.token-sharing-hint')}</div>
           </SettingsGroup>
 
           {showNetworkGroup ? (
             <SettingsGroup label={t('settings.web.lan')}>
               <SettingsList>
-                {isElectron ? (
-                  <SettingsRow
-                    controlId="settings-web-lan-enabled"
-                    label={t('settings.lan.enabled')}
-                    hint={t('settings.lan.enabled-hint')}
-                    control={
-                      <Switch
-                        id="settings-web-lan-enabled"
-                        modelValue={lanEnabled}
-                        onUpdate:modelValue={(enabled) => void setLanEnabled(enabled)}
-                        aria-label={t('settings.lan.enabled')}
-                      />
-                    }
-                  />
-                ) : null}
                 {lanUrls.length > 0 ? (
                   <SettingsRow
                     controlId="settings-web-lan-urls"
@@ -204,7 +136,6 @@ export const WebSettings = defineComponent({
                   />
                 ) : null}
               </SettingsList>
-              {lanStatusKey ? <div class="px-4 py-2 text-sm text-muted-foreground">{t(lanStatusKey)}</div> : null}
             </SettingsGroup>
           ) : null}
 
@@ -222,19 +153,6 @@ export const WebSettings = defineComponent({
     }
   },
 })
-
-function isLoopbackHost(host: string): boolean {
-  return host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
-}
-
-function currentLanStatusKey(
-  lanEnabled: boolean,
-  host: string,
-): 'settings.lan.restart-hint' | 'settings.lan.local-only' | null {
-  const lanAccessActive = !isLoopbackHost(host)
-  if (lanEnabled !== lanAccessActive) return 'settings.lan.restart-hint'
-  return lanAccessActive ? null : 'settings.lan.local-only'
-}
 
 interface AddressControlProps {
   id?: string

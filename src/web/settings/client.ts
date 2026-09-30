@@ -1,10 +1,7 @@
-import { canUseGlobalShortcutSettings } from '#/web/app/shell-client.ts'
-import { invokeNativeIpcPath } from '#/web/bridge/native-host-client.ts'
 import { fetchServerJson, postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   ExternalAppsSnapshot,
   GitHubCliState,
-  SetGlobalShortcutResult,
   I18nSnapshot,
   LanInfo,
   WorkspaceSettingsState,
@@ -118,10 +115,6 @@ export async function getLanInfo(): Promise<LanInfo> {
   return fetchServerJson('/api/settings/lan', decodeWith(LanInfoSchema))
 }
 
-export async function setLanEnabled(enabled: boolean): Promise<boolean> {
-  return (await updateUserSettingsPatch({ lanEnabled: enabled })).prefs.lanEnabled
-}
-
 export async function getExternalAppsSnapshot(options?: { signal?: AbortSignal }): Promise<ExternalAppsSnapshot> {
   return fetchServerJson('/api/settings/external-apps', decodeWith(ExternalAppsSnapshotSchema), {
     signal: options?.signal,
@@ -229,13 +222,4 @@ export async function setTerminalNotificationsEnabled(enabled: boolean): Promise
 
 export async function setShortcutsDisabled(disabled: boolean): Promise<boolean> {
   return (await updateUserSettingsPatch({ shortcutsDisabled: disabled })).prefs.shortcutsDisabled
-}
-
-export async function setGlobalShortcutDisabled(disabled: boolean): Promise<boolean> {
-  return (await updateUserSettingsPatch({ globalShortcutDisabled: disabled })).prefs.globalShortcutDisabled
-}
-
-export async function setGlobalShortcut(accelerator: string): Promise<SetGlobalShortcutResult> {
-  if (!canUseGlobalShortcutSettings()) throw new Error('Global shortcut unavailable')
-  return invokeNativeIpcPath<SetGlobalShortcutResult>('settings.setGlobalShortcut', { accelerator })
 }

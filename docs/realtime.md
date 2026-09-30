@@ -8,7 +8,6 @@ Use this doc for realtime transport and lifecycle rules.
 - Do not use polling (`refetchInterval`, `setInterval`, repeated timers) as a runtime-coherent read model. If server-owned state can change after the initial read, the server must publish invalidation or stream the change.
 - Explain why one-shot invalidation/refetch or streaming is the right realtime category when adding a new realtime path.
 - Prefer fixes in the shared server-backed bridge or protocol layer.
-- Add Electron-specific realtime behavior only when the browser path cannot support the requirement.
 - `/ws/app` does not queue, throttle, or retry for a slow reader. Each outbound
   message remains atomic. Before sending another message, the server terminates
   the connection if the raw WebSocket sender already retains more than 16 MiB.
@@ -26,6 +25,6 @@ When adding a new `/ws/*` channel, classify it into one of these three before wr
 - **Data plane — streaming**: server is producing a continuous event stream (PTY output, etc.).
 - **Control plane — relay**: subscriber should apply an out-of-band action (open a tab, focus a view, run a command). One envelope per trigger; the server doesn't read from these sockets.
 
-When the trigger for an action lives outside the client (CLI, OS shell, external integration), use the relay pattern rather than Electron IPC. The server broker keeps both runtime modes (Electron + standalone) working without a separate native-host bridge. See `docs/g-command.md` for the worked example.
+When an action originates outside the client (CLI or external integration), use the server relay pattern. The server broker delivers the action to an authenticated browser client. See `docs/g-command.md` for the worked example.
 
 Relay channels are one-way by construction: the server never reads from them. Interactive flows (request → response → next state) belong on HTTP, not on a relay.

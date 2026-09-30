@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-
 import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import type { VNode } from 'vue'
 import { fireEvent } from '@testing-library/vue'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { appQueryClient } from '#/web/app/query-client.ts'
@@ -164,10 +163,10 @@ describe('WorkspaceLayoutSidebar', () => {
     )
 
     const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
-    expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+
     expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
-    expect(sidebarTop?.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+    expect(sidebarTop?.style.height).toBe(`${WORKSPACE_TOOLBAR_HEIGHT_PX}px`)
   })
 
   test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
@@ -176,16 +175,15 @@ describe('WorkspaceLayoutSidebar', () => {
         workspaceId={WORKSPACE_ID}
         git={repoSnapshot()}
         compact={false}
-        chromeRegion="none"
         navigatorContent={<div data-testid="navigator-content" />}
       />,
     )
 
     const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
-    expect(sidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+
     expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
-    expect(sidebarTop?.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+    expect(sidebarTop?.style.height).toBe(`${WORKSPACE_TOOLBAR_HEIGHT_PX}px`)
   })
 })
 

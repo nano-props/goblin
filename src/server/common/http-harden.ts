@@ -54,7 +54,7 @@ export function buildCorsOriginPredicate(
   const portStr = String(serverPort)
   const wildcardBind = serverHost === '0.0.0.0' || serverHost === '::'
   return (origin) => {
-    // Electron IPC and same-origin fetches don't set an Origin header.
+    // Programmatic clients and same-origin fetches don't set an Origin header.
     if (!origin) return true
     let parsed: URL
     try {

@@ -7,7 +7,6 @@ import {
   createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'vue-sonner'
 import {
@@ -27,9 +26,6 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
-import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
-import { repoOperationsQueryKey } from '#/web/repos/query-keys.ts'
-import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneLocationForBranchTarget } from '#/web/workspace-pane/workspace-pane-location.ts'
@@ -195,84 +191,6 @@ describe('client effect intent handlers', () => {
       ),
     ).resolves.toBe(false)
   })
-
-  test('create-worktree-requested opens create-worktree for the current repo', async () => {
-    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
-    const d = deps(REPO_ID)
-
-    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
-    expect(d.openCreateWorktree).toHaveBeenCalledOnce()
-    expect(toast.error).not.toHaveBeenCalled()
-  })
-
-  test('create-worktree-requested is a no-op when no repo is active', async () => {
-    const d = deps(null)
-
-    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
-    expect(d.openCreateWorktree).not.toHaveBeenCalled()
-    expect(toast.error).not.toHaveBeenCalled()
-  })
-
-  test('create-worktree-requested shows a busy toast while a branch action is running', async () => {
-    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
-    workspacesStore.setState((state) => {
-      const repo = state.workspaces[REPO_ID]
-      if (repo?.capability.kind !== 'git') return state
-      const branchAction = {
-        ...repo.capability.git.operations.branchAction,
-        phase: 'running' as const,
-        reason: 'branch:pull' as const,
-        target: 'main',
-      }
-      const operations = { ...repo.capability.git.operations, branchAction }
-      return {
-        workspaces: {
-          ...state.workspaces,
-          [REPO_ID]: {
-            ...repo,
-            capability: { ...repo.capability, git: { ...repo.capability.git, operations } },
-          },
-        },
-      }
-    })
-    const d = deps(REPO_ID)
-
-    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
-    expect(d.openCreateWorktree).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
-  })
-
-  test('create-worktree-requested reads busy state from server operations projection', async () => {
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
-    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
-      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
-      lastFetchAt: null,
-      loadedAt: 123,
-    })
-    const d = deps(REPO_ID)
-
-    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
-    expect(d.openCreateWorktree).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
-  })
-
-  test('create-worktree-requested does not project retained operations after a canonical read error', async () => {
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
-    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
-      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
-      lastFetchAt: null,
-      loadedAt: 123,
-    })
-    const queryKey = repoOperationsQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
-    if (!query) throw new Error('Missing operations query')
-    query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
-    const d = deps(REPO_ID)
-
-    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
-    expect(d.openCreateWorktree).toHaveBeenCalledOnce()
-    expect(toast.error).not.toHaveBeenCalled()
-  })
 })
 
 function deps(currentWorkspaceId: WorkspaceId | null, currentBranchName = 'feature/worktree') {
@@ -294,19 +212,8 @@ function deps(currentWorkspaceId: WorkspaceId | null, currentBranchName = 'featu
         }
       : null,
     closeAllOverlays: vi.fn(),
-    openWorkspacePathDialog: vi.fn(),
-    openCloneRepo: vi.fn(),
-    openRemoteWorkspace: vi.fn(),
-    openCreateWorktree: vi.fn(),
     overlayBlocked: false,
     workspaceShortcutSuppressed: false,
-    terminalFocused: false,
-    openWorkspaceMembership: vi.fn(async (input: string | { id: string }) => ({
-      ok: true as const,
-      workspaceId: workspaceIdForTest(typeof input === 'string' ? input : input.id),
-    })),
-    resetLayout: vi.fn(),
-    toggleZenMode: vi.fn(),
     t: (key: string) => key,
   }
 }
@@ -329,33 +236,4 @@ function navigationWithStoreActions(): ObservedAppNavigationActionsForTest {
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   })
-}
-
-function serverOperation(
-  workspaceRuntimeId: string,
-  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
-): RepoServerOperationState {
-  return {
-    id: `repo-op-${overrides.kind}-${overrides.phase}`,
-    repoId: REPO_ID,
-    workspaceRuntimeId,
-    kind: overrides.kind,
-    phase: overrides.phase,
-    source: 'user',
-    target: null,
-    queuedAt: 100,
-    startedAt: overrides.phase === 'queued' ? null : 101,
-    deadlineAt: null,
-    settledAt: null,
-    error: null,
-    cancellation: {
-      underlyingRequested: false,
-      reason: null,
-      requestedAt: null,
-      waitCancelledCount: 0,
-      lastWaitCancelledAt: null,
-      lastWaitCancellationReason: null,
-    },
-    canCancelUnderlying: true,
-  }
 }

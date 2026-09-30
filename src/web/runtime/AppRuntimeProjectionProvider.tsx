@@ -26,7 +26,6 @@ import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pa
 import { provideWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { resyncActiveRepoReadQueries } from '#/web/stores/workspaces/repo-refresh-actions.ts'
-import { subscribeServerCommandGenerationAdvance } from '#/web/lib/server-command-generation.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -97,11 +96,8 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
       },
     })
     // Complete membership recovery belongs to the authenticated app lifecycle,
-    // even without an active workspace route; re-declare it after a command
-    // reset so interrupted recovery cannot leave projections stale.
-    const offGenerationAdvance = subscribeServerCommandGenerationAdvance(() => {
-      if (workspacesStore.getState().workspaceMembershipReady) projectionRecovery.request()
-    })
+    // even without an active workspace route. Server invalidations refresh the
+    // projection after membership has been restored.
     useRepoStoreInvalidationRefresh(() => {
       if (workspacesStore.getState().workspaceMembershipReady) projectionRecovery.request()
     })
@@ -189,7 +185,6 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
     )
 
     onScopeDispose(() => {
-      offGenerationAdvance()
       projectionRecovery.invalidate()
       scopeRegistry.disposeScopes()
       document.removeEventListener('visibilitychange', onVisibilityChange)

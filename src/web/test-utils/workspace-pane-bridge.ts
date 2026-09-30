@@ -1,6 +1,4 @@
 // Workspace-pane tab bridge and canonical tab-operation behavior for web tests.
-
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
@@ -12,7 +10,6 @@ import type {
 import { workspacePaneTabsWithUpdateOperation } from '#/shared/workspace-pane-tabs-operations.ts'
 import {
   gitWorktreeWorkspacePaneTabsTarget,
-  requiredGitWorkspacePaneTabsTarget,
   runtimeWorkspacePaneTarget,
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
@@ -57,7 +54,6 @@ export function installWorkspacePaneTabsTestBridge(
     updateWorkspaceTabs?: (
       input: WorkspacePaneTabsUpdateInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
-    onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): {
   addRuntimeTab: (
@@ -138,28 +134,14 @@ export function installWorkspacePaneTabsTestBridge(
     return serverSnapshot()
   }
   setClientBridgeForTests({
-    kind: () => 'web',
-    hasCapability: () => false,
     getBootstrap: () => ({
-      runtime: {
-        kind: 'web',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [],
-      },
       homeDir: '/Users/test',
       platform: 'web',
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
-    invokeIpc: async ({ path }) => {
-      throw new Error(`Unhandled IPC path: ${path}`)
-    },
-    abortIpc: async () => false,
-    onEffectIntent: options.onEffectIntent ?? (() => () => {}),
-    pathForFile: () => '',
+
     saveClipboardFiles: async () => [],
-    getAccessTokenProjection: async () => ({ accessToken: 'test-access-token', activation: 'current' }),
-    rotateAccessToken: async () => ({ accessToken: 'test-access-token', activation: 'after-restart' }),
-    host: () => null,
+
     appRealtime: () => ({
       kickReconnect: () => {},
       onRecovered: () => () => {},
@@ -193,7 +175,7 @@ export function installWorkspacePaneTabsTestBridge(
       recoverSessions: async () => ({ revision: 0, sessions: [] }),
       notifyBell: async () => true,
       sendTestNotification: async () => true,
-      setBadge: () => {},
+
       onOutput: () => () => {},
       onBell: () => () => {},
       onTitle: () => () => {},

@@ -100,11 +100,11 @@ vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {
       | { kind: 'routed'; route: { kind: string; tab?: string } | null }
       | { kind: 'inactive' }
     shortcutsEnabled?: boolean
-    toolbarTrafficLightOffset?: boolean
+    toolbarNavigationOffset?: boolean
   }
   return {
     WorkspacePane: defineComponent<WorkspacePaneMockProps>({
-      props: ['currentBranchName', 'workspacePaneRouteContext', 'shortcutsEnabled', 'toolbarTrafficLightOffset'],
+      props: ['currentBranchName', 'workspacePaneRouteContext', 'shortcutsEnabled', 'toolbarNavigationOffset'],
       setup(props) {
         const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
         return () => (
@@ -125,7 +125,7 @@ vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {
                 : ''
             }
             data-shortcuts-enabled={props.shortcutsEnabled !== false ? 'true' : 'false'}
-            data-traffic-light-offset={props.toolbarTrafficLightOffset ? 'true' : 'false'}
+            data-navigation-offset={props.toolbarNavigationOffset ? 'true' : 'false'}
           >
             {workspacePaneMocks.scrollMemoryProbe ? (
               <>
@@ -362,7 +362,6 @@ export {
   compactWorkspace,
   compactPane,
   zenModeSidebarHitArea,
-  zenModeSidebarDragPlate,
   zenModeSidebarReveal,
   zenModeSidebarLayer,
   zenModeSidebarResizeHandle,
@@ -408,10 +407,6 @@ function compactPane(container: HTMLElement, pane: 'navigator' | 'workspace'): H
 
 function zenModeSidebarHitArea(container: HTMLElement): HTMLElement | null {
   return container.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-hit-area"]')
-}
-
-function zenModeSidebarDragPlate(container: HTMLElement): HTMLElement | null {
-  return container.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-drag-plate"]')
 }
 
 function zenModeSidebarReveal(container: HTMLElement): HTMLElement | null {

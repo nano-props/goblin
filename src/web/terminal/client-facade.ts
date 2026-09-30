@@ -30,9 +30,6 @@ export const terminalClient: ClientTerminal = {
   sendTestNotification(input) {
     return getTerminalClient().sendTestNotification(input)
   },
-  setBadge(count) {
-    getTerminalClient().setBadge(count)
-  },
   onOutput(cb) {
     return getTerminalClient().onOutput(cb)
   },

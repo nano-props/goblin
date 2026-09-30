@@ -56,8 +56,7 @@ export function generateAccessToken(): string {
 /**
  * Read the access token from `<dataDir>/server-token`, or create
  * it (with `0o600` mode) if missing or corrupt. The token is the
- * single source of truth for both browser (cookie) and embedded
- * client (header / `?t=` query) authentication.
+ * authentication source for cookies, headers, and WebSocket credentials.
  *
  * Atomicity: writes go to `<file>.tmp.<pid>.<rand>` and are
  * `rename()`d onto the final path so a concurrent reader never sees
@@ -66,10 +65,7 @@ export function generateAccessToken(): string {
  * wins. The losing process keeps the in-memory token it generated
  * and will be rejected by the live server until it restarts.
  *
- * Pass `dataDir` explicitly when calling from a context that has a
- * different canonical data path (e.g. the Electron main, which
- * owns `app.getPath('userData')`). Omit for the server-internal
- * default (`serverDataDir()`).
+ * Pass `dataDir` to select a server data directory; otherwise use `serverDataDir()`.
  */
 export async function readOrCreateAccessToken(dataDir: string = serverDataDir()): Promise<string> {
   const filePath = accessTokenFilePath(dataDir)

@@ -1,57 +1,14 @@
 #!/usr/bin/env bun
-/**
- * Regression guard against the old "server reads dist/web/index.html
- * and rewrites it to inject the client bootstrap" anti-pattern.
- *
- * Why this exists: in the auth refactor (#59) the client bootstrap
- * moved from inlined HTML (token + i18n + settings baked into
- * `<script id="goblin-bootstrap">` at response-build time) to a
- * pure IPC model — the Electron preload seeds
- * `window.__GOBLIN_BOOTSTRAP__` via `goblin:get-access-token` etc.,
- * and the web path goes through the `/api/login` gate. We also
- * dropped the i18n / settings inlining while we were at it.
- *
- * The HTML-injection path was an anti-pattern: it coupled the
- * server to the client's bundle format, it made the dev mode
- * broken (Vite-served HTML can never carry the secret), and it
- * leaked long-lived credentials into the response body of every
- * page render. This guard makes sure none of it sneaks back in.
- *
- * What it checks:
- *
- *  - `replace(...<script|...<head|...<html lang` — string-replace
- *    on HTML tags from inside server/handlers.
- *  - `readFile(...index.html` — reading the built client HTML
- *    to rewrite it (the SPA fallback is allowed to read it but
- *    must serve it untouched).
- *  - `injectBootstrapIntoHtml` / `buildWebBootstrap` /
- *    `renderClientIndexHtml` / `shouldInlineAccessTokenInBootstrap`
- *    — the legacy function names.
- *  - `GOBLIN_EMBEDDED_RUNTIME` / `GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN`
- *    — the env vars whose only purpose was to gate HTML inlining.
- *  - `GOBLIN_HOME_DIR` / `GOBLIN_PLATFORM` — passed to the server
- *    child process so it could bake the values into the bootstrap;
- *    the client now gets them via `goblin:get-home-dir` /
- *    `goblin:get-platform` IPC. Allowed in the Electron main
- *    spawn-env (deprecated; harmless) but flagged in src/server.
- *
- * Rules match against raw file content. Legacy names are intentionally
- * comment-aware so reintroducing them in refactor notes still prompts review.
- *
- * The script walks src/server, src/main, and src/shared. It
- * ignores `*.test.*` / `*.spec.*` files and the `dist/` build
- * output. Test files may reference the legacy names for explicit
- * negative checks; production code must not.
+/** Static HTML must never carry credentials or runtime state injected by the server.
+ * Browser authentication uses POST /api/login; public presentation hydrates through HTTP.
+ * The SPA fallback may serve index.html unchanged. Scan server and shared code,
+ * excluding tests and generated output.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
-const searchRoots = [
-  path.join(repoRoot, 'src', 'server'),
-  path.join(repoRoot, 'src', 'main'),
-  path.join(repoRoot, 'src', 'shared'),
-]
+const searchRoots = [path.join(repoRoot, 'src', 'server'), path.join(repoRoot, 'src', 'shared')]
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.cjs', '.mjs'])
 const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|cjs|mjs)$/
@@ -111,7 +68,7 @@ const RULES: Rule[] = [
   },
   // Env vars whose only purpose was to gate the HTML inlining.
   // `GOBLIN_HOME_DIR` / `GOBLIN_PLATFORM` are still set in the
-  // native host spawn-env (legacy compat, harmless) but the
+  // process environment but the
   // server must not read them — that would mean the bootstrap is
   // being populated server-side.
   {

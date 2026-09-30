@@ -14,7 +14,6 @@ export function terminalCreateErrorKey(error: unknown): string {
 }
 
 function terminalCreateRealtimeErrorKey(error: ClientRealtimeRequestError): string {
-  if (error.kind === 'app-quitting') return 'error.terminal-create-failed'
   if (error.delivery === 'indeterminate') return 'error.operation-outcome-uncertain'
   if (error.kind === 'open-timeout') return 'error.terminal-connection-timeout'
   if (error.kind === 'timeout') return 'error.terminal-create-timeout'

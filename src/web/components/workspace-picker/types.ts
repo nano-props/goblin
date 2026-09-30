@@ -27,10 +27,7 @@ export interface WorkspacePickerLabels {
   open: string
   placeholder: string
   openLocal: string
-  openLocalShortcut: string | null
   openRemote: string
-  openRemoteShortcut: string | null
   clone: string
-  cloneShortcut: string | null
   unavailable: string
 }

@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import {
   repoPresentationFromQueryForTest,
   resetWorkspacesStore,
@@ -290,7 +289,7 @@ describe('useBranchActions', () => {
     )
   })
 
-  test('openFinder uses the embedded server route for non-remote repos', async () => {
+  test('openFinder uses the server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

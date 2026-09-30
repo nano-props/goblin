@@ -3,7 +3,7 @@
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
-import type { SetGlobalShortcutResult, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
+import type { I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import {
   addRecentWorkspace,
   clearRecentWorkspaces,
@@ -13,10 +13,7 @@ import {
   restoreServerWorkspace,
   addWorkspaceEntry,
   removeWorkspaceEntry,
-  setGlobalShortcut as setSettingsGlobalShortcut,
-  setGlobalShortcutDisabled as setSettingsGlobalShortcutDisabled,
   setI18nPref as setSettingsI18nPref,
-  setLanEnabled as setSettingsLanEnabled,
   setRecentWorkspaceExternalApp,
   setSettingsFetchInterval,
   setShortcutsDisabled as setSettingsShortcutsDisabled,
@@ -29,15 +26,14 @@ import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   externalAppsQueryKey,
-  lanInfoQueryKey,
   updateGitHubCliCache,
   updateWorkspaceSettingsStateCache,
   updateRuntimeRecentWorkspacesStateCache,
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings/query-cache.ts'
 
-// Settings actions commit to the embedded server first. TanStack Query is the
-// window-local projection of that server result, never an independent source.
+// Settings actions commit to the server first. TanStack Query is the
+// browser projection of that server result, never an independent source.
 export async function recordRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<void> {
   const result = await addRecentWorkspace(workspace)
   updateRuntimeRecentWorkspacesStateCache(appQueryClient, { recentWorkspaces: result.recentWorkspaces })
@@ -99,26 +95,6 @@ export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
   }))
 }
 
-export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
-  const globalShortcutDisabled = await setSettingsGlobalShortcutDisabled(disabled)
-  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
-    ...current,
-    globalShortcutDisabled,
-  }))
-}
-
-export async function setGlobalShortcut(accelerator: string): Promise<SetGlobalShortcutResult> {
-  const result = await setSettingsGlobalShortcut(accelerator)
-  if (result.kind === 'projected') {
-    updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
-      ...current,
-      globalShortcut: result.accelerator,
-      globalShortcutRegistered: result.registered,
-    }))
-  }
-  return result
-}
-
 export async function setThemePreference(pref: ThemePref): Promise<ThemeState> {
   const state = await setSettingsThemePref(pref)
   updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
@@ -162,10 +138,4 @@ export async function setRecentWorkspaceExternalAppPreference(input: {
 }): Promise<void> {
   const state = await setRecentWorkspaceExternalApp(input)
   updateWorkspaceSettingsStateCache(appQueryClient, state)
-}
-
-export async function setLanEnabled(enabled: boolean): Promise<void> {
-  const lanEnabled = await setSettingsLanEnabled(enabled)
-  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({ ...current, lanEnabled }))
-  void appQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
 }

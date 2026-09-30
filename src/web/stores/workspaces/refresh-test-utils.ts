@@ -6,7 +6,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/repo-store.ts'
-import { installGoblinTestBridge, type IpcTestHandler } from '#/web/test-utils/bridge.ts'
+import { installGoblinTestBridge, type ServerTestHandler } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -15,7 +15,7 @@ import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
-export const ipcHandlers: Record<string, IpcTestHandler> = {}
+export const serverHandlers: Record<string, ServerTestHandler> = {}
 export const refreshStoreAccess = { get: workspacesStore.getState, set: workspacesStore.setState }
 
 type TestRepo = NonNullable<ReturnType<typeof workspacesStore.getState>['workspaces'][string]>
@@ -118,15 +118,15 @@ function testRemoteInfo(): RepoRemoteInfo {
 }
 
 export function resetRefreshTest(): void {
-  for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
+  for (const key of Object.keys(serverHandlers)) delete serverHandlers[key]
   resetWorkspacesStore()
-  installGoblinTestBridge(ipcHandlers)
-  ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
-  ipcHandlers['settings.removeWorkspaceEntry'] = async () => ({
+  installGoblinTestBridge(serverHandlers)
+  serverHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
+  serverHandlers['settings.removeWorkspaceEntry'] = async () => ({
     openWorkspaceEntries: [],
     workspacePaneTabsByTargetByWorkspace: {},
   })
-  ipcHandlers['repo.worktreeStatus'] = ({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => ({
+  serverHandlers['repo.worktreeStatus'] = ({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => ({
     workspaceRuntimeId,
     status: [],
     loadedAt: Date.now(),

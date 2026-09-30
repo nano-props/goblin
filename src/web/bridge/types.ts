@@ -1,9 +1,4 @@
-import type { ClientBootstrapSnapshot, ClientNativeCapability, ClientRuntimeKind } from '#/shared/bootstrap.ts'
-import type { IpcRequest } from '#/shared/api-types.ts'
-import type { SettingsPage } from '#/shared/settings-pages.ts'
-import type { AccessTokenProjection } from '#/shared/access-token.ts'
-import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -17,7 +12,6 @@ import type {
   TerminalResizeResult,
   TerminalRestartInput,
   TerminalRestartResult,
-  TerminalSessionInput,
   TerminalSessionClosedEvent,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -28,7 +22,6 @@ import type {
   TerminalSessionsSnapshot,
   TerminalSessionsChangedEvent,
 } from '#/shared/terminal-types.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   WorkspacePaneTabsChangedRealtimeMessage,
   WorkspacePaneTabsListInput,
@@ -53,7 +46,6 @@ export interface ClientTerminal {
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsSnapshot>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
-  setBadge: (count: number) => void
   onOutput: (cb: (event: TerminalOutputEvent) => void) => () => void
   onBell: (cb: (event: TerminalBellRealtimeEvent) => void) => () => void
   onTitle: (cb: (event: TerminalTitleEvent) => void) => () => void
@@ -82,27 +74,10 @@ export interface ClientAppRealtimeLifecycle {
   onRecovered: (cb: (clientId: string) => void) => () => void
 }
 
-export interface ClientHostBridge {
-  openSettingsWindow: (input?: { page?: SettingsPage }) => Promise<boolean>
-  openExternalUrl: (input: { url: string; allowHttp?: boolean }) => Promise<ExecResult>
-  openDirectoryDialog: (input?: { title?: string }) => Promise<string | null>
-  consumeExternalOpenPaths: () => Promise<string[]>
-}
-
 export interface ClientBridge {
-  kind(): ClientRuntimeKind
-  hasCapability(capability: ClientNativeCapability): boolean
   getBootstrap(): ClientBootstrapSnapshot
-  invokeIpc(request: IpcRequest): Promise<unknown>
-  abortIpc(requestId: string): Promise<boolean>
-  onEffectIntent(cb: (event: ClientEffectIntent) => void): () => void
-  pathForFile(file: File): string
   /** Persist clipboard blobs and return one readable absolute path per input file. */
   saveClipboardFiles(files: File[]): Promise<string[]>
-  /** Read or stage the Electron embedded-server access token projection. */
-  getAccessTokenProjection(): Promise<AccessTokenProjection>
-  rotateAccessToken(): Promise<AccessTokenProjection>
-  host(): ClientHostBridge | null
   appRealtime(): ClientAppRealtimeLifecycle
   terminal(): ClientTerminal
   workspacePaneTabs(): ClientWorkspacePaneTabs

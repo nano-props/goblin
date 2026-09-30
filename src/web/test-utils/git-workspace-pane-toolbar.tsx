@@ -52,7 +52,6 @@ import type {
   TerminalDescriptor,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/terminal/components/types.ts'
-import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -80,7 +79,6 @@ import {
   observeWorkspacePaneRouteForTest,
   observedAppNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type ObservedBranchRouteNavigationForTest,
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
@@ -183,7 +181,7 @@ const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHa
     'detail',
     'workspacePaneId',
     'workspacePaneRoute',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToGitWorkspaceNavigator',
   ],
 
@@ -201,7 +199,7 @@ const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHa
         workspacePaneId={props.workspacePaneId}
         workspacePaneRoute={props.workspacePaneRoute}
         workspacePaneTabModel={workspacePaneTabModel.value}
-        trafficLightOffset={props.trafficLightOffset}
+        navigationOffset={props.navigationOffset}
         onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
       />
     )
@@ -294,7 +292,7 @@ export function renderToolbar(options: {
   worktree?: boolean
   collapsed?: boolean
   createPending?: boolean
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   remote?: Partial<RepoRemoteInfo>
   workspaceRuntimeId?: string
   /**
@@ -484,7 +482,7 @@ export function renderToolbar(options: {
               detail={detail}
               workspacePaneId="workspace"
               workspacePaneRoute={workspacePaneRoute}
-              trafficLightOffset={options.trafficLightOffset}
+              navigationOffset={options.navigationOffset}
             />
           </TerminalSessionReadScope>
         </TerminalSessionCommandScope>
@@ -528,7 +526,7 @@ export function renderToolbar(options: {
                 detail={getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(nextRepo))}
                 workspacePaneId="workspace"
                 workspacePaneRoute={workspacePaneRoute}
-                trafficLightOffset={options.trafficLightOffset}
+                navigationOffset={options.navigationOffset}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>

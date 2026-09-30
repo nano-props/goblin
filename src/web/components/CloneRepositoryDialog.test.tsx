@@ -1,32 +1,24 @@
 // @vitest-environment jsdom
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog, type CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CodedError } from '#/shared/coded-error.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ warning: vi.fn() }))
 
 vi.mock('vue-sonner', () => ({ toast: { warning: feedbackMocks.warning } }))
 
-const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { __GOBLIN_BOOTSTRAP__?: unknown }
 
 beforeEach(() => {
   feedbackMocks.warning.mockReset()
   setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'electron',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-    },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   // Host info used to live in the bootstrap payload; it now
@@ -39,20 +31,9 @@ beforeEach(() => {
     status: 'ready',
     error: null,
   })
-  // Use `defineProperty` with `writable: true` so a previous test that
-  // installed a read-only descriptor (via `defineProperty` without writable)
-  // doesn't leave this assignment throwing `Cannot assign to read only
-  // property 'goblinNative'`. All such property writes should opt into the
-  // same shape so cross-test isolation stays predictable.
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    writable: true,
-    value: currentNativeBridge(),
-  })
 })
 
 afterEach(() => {
-  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   setClientBridgeForTests(null)
 })
@@ -189,43 +170,6 @@ describe('CloneRepositoryDialog', () => {
 
     expect(feedbackMocks.warning).not.toHaveBeenCalled()
     expect(onClose).toHaveBeenCalledOnce()
-  })
-
-  test('does not apply a parent path selected for an earlier open cycle', async () => {
-    const selection = Promise.withResolvers<string | null>()
-    testWindow.goblinNative = currentNativeBridge({
-      host: {
-        openSettingsWindow: async () => true,
-        openExternalUrl: async ({ url }) => ({ ok: true, message: url }),
-        openDirectoryDialog: () => selection.promise,
-        consumeExternalOpenPaths: async () => [],
-      },
-    })
-    const onClose = vi.fn()
-    const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
-    const { rerender } = renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
-
-    await clickButtonByText('workspace-picker.clone-parent-choose')
-    await rerender(<CloneRepositoryDialog open={false} onClose={onClose} onClone={onClone} />)
-    await rerender(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
-    await flushTestUpdates(async () => {
-      selection.resolve('/tmp/old-selection')
-      await selection.promise
-    })
-
-    expect(input('#clone-parent-path').value).toBe('~/Developer')
-  })
-
-  test('hides native parent picker button when no Electron bridge exists', async () => {
-    delete testWindow.goblinNative
-    setClientBridgeForTests(null)
-    const onClose = vi.fn()
-    const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
-
-    renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
-    await flushTestUpdates(() => {})
-
-    expect(queryButtonByText('workspace-picker.clone-parent-choose')).toBeNull()
   })
 })
 

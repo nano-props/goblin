@@ -41,7 +41,7 @@ export async function runCreateTerminalTabCommand(input: {
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
    * supply the captured opener's identity when the terminal is opened from
    * inside a specific tab (per Chrome-style opener rules), or omit for
-   * generic entries (+ button, Cmd+T, Terminal menu) that should append.
+   * generic entries (such as the + button) that should append.
    */
   options?: TerminalCreateOptions
   insertAfterIdentity?: string | null

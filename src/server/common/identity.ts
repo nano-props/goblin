@@ -5,14 +5,14 @@ import type { Context } from 'hono'
  * Identity model
  * --------------
  * `clientId` is a per-page routing identifier minted once by the loaded
- * browser/Electron renderer module and carried by HTTP and WebSocket requests.
+ * browser page and carried by HTTP and WebSocket requests.
  * It is NOT a stable identity: reloads, duplicated tabs, and new renderer
  * instances each receive a different `clientId`.
  *
  * `userId` is a per-token identity derived deterministically from
  * the access token by `deriveUserId()`. The server uses `userId`
  * to partition the in-memory session store, so a single access token
- * shared across browsers (Electron desktop + Chrome on the same host)
+ * shared across browsers (separate browser tabs on the same host)
  * sees the same terminals. `clientId` keeps doing per-page fanout at
  * the broker layer.
  *

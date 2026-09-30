@@ -12,7 +12,6 @@ Use this doc for UI language and presentation rules.
   fallback data. Do not turn missing enrichment into an empty, zero, clean, or
   otherwise successful state.
 
-- Use Title Case for native menu items.
 - Use sentence case for buttons, actions, headings, and help text.
 - Use lowercase for status chips such as `open`, `dirty`, and `no upstream`.
 - Preserve official casing such as `GitHub`, `VS Code`, and `PR`.
@@ -72,3 +71,7 @@ Use this doc for UI language and presentation rules.
   — rendering one `<div role="status" aria-live="polite">` per state
   flip causes screen readers to re-announce the same label every time
   Vue unmounts and remounts the node.
+
+Browser-reserved shortcuts such as Ctrl/Cmd+T, N, and W retain their browser
+meaning. Do not advertise them as application commands; workspace actions
+remain available through their visible controls.

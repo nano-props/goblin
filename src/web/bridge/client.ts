@@ -1,8 +1,4 @@
-import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
-import type { IpcRequest } from '#/shared/api-types.ts'
-import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { ClientHostBridge, ClientBridge } from '#/web/bridge/types.ts'
-import { readNativeBridge } from '#/web/bridge/native.ts'
+import type { ClientBridge } from '#/web/bridge/types.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { readWebBootstrap } from '#/web/bridge/bootstrap.ts'
 import { readClientPageId } from '#/web/bridge/page-id.ts'
@@ -17,16 +13,6 @@ import type {
   ClientWorkspacePaneRuntime,
   ClientWorkspacePaneTabs,
 } from '#/web/bridge/types.ts'
-
-const NATIVE_CLIENT_CAPABILITIES: ReadonlySet<ClientNativeCapability> = new Set([
-  'global-shortcut',
-  'open-settings-window',
-  'open-external-url',
-  'open-directory-dialog',
-  'consume-external-open-paths',
-  'terminal-notifications',
-  'terminal-badge',
-])
 
 function readServerAppRealtimeConfig(): AppRealtimeServerConfig | null {
   // An initial server carries QR bootstrap credentials; other clients use their origin and auth cookie.
@@ -64,10 +50,6 @@ function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
     terminal: createServerTerminalClient({
       realtime: appRealtime,
       notificationProvider: createTerminalNotificationProvider(),
-      setBadge: (count: number) => {
-        const bridge = readNativeBridge()
-        if (bridge) bridge.terminal.setBadge(count)
-      },
     }),
     workspacePaneTabs: createServerWorkspacePaneTabsClient(appRealtime),
     workspacePaneRuntime: createServerWorkspacePaneRuntimeClient(appRealtime),
@@ -88,51 +70,12 @@ function createClientBridge(): ClientBridge {
   const realtimeClients = getOrCreateRealtimeClients()
 
   return {
-    kind() {
-      return readNativeBridge() ? 'electron' : 'web'
-    },
-    hasCapability(capability) {
-      const bridge = readNativeBridge()
-      return bridge ? NATIVE_CLIENT_CAPABILITIES.has(capability) : false
-    },
     getBootstrap() {
       return readWebBootstrap()
-    },
-    invokeIpc(request: IpcRequest) {
-      const bridge = readNativeBridge()
-      if (!bridge) throw new Error('Goblin bridge is unavailable in this runtime')
-      return bridge.invokeIpc(request)
-    },
-    async abortIpc(requestId: string) {
-      const bridge = readNativeBridge()
-      if (!bridge) return false
-      return bridge.abortIpc(requestId)
-    },
-    onEffectIntent(cb: (event: ClientEffectIntent) => void) {
-      const bridge = readNativeBridge()
-      return bridge ? bridge.onIntent(cb) : () => {}
-    },
-    pathForFile(file: File) {
-      const bridge = readNativeBridge()
-      if (!bridge) return ''
-      return bridge.pathForFile(file)
     },
     saveClipboardFiles(files: File[]) {
       if (!clipboardBackend) throw new Error('Clipboard file persistence is unavailable')
       return clipboardBackend.saveClipboardFiles(files)
-    },
-    async getAccessTokenProjection() {
-      const bridge = readNativeBridge()
-      if (!bridge) throw new Error('Token projection is unavailable in this runtime')
-      return bridge.getAccessTokenProjection()
-    },
-    async rotateAccessToken() {
-      const bridge = readNativeBridge()
-      if (!bridge) throw new Error('Token rotation is unavailable in this runtime')
-      return bridge.rotateAccessToken()
-    },
-    host(): ClientHostBridge | null {
-      return readNativeBridge()?.host ?? null
     },
     appRealtime() {
       return realtimeClients.appRealtime
@@ -149,7 +92,7 @@ function createClientBridge(): ClientBridge {
   }
 }
 
-// Rebuild stateless adapters from the live native bridge; stateful realtime clients remain shared.
+// Stateful realtime clients remain shared across feature adapters.
 export function getClientBridge(): ClientBridge {
   if (testOverride) return testOverride
   return createClientBridge()

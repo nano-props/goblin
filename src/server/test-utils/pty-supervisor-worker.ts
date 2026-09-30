@@ -60,7 +60,7 @@ export function buildSupervisor(
   } = {},
 ) {
   return new WorkerBackedPtySupervisor({
-    workerEntry: '/tmp/pty-worker.js',
+    workerCommand: ['bun', '/tmp/pty-worker.js'],
     spawnWorker: () => worker as never,
     now: options.now,
     spawnAckTimeoutMs: options.spawnAckTimeoutMs,

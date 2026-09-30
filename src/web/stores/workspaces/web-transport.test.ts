@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -10,7 +9,6 @@ describe('repo web transport helpers', () => {
     vi.resetModules()
     vi.stubGlobal('window', {
       __GOBLIN_BOOTSTRAP__: {
-        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       location: {
@@ -27,7 +25,7 @@ describe('repo web transport helpers', () => {
     vi.unstubAllGlobals()
   })
 
-  test('copy-patch helper uses embedded server route in web host mode', async () => {
+  test('copy-patch helper uses server route in web host mode', async () => {
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'diff --git a/file b/file' }),
@@ -60,7 +58,7 @@ describe('repo web transport helpers', () => {
     expect(window.open).toHaveBeenCalledWith('https://example.com/repo/tree/feature/a', '_blank', 'noopener,noreferrer')
   })
 
-  test('remote target resolution uses embedded server routes in web host mode', async () => {
+  test('remote target resolution uses server routes in web host mode', async () => {
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({

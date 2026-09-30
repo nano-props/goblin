@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -121,29 +120,6 @@ describe('server-fetch', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  test('aborts the stale command generation and admits a command in the next generation', async () => {
-    fetchMock.mockImplementationOnce((_url, init) => {
-      const signal = (init as RequestInit | undefined)?.signal
-      return new Promise((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
-      })
-    })
-
-    const { postServerCommandJson } = await import('#/web/lib/server-fetch.ts')
-    const { advanceServerCommandGeneration } = await import('#/web/lib/server-command-generation.ts')
-    const staleRequest = postServerCommandJson('/api/repo/pull', {}, decodeJson, { timeoutMs: 0 })
-    await Promise.resolve()
-
-    advanceServerCommandGeneration()
-
-    await expect(staleRequest).rejects.toMatchObject({ name: 'CodedError', code: 'OUTCOME_UNCERTAIN' })
-
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
-    await expect(postServerCommandJson('/api/repo/pull', {}, decodeJson, { timeoutMs: 0 })).resolves.toEqual({
-      ok: true,
-    })
-  })
-
   test('clears the watchdog after a successful response', async () => {
     useFakeTimers()
     fetchMock.mockResolvedValueOnce({
@@ -160,7 +136,6 @@ describe('server-fetch', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
-        runtime: { kind: 'web', bridgeVersion: 1, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32101/', accessToken: 'secret' },
       },
     })

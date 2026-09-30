@@ -1,5 +1,4 @@
 // Browser logging is silent in tests, warning-only in production, and informational in development.
-
 import { createConsola, LogLevels, type ConsolaInstance } from 'consola'
 
 const isTest = import.meta.env.MODE === 'test'
@@ -13,7 +12,6 @@ export const log: ConsolaInstance = createConsola({
 export const terminalLog = log.withTag('terminal')
 export const goblinLog = log.withTag('goblin')
 export const settingsLog = log.withTag('settings')
-export const externalOpenLog = log.withTag('external-open')
 export const bootstrapLog = log.withTag('bootstrap')
 export const intentLog = log.withTag('intent')
 export const sessionLog = log.withTag('session')

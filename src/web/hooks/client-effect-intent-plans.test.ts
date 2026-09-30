@@ -5,24 +5,14 @@ import {
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test } from 'vitest'
-import {
-  clientEffectIntentRequiresWorkspaceBootstrap,
-  createAppLevelIntentPlan,
-  createExternalOpenDrainKickPlan,
-  createTerminalBellIntentPlan,
-  createWorkspaceIntentPlan,
-} from '#/web/hooks/client-effect-intent-plans.ts'
+import { createTerminalBellIntentPlan, createWorkspaceIntentPlan } from '#/web/hooks/client-effect-intent-plans.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import type { BranchSnapshotInfo, WorkspaceRepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  workspacePaneLocationForBranchTarget,
-  workspacePaneLocationForRoot,
-} from '#/web/workspace-pane/workspace-pane-location.ts'
+import { workspacePaneLocationForBranchTarget } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const CURRENT_GIT_REPO = {
   id: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -74,18 +64,6 @@ const MAIN_COMMAND_TARGET = {
     CURRENT_GIT_REPO.workspaceRuntimeId,
   ),
   workspacePaneRoute: null,
-}
-
-const CURRENT_DIRECTORY_REPO = {
-  ...CURRENT_GIT_REPO,
-  workspaceProbe: {
-    ...CURRENT_GIT_REPO.workspaceProbe,
-    capabilities: {
-      files: { read: true as const, write: true },
-      terminal: { available: false },
-      git: { status: 'unavailable' as const },
-    },
-  },
 }
 
 function bellWorkspace(
@@ -338,383 +316,53 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses recent repo open when overlays block the action', () => {
-    const plan = createAppLevelIntentPlan(
-      {
-        type: 'open-recent-workspace-requested',
-        entry: { id: workspaceIdForTest('goblin+file:///tmp/repo') },
-      },
-      { overlayBlocked: true },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
+  test.each([
+    {
+      overlayBlocked: true,
+      workspaceShortcutSuppressed: false,
+      currentWorkspaceId: GIT_WORKSPACE_ID,
+      currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
+    },
+    {
+      overlayBlocked: false,
+      workspaceShortcutSuppressed: true,
+      currentWorkspaceId: GIT_WORKSPACE_ID,
+      currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
+    },
+    {
+      overlayBlocked: false,
+      workspaceShortcutSuppressed: false,
+      currentWorkspaceId: null,
+      currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
+    },
+    {
+      overlayBlocked: false,
+      workspaceShortcutSuppressed: false,
+      currentWorkspaceId: GIT_WORKSPACE_ID,
+      currentWorkspacePaneCommandTarget: null,
+    },
+  ])('suppresses view commands without an available workspace route', (context) => {
+    expect(createWorkspaceIntentPlan({ type: 'show-workspace-pane-tab-requested', tab: 'history' }, context)).toEqual({
+      kind: 'noop',
+    })
   })
 
-  test('suppresses close repo when workspace shortcuts are blocked', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'close-workspace-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: true,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('suppresses workspace tab close shortcut while workspace shortcuts are blocked', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-pane-close-tab-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: true,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('suppresses workspace tab close shortcut while overlays block workspace actions', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-pane-close-tab-requested' },
-      {
-        overlayBlocked: true,
-        workspaceShortcutSuppressed: true,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('treats workspace tab close as a no-op when no workspace is active', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-pane-close-tab-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: null,
-
-        currentWorkspaceRuntimeId: null,
-        currentWorkspaceCapability: null,
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: null,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('does not turn close workspace into close window when no workspace is active', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'close-workspace-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: null,
-        currentWorkspaceRuntimeId: null,
-        currentWorkspaceCapability: null,
-        currentWorkspaceCanExecute: false,
-        currentWorkspacePaneCommandTarget: null,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('keeps native new-terminal intent active while workspace shortcuts are suppressed', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'terminal-new-tab-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: true,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({
-      kind: 'new-terminal-tab',
-      workspaceId: 'goblin+file:///tmp/repo',
+  test('preserves the current route target for a view command', () => {
+    expect(
+      createWorkspaceIntentPlan(
+        { type: 'show-workspace-pane-tab-requested', tab: 'history' },
+        {
+          overlayBlocked: false,
+          workspaceShortcutSuppressed: false,
+          currentWorkspaceId: GIT_WORKSPACE_ID,
+          currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
+        },
+      ),
+    ).toEqual({
+      kind: 'show-workspace-pane-tab',
+      workspaceId: GIT_WORKSPACE_ID,
       target: MAIN_COMMAND_TARGET,
+      tab: 'history',
     })
-  })
-
-  test('rejects native terminal intent when the workspace has no terminal capability', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'terminal-new-tab-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_DIRECTORY_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: {
-          location: workspacePaneLocationForRoot(GIT_WORKSPACE_ID, CURRENT_GIT_REPO.workspaceRuntimeId),
-          workspacePaneRoute: null,
-          capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
-        },
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('rejects terminal creation before workspace operation admission is ready', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'terminal-new-tab-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: false,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('creates a refresh plan from the current workspace runtime id', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-refresh-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({
-      kind: 'refresh-workspace',
-      workspaceId: 'goblin+file:///tmp/repo',
-      workspaceRuntimeId: 'repo-runtime-test-7',
-    })
-  })
-
-  test('creates a refresh plan for a plain Workspace', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-refresh-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_DIRECTORY_REPO.id,
-        currentWorkspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: null,
-      },
-    )
-
-    expect(plan).toEqual({
-      kind: 'refresh-workspace',
-      workspaceId: CURRENT_DIRECTORY_REPO.id,
-      workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-    })
-  })
-
-  test('creates a zen mode toggle plan for the current workspace', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-zen-mode-toggle-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'toggle-zen-mode' })
-  })
-
-  test('suppresses zen mode toggle when workspace shortcuts are blocked', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-zen-mode-toggle-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: true,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('suppresses zen mode toggle while the terminal is focused', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-zen-mode-toggle-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: true,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('creates a create-worktree plan for the current workspace', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'create-worktree-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'create-worktree' })
-  })
-
-  test('rejects create-worktree intent for a non-Git workspace', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'create-worktree-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_DIRECTORY_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: {
-          location: workspacePaneLocationForRoot(GIT_WORKSPACE_ID, CURRENT_GIT_REPO.workspaceRuntimeId),
-          workspacePaneRoute: null,
-          capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
-        },
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('suppresses create-worktree when there is no current repo', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'create-worktree-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: false,
-        terminalFocused: false,
-        currentWorkspaceId: null,
-
-        currentWorkspaceRuntimeId: null,
-        currentWorkspaceCapability: null,
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: null,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('suppresses create-worktree when workspace shortcuts are blocked', () => {
-    const plan = createWorkspaceIntentPlan(
-      { type: 'create-worktree-requested' },
-      {
-        overlayBlocked: false,
-        workspaceShortcutSuppressed: true,
-        terminalFocused: false,
-        currentWorkspaceId: CURRENT_GIT_REPO.id,
-
-        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
-        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
-        currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
-      },
-    )
-
-    expect(plan).toEqual({ kind: 'noop' })
-  })
-
-  test('external open drain kick plan schedules rerun when a drain is already active', () => {
-    expect(createExternalOpenDrainKickPlan({ disposed: false, draining: true })).toEqual({
-      kind: 'schedule-rerun',
-    })
-  })
-
-  test.each([
-    { type: 'open-settings-requested' as const, page: 'general' as const },
-    { type: 'theme-pref-set-requested' as const, pref: 'dark' as const },
-    { type: 'lang-pref-set-requested' as const, pref: 'ko' as const },
-    { type: 'open-workspace-path-requested' as const },
-    { type: 'clone-repo-requested' as const },
-    { type: 'open-remote-workspace-requested' as const },
-    { type: 'server-command-reset-requested' as const },
-  ])('does not bind $type to workspace bootstrap', (intent) => {
-    expect(clientEffectIntentRequiresWorkspaceBootstrap(intent)).toBe(false)
-  })
-
-  test.each([
-    { type: 'terminal-new-tab-requested' as const },
-    { type: 'layout-reset-requested' as const },
-    { type: 'clear-recent-workspaces-requested' as const },
-    { type: 'open-workspace-requested' as const },
-    { type: 'external-open-enqueued' as const },
-  ])('keeps $type behind workspace bootstrap', (intent) => {
-    expect(clientEffectIntentRequiresWorkspaceBootstrap(intent)).toBe(true)
   })
 })

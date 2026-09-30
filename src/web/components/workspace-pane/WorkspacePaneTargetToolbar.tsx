@@ -29,10 +29,7 @@ import type {
   WorkspacePaneFilesystemTarget,
   WorkspacePaneSurfaceTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  workspacePaneFilesystemTerminalBase,
-  workspacePaneTabsTargetForFilesystemTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneTabsTargetForFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
@@ -56,7 +53,7 @@ interface WorkspacePaneTargetToolbarProps {
   workspacePaneId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   statusCount: number | undefined
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onBackToNavigator?: () => void
 }
 
@@ -77,7 +74,7 @@ WorkspacePaneTargetToolbar.props = [
   'workspacePaneId',
   'workspacePaneRoute',
   'statusCount',
-  'trafficLightOffset',
+  'navigationOffset',
   'onBackToNavigator',
 ]
 
@@ -89,7 +86,7 @@ const WorkspacePaneFilesystemTargetToolbar = defineComponent<WorkspacePaneFilesy
     'workspacePaneId',
     'workspacePaneRoute',
     'statusCount',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToNavigator',
   ],
 
@@ -111,7 +108,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     'workspacePaneId',
     'workspacePaneRoute',
     'statusCount',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToNavigator',
     'externalAppItems',
   ],
@@ -236,7 +233,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
             workspacePaneId={props.workspacePaneId}
             activeTabIdentity={activeTabIdentity.value}
             createAction={props.target.capabilities.terminal.available ? runtimeTabCreateAction.value : null}
-            trafficLightOffset={props.trafficLightOffset ?? false}
+            navigationOffset={props.navigationOffset ?? false}
             onBackToNavigator={props.onBackToNavigator}
             trailingActions={
               retryTabsAction || showExternalAppLauncher ? (

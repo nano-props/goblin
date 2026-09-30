@@ -2,7 +2,7 @@ import { Settings } from '@lucide/vue'
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { GitWorkspaceNavigator } from '#/web/components/GitWorkspaceNavigator.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import { WorkspaceRootNavigator } from '#/web/components/workspace-navigator/WorkspaceRootNavigator.tsx'
@@ -11,7 +11,6 @@ import {
   CreateWorktreeRowAction,
   RepoSyncAction,
 } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
-import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { WorkspaceDashboardRowAction } from '#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx'
 import { WorkspaceRefreshAction } from '#/web/components/workspace-toolbar/WorkspaceRefreshAction.tsx'
@@ -22,14 +21,12 @@ import type { GitWorkspaceClientState } from '#/web/stores/workspaces/types.ts'
 
 const NOOP = () => {}
 const SIDEBAR_TOP_CLASS = 'flex shrink-0 items-center gap-1 bg-navigation text-sm'
-type WorkspaceShellSidebarChromeRegion = 'drag' | 'none'
 
 interface WorkspaceLayoutSidebarProps {
   workspaceId?: WorkspaceId
   git: GitWorkspaceClientState | null
   compact: boolean
   navigatorContent?: VNodeChild
-  chromeRegion?: WorkspaceShellSidebarChromeRegion
   onOpenSettings?: () => void
   onSelectBranch?: (branch: string) => void
   onCreateWorktree?: () => void
@@ -49,7 +46,6 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
     'git',
     'compact',
     'navigatorContent',
-    'chromeRegion',
     'onOpenSettings',
     'onSelectBranch',
     'onCreateWorktree',
@@ -70,17 +66,11 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
       const backgroundClass = props.compact ? 'bg-background' : 'bg-navigation'
       return (
         <aside class={cn('flex min-h-0 min-w-0 flex-1 flex-col', backgroundClass)}>
-          {!props.compact && props.chromeRegion !== 'none' ? (
-            <TitleBarDragRegion
-              class={SIDEBAR_TOP_CLASS}
-              data-testid="workspace-shell-sidebar-top"
-              style={{ height: `${TITLE_BAR_HEIGHT_PX}px` }}
-            />
-          ) : !props.compact ? (
+          {!props.compact ? (
             <div
               class={SIDEBAR_TOP_CLASS}
               data-testid="workspace-shell-sidebar-top"
-              style={{ height: `${TITLE_BAR_HEIGHT_PX}px` }}
+              style={{ height: `${WORKSPACE_TOOLBAR_HEIGHT_PX}px` }}
             />
           ) : null}
           <WorkspaceShellPrimaryActions

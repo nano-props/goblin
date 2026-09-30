@@ -1,9 +1,4 @@
-// Procedure input schemas shared between the HTTP route layer and the
-// native bridge IPC layer. Each transport validates payloads with
-// `parseHttpInput` (see `#/server/common/http-validate.ts`) or
-// `parseIpcInput` using the schemas
-// declared here, so the request contract is defined once.
-
+// Shared procedure input schemas, validated at the server HTTP boundary.
 import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isValidBranchInput } from '#/shared/refnames.ts'
@@ -22,8 +17,6 @@ import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
-import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
-import { ClientWorkspaceStateSchema } from '#/shared/client-workspace-state-schema.ts'
 import { EDITOR_APP_VALUES, LANG_PREF_VALUES, TERMINAL_APP_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
 import { FetchIntervalSecSchema } from '#/shared/settings-response-schema.ts'
 
@@ -32,10 +25,6 @@ const TerminalAppSchema = v.picklist(TERMINAL_APP_VALUES)
 const EditorAppSchema = v.picklist(EDITOR_APP_VALUES)
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
 const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
-const GlobalShortcutSchema = v.pipe(
-  v.string(),
-  v.check((value) => parseAllowedGlobalShortcut(value) !== null, 'invalid global shortcut'),
-)
 const RepoUrlTargetSchema = v.variant('type', [
   v.object({ type: v.literal('root') }),
   // `remote` is an optional hint for which remote to resolve the URL against
@@ -290,7 +279,6 @@ export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
 
 export const SETTINGS_PROCEDURE_SCHEMAS = {
   fetchInterval: v.strictObject({ sec: FetchIntervalSecSchema }),
-  globalShortcutState: v.object({ registered: v.boolean() }),
   recentWorkspacesAdd: v.object({ workspace: WorkspaceSessionEntrySchema }),
   // Body for `POST /api/settings/workspace-external-app-recent`. The
   // server re-validates that targetKey is canonical and belongs to
@@ -330,21 +318,6 @@ export const SETTINGS_PATCH_SCHEMAS = {
       fetchIntervalSec: v.optional(FetchIntervalSecSchema),
       terminalNotificationsEnabled: v.optional(v.boolean()),
       shortcutsDisabled: v.optional(v.boolean()),
-      globalShortcutDisabled: v.optional(v.boolean()),
-      globalShortcut: v.optional(GlobalShortcutSchema),
-      lanEnabled: v.optional(v.boolean()),
     }),
   }),
-} as const
-
-// Native host IPC procedures — Electron-only operations that bypass
-// the HTTP server entirely. Handlers live in `main/native-host-ipc-router.ts`.
-export const NATIVE_HOST_IPC_PROCEDURE_SCHEMAS = {
-  clientWorkspace: {
-    read: v.undefined(),
-    write: ClientWorkspaceStateSchema,
-  },
-  settings: {
-    setGlobalShortcut: v.strictObject({ accelerator: GlobalShortcutSchema }),
-  },
 } as const

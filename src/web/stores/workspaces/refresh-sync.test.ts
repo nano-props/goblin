@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRefreshSyncHelpers, refreshFailureMessage } from '#/web/stores/workspaces/refresh-sync.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
-import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/stores/workspaces/refresh-test-utils.ts'
+import {
+  REPO_ID,
+  branch,
+  serverHandlers,
+  resetRefreshTest,
+  seedRepo,
+} from '#/web/stores/workspaces/refresh-test-utils.ts'
 
 beforeEach(resetRefreshTest)
 
@@ -34,7 +40,7 @@ describe('refresh sync pipeline', () => {
       message: 'cancelled',
       recoveryMessageKeys: ['error.workspace-runtime-settlement-failed'],
     }
-    ipcHandlers['repo.fetch'] = async () => fetchResult
+    serverHandlers['repo.fetch'] = async () => fetchResult
     const projectionFailure = new Error('projection failed')
     const refreshReadModels = vi.fn(async () => {
       const workspace = requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID])

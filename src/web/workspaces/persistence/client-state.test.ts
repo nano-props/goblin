@@ -6,8 +6,6 @@ import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { withBrowserStorageUnavailable } from '#/test-utils/storage.ts'
-import * as nativeBridge from '#/web/bridge/native.ts'
-import * as nativeHostClient from '#/web/bridge/native-host-client.ts'
 
 beforeEach(() => {
   localStorage.clear()
@@ -15,14 +13,6 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('client workspace persistence', () => {
-  test('fails fast when native workspace state cannot be read', async () => {
-    const readError = new Error('native workspace unavailable')
-    vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
-    vi.spyOn(nativeHostClient, 'invokeNativeIpcPath').mockRejectedValue(readError)
-
-    await expect(readClientWorkspaceState()).rejects.toBe(readError)
-  })
-
   test('replaces corrupt browser state with defaults', async () => {
     localStorage.setItem('goblin.workspace', '{broken json')
     await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
@@ -38,15 +28,6 @@ describe('client workspace persistence', () => {
 
     expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
     expect(setItem).toHaveBeenCalledOnce()
-  })
-
-  test('rejects a structurally corrupt native root', async () => {
-    vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
-    vi.spyOn(nativeHostClient, 'invokeNativeIpcPath').mockResolvedValue({
-      kind: 'loaded',
-      state: [],
-    })
-    await expect(readClientWorkspaceState()).rejects.toThrow('Corrupt native client workspace state')
   })
 
   test('round-trips client-owned presentation without server workspace fields', async () => {

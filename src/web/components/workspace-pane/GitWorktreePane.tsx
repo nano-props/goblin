@@ -37,7 +37,7 @@ interface GitWorktreePaneProps {
   worktreePath: string
   route: ParsedWorkspacePaneRoute | null
   workspacePaneId: string
-  toolbarTrafficLightOffset: boolean
+  toolbarNavigationOffset: boolean
   onBackToNavigator?: () => void
 }
 
@@ -49,7 +49,7 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
     'worktreePath',
     'route',
     'workspacePaneId',
-    'toolbarTrafficLightOffset',
+    'toolbarNavigationOffset',
     'onBackToNavigator',
   ],
 
@@ -73,7 +73,7 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
 
     return () => {
       if (!snapshotReadModel.data.value && snapshotReadModel.isPending.value) {
-        return <WorkspacePaneSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+        return <WorkspacePaneSkeleton toolbarNavigationOffset={props.toolbarNavigationOffset} />
       }
       if (!snapshotReadModel.data.value && snapshotReadModel.isError.value) {
         const error = snapshotReadModel.error.value
@@ -104,7 +104,7 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
             workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath: props.worktreePath, route: props.route }}
             workspacePaneId={props.workspacePaneId}
             shortcutsEnabled
-            toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+            toolbarNavigationOffset={props.toolbarNavigationOffset}
             onBackToGitWorkspaceNavigator={props.onBackToNavigator}
           />
         )
@@ -120,7 +120,7 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
           target={currentTarget}
           route={props.route}
           workspacePaneId={props.workspacePaneId}
-          toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+          toolbarNavigationOffset={props.toolbarNavigationOffset}
           onBackToNavigator={props.onBackToNavigator}
         />
       )
@@ -137,7 +137,7 @@ interface GitWorktreePaneReadyProps {
   target: GitWorktreeWorkspacePaneTabsTarget
   route: ParsedWorkspacePaneRoute | null
   workspacePaneId: string
-  toolbarTrafficLightOffset: boolean
+  toolbarNavigationOffset: boolean
   onBackToNavigator?: () => void
 }
 
@@ -152,7 +152,7 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
     'target',
     'route',
     'workspacePaneId',
-    'toolbarTrafficLightOffset',
+    'toolbarNavigationOffset',
     'onBackToNavigator',
   ],
 
@@ -200,7 +200,7 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
             workspacePaneId={props.workspacePaneId}
             workspacePaneRoute={props.route}
             statusCount={props.status?.entries.length}
-            trafficLightOffset={props.toolbarTrafficLightOffset}
+            navigationOffset={props.toolbarNavigationOffset}
             onBackToNavigator={props.onBackToNavigator}
           />
           {routeMissing ? (

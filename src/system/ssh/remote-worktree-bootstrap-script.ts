@@ -1,8 +1,5 @@
-import { readFileSync } from 'node:fs'
-
-let cachedScript: string | undefined
+import script from '#/system/ssh/remote-worktree-bootstrap.sh' with { type: 'text' }
 
 export function loadRemoteWorktreeBootstrapScript(): string {
-  cachedScript ??= readFileSync(new URL('./remote-worktree-bootstrap.sh', import.meta.url), 'utf8')
-  return cachedScript
+  return script
 }

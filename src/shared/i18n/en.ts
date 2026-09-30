@@ -5,83 +5,17 @@
 // translated.
 
 export const en = {
-  // ---- Menu (top-level) ---------------------------------------------------
-  'menu.file': 'File',
-  'menu.edit': 'Edit',
-  'menu.view': 'View',
-  'menu.window': 'Window',
-  'menu.help': 'Help',
-
-  // ---- Menu — App (macOS application menu) --------------------------------
-  'menu.app.about': 'About {name}',
-  'menu.app.services': 'Services',
-  'menu.app.hide': 'Hide {name}',
-  'menu.app.hide-others': 'Hide Others',
-  'menu.app.show-all': 'Show All',
-  'menu.app.quit': 'Quit {name}',
-  'menu.app.settings': 'Settings…',
-
-  // ---- Menu — Window (macOS) ----------------------------------------------
-  'menu.window.minimize': 'Minimize',
-  'menu.window.zoom': 'Zoom',
-  'menu.window.front': 'Bring All to Front',
-
-  // ---- Menu — File --------------------------------------------------------
-  'menu.file.open-local-workspace': 'Open Workspace…',
-  'menu.file.open-local-workspace-path': 'Open Workspace by Path…',
-  'menu.file.open-remote-workspace': 'Open Remote Workspace…',
-  'menu.file.clone-repo': 'Clone Repository…',
-  'menu.file.create-worktree': 'New Worktree…',
-  'menu.file.open-recent': 'Open Recent',
-  'menu.file.no-recent': 'No Recent Workspaces',
-  'menu.file.clear-recent': 'Clear Menu',
-  'menu.file.open-in-browser': 'Open in Browser',
-  'menu.file.open-data-folder': 'Open Data Folder',
-  // Platform variants picked at menu-build time in the native host
   // (where `process.platform` is the source of truth — the client is
   // sandboxed and only sees `bootstrap.platform`).
-  'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
-  'menu.file.open-data-folder.win': 'Open Data Folder in Explorer',
-  'menu.file.close-window': 'Close Window',
-  'menu.file.close-workspace-tab': 'Close Workspace Tab',
-  'menu.file.close-workspace': 'Close Workspace',
-  'menu.file.settings': 'Settings…',
-  'menu.file.quit': 'Quit',
-  'menu.client-intent-delivery-failed':
-    'The action could not be sent because the app window changed or failed to load. Please try again.',
 
-  // ---- Menu — Edit --------------------------------------------------------
-  'menu.edit.undo': 'Undo',
-  'menu.edit.redo': 'Redo',
-  'menu.edit.cut': 'Cut',
-  'menu.edit.copy': 'Copy',
-  'menu.edit.paste': 'Paste',
-  'menu.edit.paste-match-style': 'Paste and Match Style',
   'menu.edit.delete': 'Delete',
-  'menu.edit.select-all': 'Select All',
 
-  // ---- Menu — View --------------------------------------------------------
-  'menu.view.status': 'Branch Status',
-  'menu.view.history': 'History',
-  'menu.view.changes': 'Changes',
-  'menu.view.terminal': 'Terminal',
   'menu.view.refresh': 'Refresh Workspace',
-  'menu.view.reload-page': 'Reload Page',
-  'menu.view.toggle-full-screen': 'Toggle Full Screen',
-  'menu.view.toggle-dev-tools': 'Toggle Developer Tools',
-
-  // ---- Menu — Window (goblin-specific) ---------------------------------------
-  'menu.window.next-workspace': 'Next Workspace',
-  'menu.window.prev-workspace': 'Previous Workspace',
-  'menu.window.reset-window': 'Reset Window',
-
-  // ---- Menu — Help --------------------------------------------------------
-  'menu.help.shortcuts': 'Keyboard Shortcuts',
 
   // ---- App chrome --------------------------------------------------------
   'app-chrome.open': 'Open',
   'app-chrome.menu': 'Menu',
-  'app-chrome.settings': 'Settings (⌘,)',
+  'app-chrome.settings': 'Settings',
   'app-chrome.settings-tooltip': 'Settings',
   'app-chrome.notifications': 'Notifications',
 
@@ -93,13 +27,14 @@ export const en = {
   'workspace-picker.placeholder': 'Select workspace',
   'workspace-picker.open-local': 'Open Workspace…',
   'workspace-picker.open-remote': 'Open Remote Workspace…',
+  'workspace-open.invalid-path': 'The link must contain one absolute directory path (up to 4096 characters).',
+  'workspace-open.retry': 'Retry',
   'workspace-picker.open-title': 'Open Workspace',
-  'workspace-picker.open-description': 'Enter a local path or choose a folder.',
+  'workspace-picker.open-description': 'Enter a directory path on the server.',
   'workspace-picker.open-path-label': 'Folder path',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
   'workspace-picker.open-path-no-matches': 'No matching folders',
   'workspace-picker.open-presentation-failed': 'Workspace opened, but the interface could not switch to it',
-  'workspace-picker.open-path-choose': 'Choose…',
   'workspace-picker.open-local-confirm': 'Open Workspace',
   'workspace-picker.open-opening': 'Opening…',
   'workspace-picker.clone': 'Clone repository…',
@@ -108,7 +43,6 @@ export const en = {
   'workspace-picker.clone-url-label': 'Repository URL',
   'workspace-picker.clone-url-placeholder': 'https://github.com/owner/repo.git',
   'workspace-picker.clone-parent-label': 'Save to',
-  'workspace-picker.clone-parent-choose': 'Choose…',
   'workspace-picker.clone-directory-label': 'Folder name',
   'workspace-picker.clone-directory-placeholder': 'repo',
   'workspace-picker.clone-directory-invalid': 'Use a single folder name without /, \\, or :.',
@@ -126,7 +60,6 @@ export const en = {
   'workspace-picker.open-remote-port-label': 'Port',
   'workspace-picker.open-remote-username-label': 'Username',
   'workspace-picker.open-remote-private-key-label': 'Private key',
-  'workspace-picker.open-remote-private-key-choose': 'Choose private key',
   'workspace-picker.open-remote-path-label': 'Remote path',
   'workspace-picker.open-remote-path-placeholder': '/home/user/repo or ~/repo',
   'workspace-picker.open-remote-test-connection': 'Test connection',
@@ -204,15 +137,12 @@ export const en = {
 
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No workspace open',
-  'empty.body': 'Choose a workspace from the sidebar, or drop a folder here.',
+  'empty.body': 'Open a workspace from the sidebar.',
   'route.not-found-title': 'Page not found',
   'route.not-found-home': 'Back to home',
   'workspace-route.not-found-title': 'Workspace not found',
 
   // ---- Drag and drop ------------------------------------------------------
-  'drop.title': 'Drop to open workspace',
-  'drop.body': 'Drop a folder anywhere in Goblin.',
-  'drop.open-failed': 'Could not open workspace',
   'workspace-picker.recent-save-failed': 'Workspace opened, but recent history was not updated',
 
   // ---- Workspace pane tabs -----------------------------------------------
@@ -584,6 +514,12 @@ export const en = {
   // ---- Errors / banners ---------------------------------------------------
   'error.workspace-git-unavailable': 'Git features are unavailable for this workspace',
   'error.workspace-operation-failed': 'Workspace operation failed',
+  'error.workspace-locator-malformed': 'Invalid workspace path.',
+  'error.workspace-transport-unsupported': 'This workspace transport is not supported.',
+  'error.workspace-path-not-found': 'The directory does not exist. Check the path on the server.',
+  'error.workspace-path-not-directory': 'The path is not a directory.',
+  'error.workspace-permission-denied': 'Permission denied. Check directory access on the server.',
+  'error.workspace-transport-unavailable': 'The workspace is unavailable. Check the server and directory, then retry.',
   'error.workspace-open-failed': 'Failed to open workspace',
   'error.workspace-close-failed': 'Failed to close workspace',
   'error.failed-read-repo': 'Failed to read repository',
@@ -748,9 +684,7 @@ export const en = {
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': 'Refresh',
   'settings.nav.shortcuts': 'Shortcuts',
-  'settings.lan.enabled': 'Allow LAN access',
-  'settings.lan.enabled-hint': 'Allow other devices on your local network to access Goblin.',
-  'settings.lan.restart-hint': 'This setting takes effect after restarting Goblin.',
+
   'settings.web.title': 'Remote access',
   'settings.nav.web': 'Remote access',
   'settings.web.server': 'Server',
@@ -765,18 +699,13 @@ export const en = {
   'settings.web.token-copy': 'Copy token',
   'settings.web.token-copied': 'Token copied to clipboard.',
   'settings.web.token-copy-failed': 'Could not copy to clipboard.',
-  'settings.web.token-read-failed': 'Could not read token state. Reopen settings to try again.',
-  'settings.web.token-rotate': 'Rotate token',
-  'settings.web.token-rotated': 'New token saved. It will take effect after you restart Goblin.',
-  'settings.web.token-rotate-failed': 'Token rotation failed.',
-  'settings.web.token-rotation-hint':
-    'The QR codes below include the currently active token. Scanning them auto-fills the gate on the target device.',
-  'settings.web.token-pending-restart-hint':
-    'The displayed token and QR codes become valid when Goblin next starts. The current token remains active until then.',
+
+  'settings.web.token-sharing-hint':
+    'The QR codes include the active access token. Scan one to sign in from another device.',
   'settings.web.lan': 'Network',
   'settings.web.lan-urls': 'LAN addresses',
   'settings.web.lan-urls-hint': 'Other devices on the same local network can use these addresses to access Goblin.',
-  'settings.lan.local-only': 'Access is currently limited to this device.',
+
   'settings.web.qr': 'QR codes',
   'settings.web.qr-scan': 'QR code',
   'settings.about': 'About',
@@ -801,10 +730,6 @@ export const en = {
   'settings.apps.status.not-detected': 'not detected',
   'settings.fetch': 'Auto-fetch',
   'settings.fetch-hint': 'Fetches the active repository in the background.',
-  'settings.general.open-from-terminal-title': 'Open from Terminal',
-  'settings.general.open-from-terminal-body':
-    'On macOS, you can open a local repository directly in Goblin from Terminal or scripts.',
-  'settings.general.open-from-terminal-command': 'open -b goblin.app /path/to/repo',
   'settings.fetch.off': 'Off',
   'settings.fetch.30s': '30 sec',
   'settings.fetch.1m': '1 min',
@@ -829,17 +754,7 @@ export const en = {
     '  IdentityFile ~/.ssh/id_ed25519\n',
   'settings.shortcuts': 'Keyboard shortcuts',
   'settings.shortcuts-disable-app': 'Disable app shortcuts',
-  'settings.shortcuts-disable-global': 'Disable global shortcut',
-  'settings.global-shortcut': 'Global shortcut',
-  'settings.global-shortcut-hint': 'Press a combo. Esc cancels.',
-  'settings.global-shortcut-disabled-hint': 'Saved, currently off.',
-  'settings.global-shortcut-record': 'Change global shortcut',
-  'settings.global-shortcut-recording': 'Press keys…',
-  'settings.global-shortcut-reset': 'Reset',
-  'settings.global-shortcut-conflict': 'Registration failed. It may be in use.',
-  'settings.global-shortcut-projection-failed':
-    'The preference was saved, but the app shortcut could not be updated. Reopen the app to apply it.',
-  'settings.global-shortcut-invalid': 'Use Command, Control, or Option with a key.',
+
   'settings.open-github': 'Open project on GitHub',
   'about.app': 'Goblin',
   'about.version': 'Version',
@@ -857,32 +772,13 @@ export const en = {
   'help.section.app': 'App',
   'help.row.next-branch': 'Next branch / commit',
   'help.row.prev-branch': 'Previous branch / commit',
-  'help.row.next-workspace': 'Next workspace',
-  'help.row.prev-workspace': 'Previous workspace',
-  'help.row.view-status': 'Branch status',
-  'help.row.view-changes': 'Changes',
-  'help.row.view-log': 'Log',
-  'help.row.view-terminal': 'Terminal',
-  'help.row.new-terminal': 'New terminal tab',
-  'help.row.create-worktree': 'New worktree',
   'help.row.select-workspace-tab': 'Select tab',
   'help.row.switch-workspace-pane-tab': 'Previous / next workspace tab',
-  'help.row.open-local-workspace': 'Open workspace',
-  'help.row.clone-repo': 'Clone repository',
-  'help.row.activate-window': 'Show Goblin window',
-  'help.row.close-workspace-tab': 'Close workspace tab',
-  'help.row.close-window': 'Close window',
-  'help.row.refresh': 'Refresh Workspace',
   'help.row.reload-page': 'Reload Page',
-  'help.row.settings': 'Settings',
   'help.row.this-help': 'This help',
   'help.row.dismiss': 'Dismiss overlay / leave focused non-text control',
 
-  // ---- Embedded server -----------------------------------------------------
-  'embedded-server.fatal-exit.title': 'Goblin server stopped',
-  'embedded-server.fatal-exit.body': 'The embedded server stopped unexpectedly ({exitDetail}). Restart Goblin.',
-  'embedded-server.fatal-exit.body-with-detail':
-    'The embedded server stopped unexpectedly ({exitDetail}). Restart Goblin.\n\nLast server error:\n{stderr}',
+  // ---- Server -----------------------------------------------------
 
   // ---- Generic dialog -----------------------------------------------------
   'dialog.cancel': 'Cancel',

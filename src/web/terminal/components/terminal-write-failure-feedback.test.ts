@@ -92,23 +92,6 @@ describe('terminal write failure feedback', () => {
     expect(mocks.warning).toHaveBeenCalledWith(message, { id: `terminal-write-failure:${message}` })
   })
 
-  test('does not report shutdown as an outage', () => {
-    const reporter = createTerminalWriteFailureReporter()
-    reporter.report({
-      terminalRuntimeSessionId: 'pty_session_first_123456',
-      failure: {
-        kind: 'error',
-        error: new ClientRealtimeRequestError('closed', {
-          kind: 'app-quitting',
-          delivery: 'indeterminate',
-          outageId: null,
-        }),
-      },
-    })
-
-    expect(mocks.warning).not.toHaveBeenCalled()
-  })
-
   test('does not re-report a delayed failure from an older outage', () => {
     const reporter = createTerminalWriteFailureReporter()
     for (const outageId of [2, 1]) {

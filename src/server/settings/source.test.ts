@@ -80,9 +80,6 @@ describe('settings source', () => {
       colorTheme: 'macos',
       terminalNotificationsEnabled: false,
       shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      globalShortcut: 'Alt+G',
-      lanEnabled: false,
     })
     expect(await mod.getServerWorkspaceState()).toEqual(defaultServerWorkspaceState())
     expect(await mod.getServerRecentWorkspaces()).toEqual([])
@@ -108,9 +105,6 @@ describe('settings source', () => {
       colorTheme: 'github',
       terminalNotificationsEnabled: true,
       shortcutsDisabled: true,
-      globalShortcutDisabled: true,
-      globalShortcut: 'Alt+K',
-      lanEnabled: false,
     })
     await writeWorkspacePaneLayout(mod, REPO_B, {
       entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
@@ -135,9 +129,6 @@ describe('settings source', () => {
       colorTheme: 'github',
       terminalNotificationsEnabled: true,
       shortcutsDisabled: true,
-      globalShortcutDisabled: true,
-      globalShortcut: 'Alt+K',
-      lanEnabled: false,
     })
     expect(await reloaded.getServerWorkspaceState()).toMatchObject({
       workspacePaneTabsByTargetByWorkspace: {
@@ -158,17 +149,6 @@ describe('settings source', () => {
     ])
   })
 
-  test('rejects an invalid global shortcut without resetting persisted settings', async () => {
-    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-    previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-    process.env.GOBLIN_SERVER_DATA_DIR = tmp
-
-    const mod = await import('#/server/settings/source.ts')
-    await mod.updateUserSettings({ globalShortcut: 'Alt+K' })
-    await expect(mod.updateUserSettings({ globalShortcut: 'Control+O' })).rejects.toThrow('invalid global shortcut')
-    expect((await mod.getUserSettings()).globalShortcut).toBe('Alt+K')
-  })
-
   test.each([
     [{ lang: 'fr' }, 'invalid language'],
     [{ theme: 'sepia' }, 'invalid theme'],
@@ -177,8 +157,6 @@ describe('settings source', () => {
     [{ fetchIntervalSec: 3601 }, 'invalid fetch interval'],
     [{ terminalNotificationsEnabled: 'yes' }, 'invalid terminal notifications setting'],
     [{ shortcutsDisabled: 1 }, 'invalid shortcuts setting'],
-    [{ globalShortcutDisabled: null }, 'invalid global shortcut disabled setting'],
-    [{ lanEnabled: 'true' }, 'invalid LAN setting'],
   ] as const)('rejects invalid direct settings patch %j without mutation', async (patch, message) => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

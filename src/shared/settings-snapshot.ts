@@ -3,10 +3,7 @@ import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import type { RuntimeRecentWorkspacesState, RuntimeSettingsSnapshot, SettingsSnapshot } from '#/shared/api-types.ts'
 import type { UserSettings } from '#/shared/settings.ts'
 
-export function buildRuntimeSettingsSnapshot(input: {
-  prefs: UserSettings
-  globalShortcutRegistered: boolean
-}): RuntimeSettingsSnapshot {
+export function buildRuntimeSettingsSnapshot(input: { prefs: UserSettings }): RuntimeSettingsSnapshot {
   return {
     lang: input.prefs.lang,
     theme: input.prefs.theme,
@@ -14,10 +11,6 @@ export function buildRuntimeSettingsSnapshot(input: {
     fetchIntervalSec: input.prefs.fetchIntervalSec,
     terminalNotificationsEnabled: input.prefs.terminalNotificationsEnabled,
     shortcutsDisabled: input.prefs.shortcutsDisabled,
-    globalShortcutDisabled: input.prefs.globalShortcutDisabled,
-    globalShortcut: input.prefs.globalShortcut,
-    globalShortcutRegistered: input.globalShortcutRegistered,
-    lanEnabled: input.prefs.lanEnabled,
   }
 }
 
@@ -31,14 +24,12 @@ export function buildRuntimeRecentWorkspacesState(input: {
 
 export function buildSettingsSnapshot(input: {
   prefs: UserSettings
-  globalShortcutRegistered: boolean
   recentWorkspaces: WorkspaceSessionEntry[]
   workspaceSettings: WorkspaceSettingsEntry[]
 }): SettingsSnapshot {
   return {
     ...buildRuntimeSettingsSnapshot({
       prefs: input.prefs,
-      globalShortcutRegistered: input.globalShortcutRegistered,
     }),
     ...buildRuntimeRecentWorkspacesState({ recentWorkspaces: input.recentWorkspaces }),
     workspaceSettings: input.workspaceSettings,
@@ -48,16 +39,7 @@ export function buildSettingsSnapshot(input: {
 export function runtimeSettingsSnapshotFromSettingsSnapshot(
   snapshot: Pick<
     SettingsSnapshot,
-    | 'lang'
-    | 'theme'
-    | 'colorTheme'
-    | 'fetchIntervalSec'
-    | 'terminalNotificationsEnabled'
-    | 'shortcutsDisabled'
-    | 'globalShortcutDisabled'
-    | 'globalShortcut'
-    | 'globalShortcutRegistered'
-    | 'lanEnabled'
+    'lang' | 'theme' | 'colorTheme' | 'fetchIntervalSec' | 'terminalNotificationsEnabled' | 'shortcutsDisabled'
   >,
 ): RuntimeSettingsSnapshot {
   return {
@@ -67,9 +49,5 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     fetchIntervalSec: snapshot.fetchIntervalSec,
     terminalNotificationsEnabled: snapshot.terminalNotificationsEnabled,
     shortcutsDisabled: snapshot.shortcutsDisabled,
-    globalShortcutDisabled: snapshot.globalShortcutDisabled,
-    globalShortcut: snapshot.globalShortcut,
-    globalShortcutRegistered: snapshot.globalShortcutRegistered,
-    lanEnabled: snapshot.lanEnabled,
   }
 }

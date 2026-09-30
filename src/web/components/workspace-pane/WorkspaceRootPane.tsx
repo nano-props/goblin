@@ -24,13 +24,13 @@ interface WorkspaceRootPaneProps {
   workspace: FilesystemWorkspacePaneProjection
   workspacePaneId: string
   route: ParsedWorkspacePaneRoute | null
-  toolbarTrafficLightOffset: boolean
+  toolbarNavigationOffset: boolean
   onBackToNavigator?: () => void
 }
 
 export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
   name: 'WorkspaceRootPane',
-  props: ['workspace', 'workspacePaneId', 'route', 'toolbarTrafficLightOffset', 'onBackToNavigator'],
+  props: ['workspace', 'workspacePaneId', 'route', 'toolbarNavigationOffset', 'onBackToNavigator'],
 
   setup(props) {
     const t = useT()
@@ -76,7 +76,7 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
             workspacePaneId={props.workspacePaneId}
             workspacePaneRoute={props.route}
             statusCount={0}
-            trafficLightOffset={props.toolbarTrafficLightOffset}
+            navigationOffset={props.toolbarNavigationOffset}
             onBackToNavigator={props.onBackToNavigator}
           />
           {currentActivePanel === 'status' ? (

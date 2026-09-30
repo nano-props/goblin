@@ -3,7 +3,13 @@ import { refreshStatusLog } from '#/web/logger.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/stores/workspaces/refresh-test-utils.ts'
+import {
+  REPO_ID,
+  branch,
+  serverHandlers,
+  resetRefreshTest,
+  seedRepo,
+} from '#/web/stores/workspaces/refresh-test-utils.ts'
 import { createRepoWorktreeSnapshotForTest } from '#/web/test-utils/repo-store.ts'
 
 beforeEach(resetRefreshTest)
@@ -15,7 +21,7 @@ describe('independent worktree status refresh', () => {
       createRepoWorktreeSnapshotForTest('feature/a', '/tmp/worktree-a'),
     ])
     const snapshotBefore = getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId)
-    ipcHandlers['repo.worktreeStatus'] = () => ({
+    serverHandlers['repo.worktreeStatus'] = () => ({
       workspaceRuntimeId,
       status: [
         { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'file.ts' }] },
@@ -32,7 +38,7 @@ describe('independent worktree status refresh', () => {
   test('keeps accepted status when a background status refresh fails', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     const acceptedStatus = getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)
-    ipcHandlers['repo.worktreeStatus'] = () => {
+    serverHandlers['repo.worktreeStatus'] = () => {
       throw new Error('status unavailable')
     }
     const warn = vi.spyOn(refreshStatusLog, 'warn').mockImplementation(() => {})
@@ -46,7 +52,7 @@ describe('independent worktree status refresh', () => {
   test('does not request status for a stale workspace runtime', async () => {
     seedRepo([branch('main')], 'repo-runtime-current')
     const handler = vi.fn()
-    ipcHandlers['repo.worktreeStatus'] = handler
+    serverHandlers['repo.worktreeStatus'] = handler
 
     await refreshRepoWorktreeStatus({ get: workspacesStore.getState }, REPO_ID, 'repo-runtime-stale')
 

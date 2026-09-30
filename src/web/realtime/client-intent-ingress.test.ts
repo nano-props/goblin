@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
 describe('server client intent ingress', () => {
@@ -13,7 +11,6 @@ describe('server client intent ingress', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
-        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'test-token' },
       },
     })

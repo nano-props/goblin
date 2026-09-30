@@ -15,10 +15,7 @@ import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authent
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
-import {
-  advanceServerCommandGeneration,
-  composeServerCommandGenerationSignal,
-} from '#/web/lib/server-command-generation.ts'
+
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
@@ -194,87 +191,6 @@ beforeEach(() => {
 })
 
 describe('Layout shell providers', () => {
-  test('keeps runtime projection recovery active across the settings route', async () => {
-    workspacesStore.setState({ workspaceMembershipReady: true })
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [
-        { path: '/', name: 'home', component: { template: '<div>workspace</div>' } },
-        { path: '/settings/general', name: 'settings', component: { template: '<div>settings</div>' } },
-      ],
-    })
-    await router.push('/')
-    await router.isReady()
-    renderLayout(router)
-
-    await flushTestUpdates(async () => await router.push('/settings/general'))
-    advanceServerCommandGeneration()
-    await waitFor(() =>
-      expect(runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce(),
-    )
-
-    await flushTestUpdates(async () => await router.push('/'))
-    advanceServerCommandGeneration()
-    await waitFor(() =>
-      expect(runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2),
-    )
-  })
-
-  test('owns the intent router on settings and keeps the single preload consumer across route changes', async () => {
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [
-        { path: '/settings/general', name: 'settings', component: { template: '<div>settings</div>' } },
-        { path: '/', name: 'home', component: { template: '<div>workspace</div>' } },
-      ],
-    })
-    await router.push('/settings/general')
-    await router.isReady()
-    renderLayout(router)
-
-    expect(clientIntentIngress.subscriptionStarts).toBe(1)
-    expect(clientWorkspacePersistence).toHaveBeenCalledOnce()
-    await flushTestUpdates(() => {
-      for (const listener of clientIntentIngress.listeners) listener({ type: 'open-workspace-path-requested' })
-    })
-    await waitFor(() => expect(document.querySelector('[data-testid="workspace-open-dialog"]')).not.toBeNull())
-
-    await flushTestUpdates(async () => {
-      await router.push('/')
-    })
-
-    expect(clientIntentIngress.subscriptionStarts).toBe(1)
-    expect(clientWorkspacePersistence).toHaveBeenCalledOnce()
-  })
-
-  test('advances command generation before authentication and retains business intents for the authenticated router', async () => {
-    authMock.status.state = 'unauthenticated'
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
-    })
-    await router.push('/')
-    await router.isReady()
-    renderLayout(router)
-
-    const staleCommandSignal = composeServerCommandGenerationSignal()
-    await flushTestUpdates(() => {
-      for (const listener of clientIntentIngress.listeners) {
-        listener({ type: 'server-command-reset-requested' })
-        listener({ type: 'open-workspace-path-requested' })
-      }
-    })
-
-    expect(staleCommandSignal.aborted).toBe(true)
-    expect(document.querySelector('[data-testid="workspace-open-dialog"]')).toBeNull()
-
-    await flushTestUpdates(() => {
-      authMock.status.state = 'authenticated'
-    })
-    await waitFor(() => expect(document.querySelector('[data-testid="workspace-open-dialog"]')).not.toBeNull())
-    expect(clientIntentIngress.subscriptionStarts).toBe(1)
-  })
-
   test('keeps terminal read context above the settings shell outlet while workspace restore is pending', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({

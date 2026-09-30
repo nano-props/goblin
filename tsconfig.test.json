@@ -20,7 +20,7 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node", "bun"]
   },
   "include": ["vitest.config.ts", "src/**/*.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*test-utils.ts"],
   "exclude": ["node_modules", "dist", "release"]

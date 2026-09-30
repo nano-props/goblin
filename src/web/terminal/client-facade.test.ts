@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
@@ -18,7 +17,6 @@ describe('terminal web host client', () => {
   beforeEach(() => {
     wsMock = installWebSocketMock({ autoOpen: false })
     installHostBootstrap({
-      runtime: 'web',
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     vi.restoreAllMocks()
@@ -724,22 +722,6 @@ describe('terminal web host client', () => {
       seq: 2,
       processName: 'zsh',
     })
-    dispose()
-  })
-
-  test('stops reconnecting terminal sockets after app quitting starts', async () => {
-    useFakeTimers()
-    const { markAppQuitting } = await import('#/web/app/lifecycle.ts')
-    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    if (!socket) throw new Error('missing initial terminal socket')
-
-    markAppQuitting()
-    await vi.advanceTimersByTimeAsync(300)
-
-    expect(socket.readyState).toBe(wsMock.CLOSED)
-    expect(wsMock.instances).toHaveLength(1)
     dispose()
   })
 

@@ -1,6 +1,5 @@
 import type { ILinkHandler } from '@xterm/xterm'
 import { vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -465,10 +464,8 @@ export const terminalCalls = {
   takeover: vi.fn<(input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>>(),
   close: vi.fn<(input: TerminalSessionInput) => Promise<TerminalMutationResult>>(),
   notifyBell: vi.fn<(input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>>(),
-  setBadge: vi.fn<(count: number) => void>(),
 }
-const invokeIpc = vi.fn<Window['goblinNative']['invokeIpc']>()
-export const hostOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['host']>['openExternalUrl']>()
+export const openBrowserUrl = vi.fn()
 export const mockFonts = new MockFontFaceSet()
 let nextIdentityRevision = 0
 
@@ -498,6 +495,8 @@ export const descriptor: TerminalDescriptor = {
 }
 
 export function resetTerminalSessionHarness() {
+  openBrowserUrl.mockReset()
+  window.open = openBrowserUrl
   useFakeTimers()
   xtermMocks.terminals.length = 0
   nextIdentityRevision = 0
@@ -538,55 +537,14 @@ export function resetTerminalSessionHarness() {
     value: (handle: number) => window.clearTimeout(handle),
   })
   HTMLElement.prototype.getBoundingClientRect = vi.fn(() => terminalRect(800, 400))
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: {
-      invokeIpc: invokeIpc.mockResolvedValue({ ok: true }),
-      abortIpc: vi.fn(),
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-      },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-      pathForFile: vi.fn(),
-      host: {
-        openSettingsWindow: vi.fn(),
-        openExternalUrl: hostOpenExternalUrl.mockResolvedValue({ ok: true, message: 'https://example.com/path' }),
-        openDirectoryDialog: vi.fn(),
-        consumeExternalOpenPaths: vi.fn(),
-      },
-    },
-  })
+
   setClientBridgeForTests({
-    kind: () => 'electron',
-    hasCapability: (capability) =>
-      capability === 'global-shortcut' ||
-      capability === 'open-settings-window' ||
-      capability === 'open-external-url' ||
-      capability === 'open-directory-dialog' ||
-      capability === 'consume-external-open-paths' ||
-      capability === 'terminal-notifications' ||
-      capability === 'terminal-badge',
     getBootstrap: () => ({
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-      },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
-    invokeIpc,
-    abortIpc: vi.fn(async () => false),
-    onEffectIntent: vi.fn(() => () => {}),
-    pathForFile: vi.fn(() => ''),
+
     saveClipboardFiles: vi.fn(() => Promise.resolve([])),
-    getAccessTokenProjection: vi.fn(async () => ({ accessToken: 'test-access-token', activation: 'current' as const })),
-    rotateAccessToken: vi.fn(async () => ({
-      accessToken: 'test-access-token',
-      activation: 'after-restart' as const,
-    })),
-    host: () => window.goblinNative.host ?? null,
+
     appRealtime: () => ({
       kickReconnect: () => {},
       onRecovered: () => () => {},
@@ -610,7 +568,7 @@ export function resetTerminalSessionHarness() {
       recoverSessions: vi.fn(async () => ({ revision: 0, sessions: [] })),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),
-      setBadge: terminalCalls.setBadge,
+
       onOutput: vi.fn(() => () => {}),
       onBell: vi.fn(() => () => {}),
       onTitle: vi.fn(() => () => {}),

@@ -11,7 +11,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { useExternalAppSettings } from '#/web/settings/runtime-external-apps.ts'
 import { useFetchSettings } from '#/web/settings/runtime-fetch.ts'
-import { useLanSettings } from '#/web/settings/runtime-lan.ts'
 import { useRuntimeRecentWorkspaces } from '#/web/settings/read-projection.ts'
 import { useShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
@@ -37,24 +36,19 @@ beforeEach(() => {
 })
 
 describe('runtime settings hooks', () => {
-  test('reads fetch, shortcut, and lan settings from the runtime settings snapshot', async () => {
+  test('reads fetch and shortcut settings from the runtime settings snapshot', async () => {
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         fetchIntervalSec: 300,
         terminalNotificationsEnabled: true,
         shortcutsDisabled: true,
-        globalShortcutDisabled: true,
-        globalShortcut: 'CommandOrControl+Shift+K',
-        globalShortcutRegistered: true,
-        lanEnabled: true,
       }),
     )
     const { result } = renderComposableInJsdom(
       () => ({
         fetch: useFetchSettings(),
         shortcuts: useShortcutSettings(),
-        lan: useLanSettings(),
       }),
       { wrapper: AppVueQueryClientScope },
     )
@@ -65,12 +59,6 @@ describe('runtime settings hooks', () => {
     })
     expect(result.value.shortcuts.value).toMatchObject({
       shortcutsDisabled: true,
-      globalShortcutDisabled: true,
-      globalShortcut: 'CommandOrControl+Shift+K',
-      globalShortcutRegistered: true,
-    })
-    expect(result.value.lan.value).toMatchObject({
-      lanEnabled: true,
     })
   })
 

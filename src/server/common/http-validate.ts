@@ -9,9 +9,6 @@ import { errorJson } from '#/server/common/responses.ts'
  * Parse a request body against a valibot schema. Throws `CodedError` with
  * `code: 'BAD_REQUEST'` when the shape is invalid; the Hono error handler in
  * `app-factory.ts` converts that into a 400 JSON response.
- *
- * Mirrors `parseIpcInput` in `#/shared/api-types.ts` so HTTP routes and the
- * native bridge can share the same valibot schema registry.
  */
 export function parseHttpInput<T>(schema: v.GenericSchema<unknown, T>, input: unknown): T {
   const parsed = v.safeParse(schema, input)

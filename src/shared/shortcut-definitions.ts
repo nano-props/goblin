@@ -1,4 +1,3 @@
-import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/en.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push'
@@ -7,28 +6,6 @@ export type ClientNavigationShortcutAction =
 export type ClientAppShortcutAction = 'show-help' | 'dismiss'
 export type ClientKeyboardShortcutAction =
   BranchActionShortcutAction | ClientNavigationShortcutAction | ClientAppShortcutAction
-export type ClientMenuCommandId =
-  | 'app-settings'
-  | 'file-new-terminal-tab'
-  | 'file-create-worktree'
-  | 'file-open-local-workspace'
-  | 'file-open-local-workspace-path'
-  | 'file-clone-repo'
-  | 'file-open-remote-workspace'
-  | 'file-close-workspace-tab'
-  | 'file-close-workspace'
-  | 'file-settings'
-  | 'view-status'
-  | 'view-history'
-  | 'view-changes'
-  | 'view-terminal'
-  | 'view-toggle-zen-mode'
-  | 'view-refresh'
-  | 'window-next-workspace'
-  | 'window-prev-workspace'
-  | 'window-reset-layout'
-  | 'help-shortcuts'
-
 export interface KeyboardShortcutMatch {
   key?: string
   code?: string
@@ -44,14 +21,6 @@ export interface AcceleratorShortcutDefinition {
   accelerator: string
   labelKey: DictKey
   labelParams?: Record<string, string | number>
-}
-
-export interface ClientMenuCommandDefinition {
-  id: ClientMenuCommandId
-  menuLabelKey: DictKey
-  helpLabelKey?: DictKey
-  accelerator?: string
-  intent: ClientEffectIntent
 }
 
 export interface BranchActionShortcutDefinition {
@@ -87,176 +56,9 @@ export const CLIENT_APP_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientAppSho
   keyboardShortcut([{ key: 'Escape' }], 'dismiss', [['Esc']], 'help.row.dismiss'),
 ]
 
-export const SETTINGS_SHORTCUT_MAC = 'Cmd+,'
-export const SETTINGS_SHORTCUT_NON_MAC = 'Ctrl+,'
-export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+T'
-export const CREATE_WORKTREE_SHORTCUT = 'CmdOrCtrl+N'
-export const CLOSE_WORKSPACE_TAB_SHORTCUT = 'CmdOrCtrl+W'
-export const CLOSE_WINDOW_SHORTCUT = 'CmdOrCtrl+Shift+W'
-
-export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
-  clientMenuCommand(
-    'app-settings',
-    'menu.app.settings',
-    { type: 'open-settings-requested', page: 'general' },
-    {
-      helpLabelKey: 'help.row.settings',
-      accelerator: SETTINGS_SHORTCUT_MAC,
-    },
-  ),
-  clientMenuCommand(
-    'file-new-terminal-tab',
-    'terminal.new',
-    { type: 'terminal-new-tab-requested' },
-    {
-      helpLabelKey: 'help.row.new-terminal',
-      accelerator: NEW_TERMINAL_TAB_SHORTCUT,
-    },
-  ),
-  clientMenuCommand(
-    'file-create-worktree',
-    'menu.file.create-worktree',
-    { type: 'create-worktree-requested' },
-    {
-      helpLabelKey: 'help.row.create-worktree',
-      accelerator: CREATE_WORKTREE_SHORTCUT,
-    },
-  ),
-  clientMenuCommand(
-    'file-open-local-workspace',
-    'menu.file.open-local-workspace',
-    { type: 'open-workspace-requested' },
-    {
-      helpLabelKey: 'help.row.open-local-workspace',
-      accelerator: 'CmdOrCtrl+O',
-    },
-  ),
-  clientMenuCommand('file-open-local-workspace-path', 'menu.file.open-local-workspace-path', {
-    type: 'open-workspace-path-requested',
-  }),
-  clientMenuCommand(
-    'file-clone-repo',
-    'menu.file.clone-repo',
-    { type: 'clone-repo-requested' },
-    {
-      helpLabelKey: 'help.row.clone-repo',
-      accelerator: 'CmdOrCtrl+Shift+O',
-    },
-  ),
-  clientMenuCommand(
-    'file-open-remote-workspace',
-    'menu.file.open-remote-workspace',
-    { type: 'open-remote-workspace-requested' },
-    {
-      accelerator: 'CmdOrCtrl+Shift+R',
-    },
-  ),
-  clientMenuCommand(
-    'file-close-workspace-tab',
-    'menu.file.close-workspace-tab',
-    { type: 'workspace-pane-close-tab-requested' },
-    {
-      helpLabelKey: 'help.row.close-workspace-tab',
-      accelerator: CLOSE_WORKSPACE_TAB_SHORTCUT,
-    },
-  ),
-  clientMenuCommand('file-close-workspace', 'menu.file.close-workspace', { type: 'close-workspace-requested' }),
-  clientMenuCommand(
-    'file-settings',
-    'menu.file.settings',
-    { type: 'open-settings-requested', page: 'general' },
-    {
-      helpLabelKey: 'help.row.settings',
-      accelerator: SETTINGS_SHORTCUT_NON_MAC,
-    },
-  ),
-  clientMenuCommand(
-    'view-status',
-    'menu.view.status',
-    { type: 'show-workspace-pane-tab-requested', tab: 'status' },
-    {
-      helpLabelKey: 'help.row.view-status',
-    },
-  ),
-  clientMenuCommand(
-    'view-history',
-    'menu.view.history',
-    { type: 'show-workspace-pane-tab-requested', tab: 'history' },
-    {
-      helpLabelKey: 'help.row.view-log',
-    },
-  ),
-  clientMenuCommand(
-    'view-changes',
-    'menu.view.changes',
-    { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
-    {
-      helpLabelKey: 'help.row.view-changes',
-    },
-  ),
-  clientMenuCommand(
-    'view-terminal',
-    'menu.view.terminal',
-    { type: 'terminal-primary-action-requested' },
-    {
-      helpLabelKey: 'help.row.view-terminal',
-    },
-  ),
-  clientMenuCommand(
-    'view-toggle-zen-mode',
-    'workspace.zen-mode-toggle-label',
-    { type: 'workspace-zen-mode-toggle-requested' },
-    {
-      helpLabelKey: 'workspace.zen-mode-toggle-label',
-      accelerator: 'CmdOrCtrl+B',
-    },
-  ),
-  clientMenuCommand(
-    'view-refresh',
-    'menu.view.refresh',
-    { type: 'workspace-refresh-requested' },
-    {
-      helpLabelKey: 'help.row.refresh',
-      accelerator: 'CmdOrCtrl+U',
-    },
-  ),
-  clientMenuCommand(
-    'window-next-workspace',
-    'menu.window.next-workspace',
-    { type: 'cycle-workspace-requested', direction: 1 },
-    {
-      helpLabelKey: 'help.row.next-workspace',
-      accelerator: 'CmdOrCtrl+Shift+]',
-    },
-  ),
-  clientMenuCommand(
-    'window-prev-workspace',
-    'menu.window.prev-workspace',
-    { type: 'cycle-workspace-requested', direction: -1 },
-    {
-      helpLabelKey: 'help.row.prev-workspace',
-      accelerator: 'CmdOrCtrl+Shift+[',
-    },
-  ),
-  clientMenuCommand('window-reset-layout', 'menu.window.reset-window', { type: 'layout-reset-requested' }),
-  clientMenuCommand('help-shortcuts', 'menu.help.shortcuts', { type: 'open-settings-requested', page: 'shortcuts' }),
+export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = [
+  { accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' },
 ]
-
-export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
-  'file-new-terminal-tab',
-  'file-create-worktree',
-  'file-open-local-workspace',
-  'file-clone-repo',
-  'file-close-workspace-tab',
-  'view-refresh',
-]).concat([{ accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' }])
-
-export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
-  'window-next-workspace',
-  'window-prev-workspace',
-])
-
-export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts(['view-toggle-zen-mode'])
 
 export const CLIENT_KEYBOARD_SHORTCUTS: ClientKeyboardShortcutDefinition[] = [
   ...CLIENT_NAVIGATION_SHORTCUTS,
@@ -279,12 +81,6 @@ export function matchClientKeyboardShortcut(input: {
   return matchKeyboardShortcut(CLIENT_KEYBOARD_SHORTCUTS, input)
 }
 
-export function clientMenuCommandById(id: ClientMenuCommandId): ClientMenuCommandDefinition {
-  const command = CLIENT_MENU_COMMANDS.find((candidate) => candidate.id === id)
-  if (!command) throw new Error(`Unknown client menu command: ${id}`)
-  return command
-}
-
 function keyboardShortcut<Action extends ClientKeyboardShortcutAction>(
   matches: KeyboardShortcutMatch[],
   action: Action,
@@ -301,15 +97,6 @@ function branchActionShortcut(
   labelKey: DictKey,
 ): BranchActionShortcutDefinition {
   return { matches, action, combos, labelKey }
-}
-
-function clientMenuCommand(
-  id: ClientMenuCommandId,
-  menuLabelKey: DictKey,
-  intent: ClientEffectIntent,
-  options: Omit<Partial<ClientMenuCommandDefinition>, 'id' | 'menuLabelKey' | 'intent'> = {},
-): ClientMenuCommandDefinition {
-  return { id, menuLabelKey, intent, ...options }
 }
 
 function matchKeyboardShortcut<Action extends string>(
@@ -330,14 +117,4 @@ function keyboardShortcutMatch(
   if (match.code !== undefined && input.code !== match.code) return false
   if (match.shiftKey !== undefined && input.shiftKey !== match.shiftKey) return false
   return true
-}
-
-function clientMenuAcceleratorShortcuts(ids: ClientMenuCommandId[]): AcceleratorShortcutDefinition[] {
-  return ids.map((id) => {
-    const command = clientMenuCommandById(id)
-    const { accelerator } = command
-    if (!accelerator || !command.helpLabelKey)
-      throw new Error(`Client menu command ${id} is missing help shortcut metadata`)
-    return { accelerator, labelKey: command.helpLabelKey }
-  })
 }

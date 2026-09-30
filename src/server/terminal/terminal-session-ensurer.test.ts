@@ -1,3 +1,4 @@
+import { createGoblinCommandLauncher } from '#/server/terminal/g-command.ts'
 // @vitest-environment node
 
 import path from 'node:path'
@@ -147,16 +148,16 @@ describe('terminal session ensurer', () => {
     })
   })
 
-  test('injects the durable terminal session id into the prepared local PTY environment', async () => {
+  test('injects the durable terminal session id into the prepared local PTY environment', async (testContext) => {
+    const launcher = createGoblinCommandLauncher(['/app/goblin'])
+    testContext.onTestFinished(launcher.dispose)
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId))
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
       gCommand: {
         serverUrl: 'http://127.0.0.1:32100',
         accessToken: 'secret',
-        entryPath: import.meta.filename,
-        binDir: path.resolve('resources/terminal-bin'),
-        nodePath: process.execPath,
+        binDir: launcher.binDir,
       },
     })
     const context = ensureContext({
