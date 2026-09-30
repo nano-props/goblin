@@ -71,3 +71,7 @@ Use this doc for UI language and presentation rules.
   — rendering one `<div role="status" aria-live="polite">` per state
   flip causes screen readers to re-announce the same label every time
   Vue unmounts and remounts the node.
+
+Browser-reserved shortcuts such as Ctrl/Cmd+T, N, and W retain their browser
+meaning. Do not advertise them as application commands; workspace actions
+remain available through their visible controls.

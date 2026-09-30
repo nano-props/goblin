@@ -52,7 +52,6 @@ import type {
   TerminalDescriptor,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/terminal/components/types.ts'
-import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -80,7 +79,6 @@ import {
   observeWorkspacePaneRouteForTest,
   observedAppNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type ObservedBranchRouteNavigationForTest,
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'

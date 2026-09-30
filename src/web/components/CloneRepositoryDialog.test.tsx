@@ -1,12 +1,10 @@
 // @vitest-environment jsdom
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog, type CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
-import { WEB_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CodedError } from '#/shared/coded-error.ts'
@@ -15,17 +13,12 @@ const feedbackMocks = vi.hoisted(() => ({ warning: vi.fn() }))
 
 vi.mock('vue-sonner', () => ({ toast: { warning: feedbackMocks.warning } }))
 
-const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { __GOBLIN_BOOTSTRAP__?: unknown }
 
 beforeEach(() => {
   feedbackMocks.warning.mockReset()
   setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'web',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...WEB_CLIENT_CAPABILITIES],
-    },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   // Host info used to live in the bootstrap payload; it now
@@ -38,11 +31,6 @@ beforeEach(() => {
     status: 'ready',
     error: null,
   })
-  // Use `defineProperty` with `writable: true` so a previous test that
-  // installed a read-only descriptor (via `defineProperty` without writable)
-  // doesn't leave this assignment throwing `Cannot assign to read only
-  // property 'goblinNative'`. All such property writes should opt into the
-  // same shape so cross-test isolation stays predictable.
 })
 
 afterEach(() => {

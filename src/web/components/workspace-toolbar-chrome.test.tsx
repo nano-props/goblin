@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
-
 import { describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceChrome, WorkspaceToolbar } from '#/web/components/workspace-toolbar-chrome.tsx'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 
 describe('WorkspaceToolbar', () => {
   test('owns workspace chrome without inheriting a generic toolbar gap', () => {
@@ -21,7 +20,7 @@ describe('WorkspaceToolbar', () => {
     expect(toolbar?.className).toContain('border-border/60')
     expect(toolbar?.className).not.toContain('gap-2')
     expect(toolbar?.className).not.toContain('goblin-workspace-toolbar--compact')
-    expect(toolbar?.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+    expect(toolbar?.style.height).toBe(`${WORKSPACE_TOOLBAR_HEIGHT_PX}px`)
     expect(container.querySelector('[data-testid="body"]')).not.toBeNull()
   })
 

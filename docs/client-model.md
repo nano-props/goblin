@@ -9,7 +9,7 @@ Use this doc for the server-first client model.
 - Prefer shared server-backed terminal, session, and realtime paths across browser clients.
 - Keep client identity semantics aligned across browser clients:
   - `userId`: authenticated terminal user. The server partitions session visibility, lifecycle cleanup, and realtime fanout by this id.
-  - `clientId`: logical client for one loaded browser page . It validates and routes requests, but it does not own sessions.
+  - `clientId`: logical client for one loaded browser page. It validates and routes requests, but it does not own sessions.
   - Describe reconnect, mirror, and takeover in user/client/attachment terms, not operating-system window terms. In the terminal wire protocol, the attachment/controller identity is represented by `clientId`; do not introduce a separate `attachmentId` for multiple independent views inside one client, because that product mode is intentionally out of scope.
 
 ## Repository read models
@@ -35,3 +35,10 @@ Use this doc for the server-first client model.
   carry a full repository snapshot. Repository snapshots have one client cache
   submission path: the snapshot query converges from server-published
   invalidation without a mutation read-back or client-side cache replacement.
+
+## Recent workspaces
+
+The server persists the recent-workspace list. Browser clients read, open, and
+clear that list through the server contracts. Local workspace paths refer to
+the server filesystem; SSH workspaces retain their remote locator. Switching
+servers selects that server’s history, not a browser-local recent-path list.

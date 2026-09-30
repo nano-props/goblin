@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { WEB_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/bridge/types.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -16,19 +15,6 @@ const executionTarget = {
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-    initialServer: null,
-    ...overrides,
-  }
-}
-
-function browserBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
-  return {
-    runtime: {
-      kind: 'web',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...WEB_CLIENT_CAPABILITIES],
-    },
     initialServer: null,
     ...overrides,
   }
@@ -52,7 +38,7 @@ function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
 
 function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
   return {
-    getBootstrap: () => browserBootstrap(),
+    getBootstrap: () => webBootstrap(),
 
     saveClipboardFiles: () => Promise.resolve([]),
 
@@ -84,7 +70,6 @@ describe('repo-client', () => {
 
   test('opens repository branch URLs in the browser', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    window.open = vi.fn(() => null)
     const bridgeModule = await import('#/web/bridge/client.ts')
     window.open = vi.fn(() => null)
     bridgeModule.setClientBridgeForTests(
@@ -162,7 +147,7 @@ describe('repo-client', () => {
     )
   })
 
-  test('clones repositories through the embedded server over HTTP', async () => {
+  test('clones repositories through the server over HTTP', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = mockFetch(async () => ({
       ok: true,
@@ -502,7 +487,7 @@ describe('repo-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: browserBootstrap({
+        __GOBLIN_BOOTSTRAP__: webBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
 

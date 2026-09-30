@@ -1,10 +1,5 @@
-// HTTP API response types and native bridge IPC types shared by
-// main, server, and client. Domain types live in their own
-// modules (#/shared/git-types.ts, #/shared/settings.ts, etc.);
-// this file aggregates what crosses process/transport boundaries.
-
-import * as v from 'valibot'
-import { CodedError } from '#/shared/coded-error.ts'
+// HTTP API response types shared by the server and browser client.
+// Domain types live in their own modules.
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   BranchSnapshotInfo,

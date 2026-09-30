@@ -33,6 +33,6 @@ export function hasClientServerConfig(): boolean {
 
 export function requireClientServerConfig(): ClientServerConfig {
   const server = resolveClientServerConfig()
-  if (!server) throw new Error('Embedded server unavailable')
+  if (!server) throw new Error('Server unavailable')
   return server
 }

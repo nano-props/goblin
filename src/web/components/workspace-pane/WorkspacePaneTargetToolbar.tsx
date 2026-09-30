@@ -29,10 +29,7 @@ import type {
   WorkspacePaneFilesystemTarget,
   WorkspacePaneSurfaceTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  workspacePaneFilesystemTerminalBase,
-  workspacePaneTabsTargetForFilesystemTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneTabsTargetForFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'

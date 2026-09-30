@@ -29,9 +29,6 @@ interface AppNavigationStoreActions extends RuntimeCoherentWorkspaceNavigationSt
 
 interface WorkspacePickerStoreActions extends RuntimeCoherentWorkspaceOpenStoreActions {}
 
-interface ClientEffectIntentStoreActions
-  extends RuntimeCoherentWorkspaceOpenStoreActions, RestorableWorkspaceLayoutStoreActions {}
-
 export function runtimeCoherentWorkspaceOpenStoreActionsFromStore(
   state: RuntimeCoherentWorkspaceOpenStoreActions,
 ): RuntimeCoherentWorkspaceOpenStoreActions {
@@ -95,18 +92,5 @@ export function workspacePickerStoreActionsFromStore(state: WorkspacePickerStore
   })
   return {
     openWorkspaceMembership: runtimeCoherent.openWorkspaceMembership,
-  }
-}
-
-export function clientEffectIntentStoreActionsFromStore(
-  state: ClientEffectIntentStoreActions,
-): ClientEffectIntentStoreActions {
-  const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
-    openWorkspaceMembership: state.openWorkspaceMembership,
-  })
-  return {
-    openWorkspaceMembership: runtimeCoherent.openWorkspaceMembership,
-    resetLayout: state.resetLayout,
-    toggleZenMode: state.toggleZenMode,
   }
 }

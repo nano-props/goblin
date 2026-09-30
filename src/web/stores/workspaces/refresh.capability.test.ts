@@ -6,7 +6,7 @@ import {
   branch,
   REPO_ID,
   resetRefreshTest,
-  ipcHandlers,
+  serverHandlers,
   seedRepo,
   repoSnapshotResponse,
   refreshStoreAccess,
@@ -37,7 +37,7 @@ describe('workspace refresh capability', () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-refresh'
     seedFilesystemWorkspace(workspaceRuntimeId)
     const projection = vi.fn(async () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' }))
-    ipcHandlers['workspace.refresh'] = () => ({
+    serverHandlers['workspace.refresh'] = () => ({
       kind: 'committed',
       probe: {
         status: 'ready',
@@ -49,7 +49,7 @@ describe('workspace refresh capability', () => {
         diagnostics: [],
       },
     })
-    ipcHandlers['repo.snapshot'] = projection
+    serverHandlers['repo.snapshot'] = projection
 
     await runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
@@ -61,9 +61,9 @@ describe('workspace refresh capability', () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     const fetch = vi.fn()
     const projection = vi.fn()
-    ipcHandlers['repo.fetch'] = fetch
-    ipcHandlers['repo.snapshot'] = projection
-    ipcHandlers['workspace.refresh'] = () => ({
+    serverHandlers['repo.fetch'] = fetch
+    serverHandlers['repo.snapshot'] = projection
+    serverHandlers['workspace.refresh'] = () => ({
       kind: 'committed',
       probe: {
         status: 'ready',
@@ -104,9 +104,9 @@ describe('workspace refresh capability', () => {
     const before = workspacesStore.getState().workspaces[REPO_ID]!.capability.probe
     const fetch = vi.fn()
     const projection = vi.fn()
-    ipcHandlers['repo.fetch'] = fetch
-    ipcHandlers['repo.snapshot'] = projection
-    ipcHandlers['workspace.refresh'] = () => ({
+    serverHandlers['repo.fetch'] = fetch
+    serverHandlers['repo.snapshot'] = projection
+    serverHandlers['workspace.refresh'] = () => ({
       kind: 'failed',
       probe: {
         status: 'ready',
@@ -133,7 +133,7 @@ describe('workspace refresh capability', () => {
   test('returns transport failures for a plain Workspace without creating Git state', async () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-failed-refresh'
     seedFilesystemWorkspace(workspaceRuntimeId)
-    ipcHandlers['workspace.refresh'] = () => {
+    serverHandlers['workspace.refresh'] = () => {
       throw new Error('workspace transport unavailable')
     }
 
@@ -150,7 +150,7 @@ describe('workspace refresh capability', () => {
     seedFilesystemWorkspace(workspaceRuntimeId)
     const response = Promise.withResolvers<WorkspaceRefreshResult>()
     const refreshRequest = vi.fn(() => response.promise)
-    ipcHandlers['workspace.refresh'] = refreshRequest
+    serverHandlers['workspace.refresh'] = refreshRequest
 
     const refresh = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(refreshRequest).toHaveBeenCalledOnce())
@@ -168,8 +168,8 @@ describe('workspace refresh capability', () => {
       workspacePaneTabsByTargetByWorkspace: {}
     }>()
     const removeWorkspaceEntry = vi.fn(() => removeMembership.promise)
-    ipcHandlers['settings.removeWorkspaceEntry'] = removeWorkspaceEntry
-    ipcHandlers['workspace.refresh'] = () => ({
+    serverHandlers['settings.removeWorkspaceEntry'] = removeWorkspaceEntry
+    serverHandlers['workspace.refresh'] = () => ({
       kind: 'committed',
       probe: {
         status: 'ready',
@@ -183,7 +183,7 @@ describe('workspace refresh capability', () => {
     })
     const projectionResponse = Promise.withResolvers<RepoSnapshotResponse>()
     const projection = vi.fn(() => projectionResponse.promise)
-    ipcHandlers['repo.snapshot'] = projection
+    serverHandlers['repo.snapshot'] = projection
 
     const closing = workspacesStore.getState().closeWorkspace(REPO_ID)
     await vi.waitFor(() => expect(removeWorkspaceEntry).toHaveBeenCalledOnce())

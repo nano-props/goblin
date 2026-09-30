@@ -17,7 +17,8 @@ The server sits between `g` and the client on the control plane. It does not int
 
 The server owns the CLI broker because:
 
-- The server owns the CLI broker and delivers commands to authenticated browser clients.
+- The server can identify the authenticated browser client attached to the
+  requesting terminal.
 - The client has one shared intent router. A new producer adds a subscription,
   not another routing model.
 - HTTP and WS share the same auth and lifecycle. Adding a separate IPC channel would mean a third transport with its own auth model and lifecycle.
@@ -62,7 +63,8 @@ For a command that needs a client intent, no listening window produces the same 
 
 - It is not a general CLI for repo operations. Server-owned capabilities stay behind their owning applications; `g` reaches them only through the consolidated command endpoint for user-facing terminal actions.
 - It is not a place for backend logic. Server-side operations stay in their owning repo, terminal, or settings applications behind the consolidated route. `g` is a wrapper, not a peer.
-- UI actions and CLI commands use the same client intent router.
+- The client intent router handles CLI view requests and terminal notification
+  clicks. Ordinary UI actions call their owning application commands directly.
 
 ## Adding a command
 

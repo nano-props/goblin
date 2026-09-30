@@ -56,14 +56,7 @@ export const CLIENT_APP_SHORTCUTS: ClientKeyboardShortcutDefinition<ClientAppSho
   keyboardShortcut([{ key: 'Escape' }], 'dismiss', [['Esc']], 'help.row.dismiss'),
 ]
 
-export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+T'
-export const CREATE_WORKTREE_SHORTCUT = 'CmdOrCtrl+N'
-export const CLOSE_WORKSPACE_TAB_SHORTCUT = 'CmdOrCtrl+W'
-
 export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = [
-  { accelerator: NEW_TERMINAL_TAB_SHORTCUT, labelKey: 'help.row.new-terminal' },
-  { accelerator: CREATE_WORKTREE_SHORTCUT, labelKey: 'help.row.create-worktree' },
-  { accelerator: CLOSE_WORKSPACE_TAB_SHORTCUT, labelKey: 'help.row.close-workspace-tab' },
   { accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' },
 ]
 

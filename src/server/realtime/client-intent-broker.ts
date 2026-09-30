@@ -8,8 +8,7 @@ interface ClientIntentSocket {
 // Cap the number of concurrent client-intent subscribers. Same
 // rationale as `invalidation-broker.ts`: a hostile client that
 // keeps opening `/ws/client-intent` connections shouldn't pin
-// file descriptors or fanout cost in the server. 32 is generous
-// for a desktop app with at most a few tabs / windows.
+// file descriptors or unbounded fanout cost in the server.
 export const MAX_CLIENT_INTENT_SOCKETS = 32
 
 export class ClientIntentSocketLimitError extends Error {

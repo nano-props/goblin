@@ -26,15 +26,14 @@ import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   externalAppsQueryKey,
-  lanInfoQueryKey,
   updateGitHubCliCache,
   updateWorkspaceSettingsStateCache,
   updateRuntimeRecentWorkspacesStateCache,
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings/query-cache.ts'
 
-// Settings actions commit to the embedded server first. TanStack Query is the
-// window-local projection of that server result, never an independent source.
+// Settings actions commit to the server first. TanStack Query is the
+// browser projection of that server result, never an independent source.
 export async function recordRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<void> {
   const result = await addRecentWorkspace(workspace)
   updateRuntimeRecentWorkspacesStateCache(appQueryClient, { recentWorkspaces: result.recentWorkspaces })

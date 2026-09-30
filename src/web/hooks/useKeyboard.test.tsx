@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import {
   workspacePaneLocationForBranchTarget,
-  workspacePaneLocationForLinkedWorktree,
-  workspacePaneLocationForRoot,
   workspacePaneLocationForWorktree,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
-
 import {
   createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
@@ -40,23 +37,16 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
-import type {
-  TerminalCreateOptions,
-  TerminalFilesystemTargetSnapshot,
-  TerminalFocusRequest,
-} from '#/web/terminal/components/types.ts'
-import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
-import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
-import { repoOperationsQueryKey, repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
-import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const branchShortcutMocks = vi.hoisted(() => ({
   runBranchActionShortcut: vi.fn(),
@@ -66,7 +56,6 @@ vi.mock('#/web/keyboard/branch-action-shortcuts.ts', () => ({
   runBranchActionShortcut: branchShortcutMocks.runBranchActionShortcut,
 }))
 
-const testWindow = window as unknown as { goblinNative?: unknown }
 const originalNavigatorPlatform = window.navigator.platform
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/keyboard-repo')
 const REPO_PATH = '/tmp/keyboard-repo'
@@ -86,7 +75,6 @@ interface HookHostOptions {
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void
-  openCreateWorktree: () => void
   navigation: AppNavigationActions
 }
 
@@ -431,7 +419,6 @@ describe('useKeyboard', () => {
   })
 
   test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
-    installNativeBridgeStub()
     seedTabbedWorktreeRepoForTest('status')
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
@@ -481,222 +468,6 @@ describe('useKeyboard', () => {
     terminalHost.remove()
   })
 
-  test('primary modifier plus t dispatches every keydown event including autorepeat', async () => {
-    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedTabbedWorktreeRepoForTest('terminal')
-    const createTerminal = vi.fn(async (_base: unknown, _options?: TerminalCreateOptions) =>
-      Promise.resolve('term-222222222222222222222'),
-    )
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
-      createTerminal,
-      createTerminalWithAdmission: vi.fn(async (base, options) => ({
-        terminalSessionId: await createTerminal(base, options),
-        presentation: base.presentation,
-        requestRole: 'leader' as const,
-        resourceDisposition: 'created' as const,
-        runtimeProjectionApplied: true,
-      })),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
-    await renderHookHost({
-      currentWorkspaceId: REPO_ID,
-      currentBranchName: 'feature/worktree',
-      currentWorkspacePaneCommandTarget: currentTerminalPaneCommandTargetForTest(),
-    })
-
-    const initialShortcut = keyboardEventForTest('keydown', {
-      key: 't',
-      code: 'KeyT',
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    const repeatedShortcut = keyboardEventForTest('keydown', {
-      key: 't',
-      code: 'KeyT',
-      ctrlKey: true,
-      repeat: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    await flushTestUpdates(async () => {
-      window.dispatchEvent(initialShortcut)
-      window.dispatchEvent(repeatedShortcut)
-      await Promise.resolve()
-    })
-
-    await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(2))
-    expect(initialShortcut.defaultPrevented).toBe(true)
-    expect(repeatedShortcut.defaultPrevented).toBe(true)
-  })
-
-  test('dispatches Ctrl+T without waiting for the initiating key to be released', async () => {
-    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedTabbedWorktreeRepoForTest('terminal')
-    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
-    const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
-      createTerminal,
-      createTerminalWithAdmission: vi.fn(async (base) => ({
-        terminalSessionId: await createTerminal(),
-        presentation: base.presentation,
-        requestRole: 'leader' as const,
-        resourceDisposition: 'created' as const,
-        runtimeProjectionApplied: true,
-      })),
-      selectTerminal: vi.fn(),
-      focusTerminal,
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
-    await renderHookHost({
-      currentWorkspaceId: REPO_ID,
-      currentBranchName: 'feature/worktree',
-      currentWorkspacePaneCommandTarget: currentTerminalPaneCommandTargetForTest(),
-    })
-    seedInitialObservedWorkspacePaneRouteForTest({
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: workspaceRuntimeIdForTest(),
-      branchName: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-      route: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-    })
-    const shortcut = keyboardEventForTest('keydown', {
-      key: 't',
-      code: 'KeyT',
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    await flushTestUpdates(async () => {
-      document.body.dispatchEvent(
-        keyboardEventForTest('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true }),
-      )
-      document.body.dispatchEvent(shortcut)
-      await Promise.resolve()
-    })
-    await vi.waitFor(() =>
-      expect(observedWorkspacePaneRouteForTarget(REPO_ID, 'feature/worktree')).toEqual({
-        kind: 'terminal',
-        terminalSessionId: 'term-222222222222222222222',
-      }),
-    )
-
-    expect(shortcut.defaultPrevented).toBe(true)
-    expect(createTerminal).toHaveBeenCalledOnce()
-    await vi.waitFor(() => expect(focusTerminal).toHaveBeenCalledOnce())
-    expect(focusTerminal.mock.calls[0]![1]?.isCurrent()).toBe(true)
-    focusTerminal.mock.calls[0]![1]?.onSettled?.()
-  })
-
-  test('primary modifier plus t creates a terminal for a workspace root target', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [],
-      currentBranchName: null,
-      workspaceProbe: {
-        status: 'ready',
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'unavailable' },
-        },
-        diagnostics: [],
-      },
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: workspaceRuntimeIdForTest(),
-      tabs: [],
-    })
-    const createTerminal = vi.fn(async (_base: unknown, _options?: TerminalCreateOptions) =>
-      Promise.resolve('term-222222222222222222222'),
-    )
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: (terminalFilesystemTargetKey) => ({
-        terminalFilesystemTargetKey,
-        selectedDescriptor: null,
-        sessions: [],
-        count: 0,
-        bellCount: 0,
-        outputActiveCount: 0,
-        createPending: false,
-      }),
-      createTerminal,
-      createTerminalWithAdmission: vi.fn(async (base, options) => ({
-        terminalSessionId: await createTerminal(base, options),
-        presentation: base.presentation,
-        requestRole: 'leader' as const,
-        resourceDisposition: 'created' as const,
-        runtimeProjectionApplied: true,
-      })),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
-    await renderHookHost({
-      currentWorkspaceId: REPO_ID,
-      currentBranchName: null,
-      currentWorkspacePaneCommandTarget: {
-        location: workspacePaneLocationForRoot(REPO_ID, workspaceRuntimeIdForTest()),
-        workspacePaneRoute: null,
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'unavailable' },
-        },
-      },
-    })
-
-    await dispatchPrimaryShortcut('t', 'KeyT')
-
-    expect(createTerminal).toHaveBeenCalledWith(
-      terminalSessionBaseForTest({
-        repoRoot: REPO_ID,
-        workspaceRuntimeId: workspaceRuntimeIdForTest(),
-        branch: null,
-        worktreePath: REPO_PATH,
-      }),
-      undefined,
-    )
-  })
-
-  test('primary modifier plus n opens the create worktree dialog', async () => {
-    seedCurrentWorktreeRepoForTest()
-    const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
-
-    await dispatchPrimaryShortcut('n', 'KeyN')
-
-    expect(openCreateWorktree).toHaveBeenCalledTimes(1)
-    expect(toast.error).not.toHaveBeenCalled()
-  })
-
-  test('primary modifier plus n no-ops when there is no current repo', async () => {
-    const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentWorkspaceId: null, openCreateWorktree })
-
-    await dispatchPrimaryShortcut('n', 'KeyN')
-
-    expect(openCreateWorktree).not.toHaveBeenCalled()
-    expect(toast.error).not.toHaveBeenCalled()
-  })
-
-  test('primary modifier plus n does not open create worktree while workspace shortcuts are suppressed', async () => {
-    seedCurrentWorktreeRepoForTest()
-    const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree, isWorkspaceShortcutSuppressed: () => true })
-
-    const shortcut = await dispatchPrimaryShortcut('n', 'KeyN', { cancelable: true })
-
-    expect(openCreateWorktree).not.toHaveBeenCalled()
-    expect(shortcut.defaultPrevented).toBe(true)
-  })
-
   test('does not consume unowned primary-modifier combinations', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     await renderHookHost()
@@ -717,174 +488,11 @@ describe('useKeyboard', () => {
     expect(copy.defaultPrevented).toBe(false)
   })
 
-  test('primary modifier plus n does not open create worktree while a branch action is busy', async () => {
+  test.each(['t', 'n', 'w'])('leaves browser-owned Ctrl/Cmd+%s shortcuts untouched', async (key) => {
     seedCurrentWorktreeRepoForTest()
-    workspacesStore.setState((state) => {
-      const repo = state.workspaces[REPO_ID]
-      if (repo?.capability.kind !== 'git') return state
-      const branchAction = {
-        ...repo.capability.git.operations.branchAction,
-        phase: 'running' as const,
-        reason: 'branch:createWorktree' as const,
-        target: 'feature/worktree',
-      }
-      const operations = { ...repo.capability.git.operations, branchAction }
-      return {
-        workspaces: {
-          ...state.workspaces,
-          [REPO_ID]: {
-            ...repo,
-            capability: { ...repo.capability, git: { ...repo.capability.git, operations } },
-          },
-        },
-      }
-    })
-    const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
-
-    await dispatchPrimaryShortcut('n', 'KeyN')
-
-    expect(openCreateWorktree).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
-  })
-
-  test('primary modifier plus n reads busy state from server operations projection', async () => {
-    const repo = seedCurrentWorktreeRepoForTest()
-    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
-      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
-      lastFetchAt: null,
-      loadedAt: 123,
-    })
-    const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
-
-    await dispatchPrimaryShortcut('n', 'KeyN')
-
-    expect(openCreateWorktree).not.toHaveBeenCalled()
-    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
-  })
-
-  test('primary modifier plus n does not project retained operations after a canonical read error', async () => {
-    const repo = seedCurrentWorktreeRepoForTest()
-    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
-      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
-      lastFetchAt: null,
-      loadedAt: 123,
-    })
-    const queryKey = repoOperationsQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
-    if (!query) throw new Error('Missing operations query')
-    query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
-    const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
-
-    await dispatchPrimaryShortcut('n', 'KeyN')
-
-    expect(openCreateWorktree).toHaveBeenCalledOnce()
-    expect(toast.error).not.toHaveBeenCalled()
-  })
-
-  test('does not dispatch workspace-pane shortcuts from the dashboard route', async () => {
-    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => ({
-      kind: 'committed' as const,
-      projection: 'applied' as const,
-    }))
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
-      createTerminal,
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor,
-    })
-
-    await renderHookHost({ currentWorkspaceId: REPO_ID, currentWorkspacePaneCommandTarget: null })
-
-    await flushTestUpdates(async () => {
-      window.dispatchEvent(keyboardEventForTest('keydown', { key: 't', code: 'KeyT', ctrlKey: true }))
-      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
-      window.dispatchEvent(keyboardEventForTest('keydown', { key: '1', code: 'Digit1', ctrlKey: true }))
-      await Promise.resolve()
-    })
-
-    expect(createTerminal).not.toHaveBeenCalled()
-    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
-  })
-
-  test('primary modifier plus w closes the selected terminal tab', async () => {
-    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedTabbedWorktreeRepoForTest('terminal')
-    const closeTerminalByDescriptor = vi.fn(async () => ({
-      kind: 'committed' as const,
-      projection: 'applied' as const,
-    }))
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
-      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor,
-    })
-    await renderHookHost({
-      currentWorkspaceId: REPO_ID,
-      currentBranchName: 'feature/worktree',
-      currentWorkspacePaneCommandTarget: currentTerminalPaneCommandTargetForTest(),
-    })
-
-    await flushTestUpdates(async () => {
-      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
-      await Promise.resolve()
-    })
-
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith(
-      'term-111111111111111111111',
-      terminalSessionBaseForTest({
-        repoRoot: REPO_ID,
-        workspaceRuntimeId: workspaceRuntimeIdForTest(),
-        branch: 'feature/worktree',
-        worktreePath: WORKTREE_PATH,
-      }),
-    )
-
-    const repeatedClose = keyboardEventForTest('keydown', {
-      key: 'w',
-      code: 'KeyW',
-      ctrlKey: true,
-      repeat: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    await flushTestUpdates(async () => {
-      window.dispatchEvent(repeatedClose)
-      await Promise.resolve()
-    })
-
-    expect(repeatedClose.defaultPrevented).toBe(true)
-    await vi.waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledTimes(2))
-
-    const secondClose = keyboardEventForTest('keydown', {
-      key: 'w',
-      code: 'KeyW',
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    await flushTestUpdates(async () => {
-      document.body.dispatchEvent(keyboardEventForTest('keyup', { key: 'w', code: 'KeyW', ctrlKey: true }))
-      document.body.dispatchEvent(secondClose)
-      await Promise.resolve()
-    })
-
-    expect(secondClose.defaultPrevented).toBe(true)
-    await vi.waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledTimes(3))
+    await renderHookHost({ currentWorkspaceId: REPO_ID })
+    const event = await dispatchPrimaryShortcut(key, `Key${key.toUpperCase()}`, { cancelable: true })
+    expect(event.defaultPrevented).toBe(false)
   })
 })
 
@@ -921,18 +529,6 @@ function seedTabbedWorktreeRepoForTest(preferredWorkspacePaneTab: 'status' | 'te
   })
 }
 
-function currentTerminalPaneCommandTargetForTest(): WorkspacePaneCommandTarget {
-  return {
-    location: workspacePaneLocationForLinkedWorktree(
-      { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-      workspaceRuntimeIdForTest(),
-      { kind: 'branch', branchName: 'feature/worktree' },
-    ),
-    workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-    capabilities: FILESYSTEM_CAPABILITIES,
-  }
-}
-
 async function dispatchBranchShortcut(key: string, code: string): Promise<KeyboardEvent> {
   const shortcut = keyboardEventForTest('keydown', { key, code })
   await flushTestUpdates(async () => {
@@ -956,35 +552,6 @@ async function dispatchPrimaryShortcut(
   return shortcut
 }
 
-function serverOperation(
-  workspaceRuntimeId: string,
-  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
-): RepoServerOperationState {
-  return {
-    id: `repo-op-${overrides.kind}-${overrides.phase}`,
-    repoId: REPO_ID,
-    workspaceRuntimeId,
-    kind: overrides.kind,
-    phase: overrides.phase,
-    source: 'user',
-    target: null,
-    queuedAt: 100,
-    startedAt: overrides.phase === 'queued' ? null : 101,
-    deadlineAt: null,
-    settledAt: null,
-    error: null,
-    cancellation: {
-      underlyingRequested: false,
-      reason: null,
-      requestedAt: null,
-      waitCancelledCount: 0,
-      lastWaitCancelledAt: null,
-      lastWaitCancellationReason: null,
-    },
-    canCancelUnderlying: true,
-  }
-}
-
 const HookHost = defineComponent<Partial<HookHostOptions>>({
   name: 'KeyboardTestHost',
   props: [
@@ -995,7 +562,6 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
     'isWorkspaceShortcutSuppressed',
     'isSettingsOpen',
     'onExitSettings',
-    'openCreateWorktree',
     'navigation',
   ],
 
@@ -1043,7 +609,6 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
       isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
       isSettingsOpen: overrides.isSettingsOpen ?? (() => false),
       onExitSettings: overrides.onExitSettings ?? (() => {}),
-      openCreateWorktree: overrides.openCreateWorktree ?? (() => {}),
     })
     return () => null
   },
@@ -1071,8 +636,6 @@ function workspaceRuntimeIdForTest(): string {
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
   return repo.workspaceRuntimeId
 }
-
-function installNativeBridgeStub() {}
 
 function terminalFilesystemTargetSnapshot(): TerminalFilesystemTargetSnapshot {
   return {

@@ -2,7 +2,7 @@
 //
 // Many web tests want to stub `globalThis.fetch` so that the client code
 // under test (e.g. a repository or settings client) doesn't actually
-// hit the embedded server. Each test wants a slightly different response —
+// hit the server. Each test wants a slightly different response —
 // some want to assert call shape, some want to return canned data per
 // `mockResolvedValueOnce`, others want a single canned response for the
 // whole test.
@@ -24,7 +24,6 @@
 // Most web tests that previously hand-rolled
 // `const fetchMock = vi.fn(...); vi.stubGlobal('fetch', fetchMock)`
 // can be simplified to `const fetchMock = mockFetch()`.
-
 import { vi } from 'vitest'
 
 type FetchMock = ReturnType<typeof vi.fn>

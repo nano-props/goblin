@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/bridge/types.ts'
 
 function installWindow(openReturn: unknown = {}) {
@@ -19,7 +18,6 @@ function installWindow(openReturn: unknown = {}) {
 function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
   return {
     getBootstrap: () => ({
-      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     }),
 
@@ -49,7 +47,7 @@ describe('app shell client', () => {
     installWindow()
   })
 
-  test('opens external URLs in the browser when no native host is available', async () => {
+  test('opens external URLs in the browser', async () => {
     const { openExternalUrl } = await import('#/web/app/shell-client.ts')
     await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')

@@ -1,12 +1,12 @@
 import type { CSSProperties, FunctionalComponent } from 'vue'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { InteractiveRegion } from '#/web/components/interactive-region.tsx'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 const ZEN_REVEAL_RESIZE_HIT_TARGET_STYLE = {
-  top: `${TITLE_BAR_HEIGHT_PX}px`,
-  height: `calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`,
+  top: `${WORKSPACE_TOOLBAR_HEIGHT_PX}px`,
+  height: `calc(100% - ${WORKSPACE_TOOLBAR_HEIGHT_PX}px)`,
 } satisfies CSSProperties
 
 export type ResizeRailState = 'idle' | 'hover' | 'drag'

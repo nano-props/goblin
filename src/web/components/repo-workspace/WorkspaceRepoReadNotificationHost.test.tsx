@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-
 import { screen } from '@testing-library/vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { WorkspaceRepoReadNotificationHost } from '#/web/components/repo-workspace/WorkspaceRepoReadNotificationHost.tsx'
@@ -54,7 +53,7 @@ describe('WorkspaceRepoReadNotificationHost', () => {
     const host = await screen.findByTestId('workspace-repo-read-notification')
     expect(screen.getAllByTestId('repo-read-notification')).toHaveLength(1)
     expect(host.getAttribute('role')).toBe('status')
-    expect(host.style.top).toBe(`${TITLE_BAR_HEIGHT_PX + 12}px`)
+    expect(host.style.top).toBe(`${WORKSPACE_TOOLBAR_HEIGHT_PX + 12}px`)
     expect(host.textContent).toContain('status.stale-title')
     const snapshotReadsBeforeRetry = readSnapshot.mock.calls.length
     const statusReadsBeforeRetry = readStatus.mock.calls.length

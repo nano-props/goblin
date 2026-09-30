@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import {
   createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
@@ -286,7 +285,7 @@ describe('useClientWorkspacePersistence', () => {
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
-    writePresentationMock.mockRejectedValueOnce(new Error('native write failed'))
+    writePresentationMock.mockRejectedValueOnce(new Error('presentation write failed'))
 
     renderInJsdom(<Harness routedWorkspaceId={repo.id} />)
     await Promise.resolve()

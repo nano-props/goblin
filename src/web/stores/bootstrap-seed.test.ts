@@ -1,23 +1,14 @@
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES, type ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 
 function installBridge() {
-  // The bootstrap is now just the Electron preload's IPC seed
-  // (homeDir, platform, initialServer). i18n and settings are
-  // fetched on boot from `/api/settings/*` — they no longer live
-  // on the bootstrap. We set `__GOBLIN_BOOTSTRAP__` for state and
-  // a minimal `goblinNative` to satisfy the bridge detection.
+  // Settings and i18n are hydrated from the server, not the bootstrap.
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
       __GOBLIN_BOOTSTRAP__: {
-        runtime: {
-          kind: 'web',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [...WEB_CLIENT_CAPABILITIES],
-        },
         initialServer: null,
       } satisfies ClientBootstrapSnapshot,
     },

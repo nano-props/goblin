@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -137,7 +136,6 @@ describe('server-fetch', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
-        runtime: { kind: 'web', bridgeVersion: 1, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32101/', accessToken: 'secret' },
       },
     })

@@ -1,12 +1,10 @@
-// Web client bridge helpers for tests that simulate the embedded server.
+// Web client bridge helpers for tests that simulate the server.
 //
-// This module owns transport wiring only: IPC/HTTP dispatch, terminal
+// This module owns transport wiring only: HTTP and WebSocket dispatch, terminal
 // actions, workspace runtime events, and workspace-pane tab operations.
 // Repo/store fixtures live in #/web/test-utils/repo-store.ts.
-
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import type { RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import type {
   TerminalAttachResult,
@@ -28,7 +26,7 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 
-export type IpcTestHandler = (input: any) => unknown
+export type ServerTestHandler = (input: any) => unknown
 interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
   'terminal.restart': TerminalRestartResult
@@ -69,7 +67,7 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
   }
 }
 
-export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
+export function installGoblinTestBridge(handlers: Record<string, ServerTestHandler>): void {
   setClientBridgeForTests(null)
   const workspaceRuntimeState = new Map<
     string,
@@ -89,11 +87,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       removeEventListener: browserWindow.removeEventListener.bind(browserWindow),
       dispatchEvent: browserWindow.dispatchEvent.bind(browserWindow),
       __GOBLIN_BOOTSTRAP__: {
-        runtime: {
-          kind: 'web',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [],
-        },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       location: {

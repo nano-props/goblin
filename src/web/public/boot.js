@@ -11,7 +11,6 @@
   var colorTheme = qs.get('colorTheme')
   var colorThemes = ['macos', 'mono', 'github']
   if (colorThemes.indexOf(colorTheme) === -1) colorTheme = 'macos'
-  document.documentElement.setAttribute('data-host', 'web')
   document.documentElement.setAttribute('data-theme', theme)
   document.documentElement.setAttribute('data-color-theme', colorTheme)
 })()

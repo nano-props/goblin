@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
@@ -18,7 +17,6 @@ describe('terminal web host client', () => {
   beforeEach(() => {
     wsMock = installWebSocketMock({ autoOpen: false })
     installHostBootstrap({
-      runtime: 'web',
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     vi.restoreAllMocks()

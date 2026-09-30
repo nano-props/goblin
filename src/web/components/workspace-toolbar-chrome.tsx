@@ -1,9 +1,9 @@
 import { defineComponent } from 'vue'
 import type { CSSProperties, HTMLAttributes } from 'vue'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { cn } from '#/web/lib/cn.ts'
 
-const WORKSPACE_TOOLBAR_STYLE = { height: `${TITLE_BAR_HEIGHT_PX}px` } satisfies CSSProperties
+const WORKSPACE_TOOLBAR_STYLE = { height: `${WORKSPACE_TOOLBAR_HEIGHT_PX}px` } satisfies CSSProperties
 const WORKSPACE_TOOLBAR_BASE_CLASS =
   'goblin-workspace-toolbar flex min-w-0 shrink-0 items-center justify-between gap-0 border-b border-border/60 bg-card'
 

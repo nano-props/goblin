@@ -3,10 +3,8 @@
 // when the OS appearance flips while the user's pref is 'auto'. The
 // store's invalidation-driven refresh path is covered by
 // `web-invalidation-sync.test.ts`.
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot, defaultUserSettings } from '#/shared/settings-defaults.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
@@ -66,7 +64,6 @@ function installWindow(options: InstallWindowOptions = {}): void {
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
     initialServer: overrides.initialServer ?? null,
     ...overrides,
   }

@@ -165,8 +165,8 @@ capabilities needed by the behavior suites.
 
 - `installGoblinTestBridge(handlers)` — installs the browser bootstrap
   boundary, shared WebSocket router, and a path-keyed `fetch` stub. It clears
-  any explicit client-bridge override so tests exercise the runtime-selected
-  transport. `handlers` is `Record<string, (input) => unknown>` mapping host
+  any explicit client-bridge override so tests exercise the browser
+  transport. `handlers` is `Record<string, (input) => unknown>` mapping server
   actions, socket actions, and server routes to their test responses.
 
 ### `src/web/test-utils/repo-store.ts`

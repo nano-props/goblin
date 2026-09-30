@@ -58,15 +58,14 @@ body,
 }
 
 html {
-  --goblin-title-bar-chrome-left: 16px;
-  --goblin-title-bar-chrome-right: 16px;
+  --goblin-workspace-navigation-inset: 16px;
   --goblin-workspace-navigation-controls-width: 6.5rem;
   --goblin-workspace-navigation-controls-reserved-width: 7rem;
 }
 
 .goblin-zen-reveal-trigger-layer {
-  width: calc(var(--goblin-title-bar-chrome-left) + var(--goblin-workspace-navigation-controls-width));
-  padding-left: var(--goblin-title-bar-chrome-left);
+  width: calc(var(--goblin-workspace-navigation-inset) + var(--goblin-workspace-navigation-controls-width));
+  padding-left: var(--goblin-workspace-navigation-inset);
   padding-right: 0;
 }
 
@@ -238,7 +237,7 @@ html {
 
 /* Leave space for the sidebar navigation controls when the sidebar is collapsed. */
 .goblin-workspace-toolbar--navigation-offset {
-  padding-left: var(--goblin-title-bar-chrome-left);
+  padding-left: var(--goblin-workspace-navigation-inset);
 }
 
 .goblin-workspace-navigation-controls {

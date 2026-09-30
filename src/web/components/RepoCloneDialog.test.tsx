@@ -4,14 +4,12 @@ import { screen, waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
-import { WEB_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
@@ -34,7 +32,7 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
-const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { __GOBLIN_BOOTSTRAP__?: unknown }
 const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
   if (url.pathname === '/api/repo/clone') {
@@ -53,11 +51,6 @@ beforeEach(() => {
   setClientBridgeForTests(null)
   fetchMock.mockClear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'web',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...WEB_CLIENT_CAPABILITIES],
-    },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
 

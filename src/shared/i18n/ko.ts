@@ -1,7 +1,6 @@
 // 한국어 사전. en.ts 와 키가 1:1 로 일치해야 합니다.
 // 스타일: 간결한 어휘, 버튼/메뉴는 종결어미 없이, 안내 문장은 평어.
 // 브랜드명(Goblin / GitHub / Finder)은 번역하지 않음.
-
 import type { DictKey } from '#/shared/i18n/en.ts'
 
 export const ko: Record<DictKey, string> = {
@@ -12,7 +11,7 @@ export const ko: Record<DictKey, string> = {
   // ---- 앱 상단 바 ------------------------------------------------------------
   'app-chrome.open': '열기',
   'app-chrome.menu': '메뉴',
-  'app-chrome.settings': '설정 (⌘,)',
+  'app-chrome.settings': '설정',
   'app-chrome.settings-tooltip': '설정',
   'app-chrome.notifications': '알림',
 
@@ -24,13 +23,14 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.placeholder': '워크스페이스 선택',
   'workspace-picker.open-local': '작업 공간 열기…',
   'workspace-picker.open-remote': '원격 작업 공간 열기…',
+  'workspace-open.invalid-path': '링크에는 절대 디렉터리 경로 하나가 필요합니다(최대 4096자).',
+  'workspace-open.retry': '다시 시도',
   'workspace-picker.open-title': '작업 공간 열기',
-  'workspace-picker.open-description': '로컬 경로를 입력하거나 폴더를 선택하세요.',
+  'workspace-picker.open-description': '서버의 디렉터리 경로를 입력하세요.',
   'workspace-picker.open-path-label': '폴더 경로',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
   'workspace-picker.open-path-no-matches': '일치하는 폴더가 없습니다',
   'workspace-picker.open-presentation-failed': '작업 공간을 열었지만 화면을 해당 작업 공간으로 전환하지 못했습니다',
-  'workspace-picker.open-path-choose': '선택…',
   'workspace-picker.open-local-confirm': '작업 공간 열기',
   'workspace-picker.open-opening': '여는 중…',
   'workspace-picker.clone': '리포지토리 클론…',
@@ -39,7 +39,6 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.clone-url-label': '리포지토리 URL',
   'workspace-picker.clone-url-placeholder': 'https://github.com/owner/repo.git',
   'workspace-picker.clone-parent-label': '저장 위치',
-  'workspace-picker.clone-parent-choose': '선택…',
   'workspace-picker.clone-directory-label': '폴더 이름',
   'workspace-picker.clone-directory-placeholder': 'repo',
   'workspace-picker.clone-directory-invalid': '폴더 이름 하나만 입력하고 /, \\, : 는 사용할 수 없습니다.',
@@ -57,7 +56,6 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.open-remote-port-label': '포트',
   'workspace-picker.open-remote-username-label': '사용자 이름',
   'workspace-picker.open-remote-private-key-label': '개인 키',
-  'workspace-picker.open-remote-private-key-choose': '개인 키 선택',
   'workspace-picker.open-remote-path-label': '원격 경로',
   'workspace-picker.open-remote-path-placeholder': '/home/user/repo 또는 ~/repo',
   'workspace-picker.open-remote-test-connection': '연결 테스트',
@@ -136,15 +134,12 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 작업 공간이 없습니다',
-  'empty.body': '사이드바에서 작업 공간을 선택하거나 폴더를 이 창으로 드래그하세요.',
+  'empty.body': '사이드바에서 작업 공간을 여세요.',
   'route.not-found-title': '페이지를 찾을 수 없음',
   'route.not-found-home': '홈으로 돌아가기',
   'workspace-route.not-found-title': '작업 공간을 찾을 수 없음',
 
   // ---- Drag and drop -----------------------------------------------------
-  'drop.title': '놓아서 작업 공간 열기',
-  'drop.body': '폴더를 Goblin 어디에나 놓으세요.',
-  'drop.open-failed': '작업 공간을 열 수 없음',
   'workspace-picker.recent-save-failed': '작업 공간은 열렸지만 최근 기록은 업데이트되지 않았습니다',
 
   // ---- Workspace pane tabs ------------------------------------------------
@@ -518,6 +513,13 @@ export const ko: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.workspace-git-unavailable': '이 작업 공간에서는 Git 기능을 사용할 수 없습니다',
   'error.workspace-operation-failed': '작업 공간 작업에 실패했습니다',
+  'error.workspace-locator-malformed': '작업 공간 경로가 잘못되었습니다.',
+  'error.workspace-transport-unsupported': '지원하지 않는 작업 공간 연결 방식입니다.',
+  'error.workspace-path-not-found': '디렉터리가 없습니다. 서버의 경로를 확인하세요.',
+  'error.workspace-path-not-directory': '이 경로는 디렉터리가 아닙니다.',
+  'error.workspace-permission-denied': '접근 권한이 없습니다. 서버의 디렉터리 권한을 확인하세요.',
+  'error.workspace-transport-unavailable':
+    '작업 공간을 사용할 수 없습니다. 서버와 디렉터리를 확인한 후 다시 시도하세요.',
   'error.workspace-open-failed': '작업 공간을 열지 못했습니다',
   'error.workspace-close-failed': '작업 공간을 닫지 못했습니다',
   'error.failed-read-repo': '리포지토리 읽기 실패',
@@ -694,10 +696,9 @@ export const ko: Record<DictKey, string> = {
   'settings.web.token-copy': '토큰 복사',
   'settings.web.token-copied': '토큰이 클립보드에 복사되었습니다.',
   'settings.web.token-copy-failed': '클립보드에 복사하지 못했습니다.',
-  'settings.web.token-read-failed': '토큰 상태를 읽지 못했습니다. 설정을 다시 열어 재시도하세요.',
 
-  'settings.web.token-pending-restart-hint':
-    '표시된 토큰과 QR 코드는 다음 Goblin 시작 시 유효해집니다. 그때까지는 현재 토큰이 계속 유효합니다.',
+  'settings.web.token-sharing-hint':
+    'QR 코드에는 현재 유효한 액세스 토큰이 포함됩니다. 다른 기기에서 스캔하여 로그인할 수 있습니다.',
   'settings.web.lan': '네트워크',
   'settings.web.lan-urls': 'LAN 주소',
   'settings.web.lan-urls-hint': '같은 로컬 네트워크의 다른 기기에서 이 주소로 Goblin에 접근할 수 있습니다.',
@@ -726,10 +727,6 @@ export const ko: Record<DictKey, string> = {
   'settings.apps.status.not-detected': '감지되지 않음',
   'settings.fetch': '자동 동기화',
   'settings.fetch-hint': '활성 리포지토리를 백그라운드에서 가져옵니다.',
-  'settings.general.open-from-terminal-title': '터미널에서 열기',
-  'settings.general.open-from-terminal-body':
-    'macOS에서는 터미널이나 스크립트에서 로컬 리포지토리 경로를 Goblin으로 바로 열 수 있습니다.',
-  'settings.general.open-from-terminal-command': 'open -b goblin.app /path/to/repo',
   'settings.fetch.off': '끄기',
   'settings.fetch.30s': '30 초',
   'settings.fetch.1m': '1 분',
@@ -771,33 +768,13 @@ export const ko: Record<DictKey, string> = {
   'help.section.app': '앱',
   'help.row.next-branch': '다음 브랜치 / 커밋',
   'help.row.prev-branch': '이전 브랜치 / 커밋',
-  'help.row.next-workspace': '다음 워크스페이스',
-  'help.row.prev-workspace': '이전 워크스페이스',
-  'help.row.view-status': '상태',
-  'help.row.view-changes': '변경 사항',
-  'help.row.view-log': '커밋 로그',
-  'help.row.view-terminal': '터미널',
-  'help.row.new-terminal': '새 터미널 탭',
-  'help.row.create-worktree': '새 워크트리',
   'help.row.select-workspace-tab': '탭 선택',
   'help.row.switch-workspace-pane-tab': '이전 / 다음 워크스페이스 탭',
-  'help.row.open-local-workspace': '작업 공간 열기',
-  'help.row.clone-repo': '리포지토리 클론',
-  'help.row.activate-window': 'Goblin 창 보이기',
-  'help.row.close-workspace-tab': '워크스페이스 탭 닫기',
-  'help.row.close-window': '창 닫기',
-  'help.row.refresh': '워크스페이스 새로 고침',
   'help.row.reload-page': '페이지 새로 고침',
-  'help.row.settings': '설정',
   'help.row.this-help': '이 도움말',
   'help.row.dismiss': '오버레이 닫기 / 포커스된 비텍스트 컨트롤 나가기',
 
-  // ---- Embedded server -----------------------------------------------------
-  'embedded-server.fatal-exit.title': 'Goblin 서버가 중지됨',
-  'embedded-server.fatal-exit.body':
-    '내장 서버가 예기치 않게 중지되었습니다 ({exitDetail}). Goblin 을(를) 다시 시작하세요.',
-  'embedded-server.fatal-exit.body-with-detail':
-    '내장 서버가 예기치 않게 중지되었습니다 ({exitDetail}). Goblin 을(를) 다시 시작하세요.\n\n마지막 서버 오류:\n{stderr}',
+  // ---- Server -----------------------------------------------------
 
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': '취소',

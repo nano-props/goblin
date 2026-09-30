@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { onClientLocalEventType, resetClientLocalEventsForTests } from '#/web/bridge/local-events.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal/notification-provider.ts'
@@ -38,7 +37,7 @@ describe('terminal notification provider', () => {
     resetClientLocalEventsForTests()
   })
 
-  test('uses browser notifications when the native provider is unavailable', async () => {
+  test('dispatches bell clicks from browser notifications', async () => {
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
 
@@ -52,16 +51,6 @@ describe('terminal notification provider', () => {
       session: bellInput.session,
     })
     dispose()
-  })
-
-  test('keeps the browser provider selected when a native bridge appears later', async () => {
-    const provider = createTerminalNotificationProvider()
-    const notifyBell = vi.fn(async () => true)
-
-    await expect(provider.notifyBell(bellInput)).resolves.toBe(true)
-
-    expect(wsMock.notificationInstances).toHaveLength(1)
-    expect(notifyBell).not.toHaveBeenCalled()
   })
 
   test('uses caller-provided copy for browser test notifications', async () => {

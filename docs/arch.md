@@ -12,8 +12,9 @@ Feature-specific invariants belong to their feature specifications.
   WebSocket contracts. Client-local presentation is persisted in browser storage.
 - Bun compiles one executable containing the runtime, server, browser assets,
   worker, CLI, and SSH scripts. The server supports Linux and macOS.
-- Terminal output is decoded as a streaming UTF-8 sequence. A terminal exits
-  only after both process exit and PTY EOF, preserving final output.
+- Terminal output is decoded as a streaming UTF-8 sequence. Process exit
+  starts a bounded trailing-output drain; EOF ends it early. See
+  `docs/terminal.md` for retirement semantics.
 - The terminal `g` launcher lives in a private temporary directory for one
   server lifetime and invokes the same executable. Credentials travel through
   the terminal environment, never the launcher file.

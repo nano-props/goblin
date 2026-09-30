@@ -159,13 +159,12 @@ Canonical rules:
 
 Selected mappings:
 
-| Concept                            | Canonical                         | Deprecated            |
-| ---------------------------------- | --------------------------------- | --------------------- |
-| User-configurable preferences      | `UserSettings`                    | `SettingsPrefs`       |
-| Prefs PATCH body key               | `prefs`                           | `settings`            |
-| Server workspace restore state     | `ServerWorkspaceState`            | `SessionState`        |
-| Client workspace state             | `ClientWorkspaceState`            | `SessionState`        |
-| Native shortcut registration state | `NativeShortcutRegistrationState` | `ServerSettingsState` |
+| Concept                        | Canonical              | Deprecated      |
+| ------------------------------ | ---------------------- | --------------- |
+| User-configurable preferences  | `UserSettings`         | `SettingsPrefs` |
+| Prefs PATCH body key           | `prefs`                | `settings`      |
+| Server workspace restore state | `ServerWorkspaceState` | `SessionState`  |
+| Client workspace state         | `ClientWorkspaceState` | `SessionState`  |
 
 ## Review checklist
 

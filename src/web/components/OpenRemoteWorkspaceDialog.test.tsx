@@ -2,7 +2,6 @@
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
-
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import type { VNode } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -12,7 +11,6 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
-import { WEB_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -27,7 +25,7 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
-const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { __GOBLIN_BOOTSTRAP__?: unknown }
 
 const target = {
   id: 'goblin+ssh://prod/srv/repo',
@@ -72,11 +70,6 @@ beforeEach(() => {
     throw new Error(`Unhandled fetch URL: ${url.pathname}`)
   })
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'web',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...WEB_CLIENT_CAPABILITIES],
-    },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
 })

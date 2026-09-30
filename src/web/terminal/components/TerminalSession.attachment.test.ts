@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import {
   MockResizeObserver,
   attachResult,
@@ -866,7 +865,7 @@ describe('TerminalSession attachment and presentation', () => {
     expect(openBrowserUrl).toHaveBeenNthCalledWith(2, 'https://example.com/osc8', '_blank', 'noopener,noreferrer')
   })
 
-  test('does not send unsafe web links to the app ipc', async () => {
+  test('does not open unsafe terminal links in the browser', async () => {
     await startOpenControllerSession()
     xtermMocks.webLinkAddons[0]!.open('javascript:alert(1)')
     xtermMocks.webLinkAddons[0]!.open('file:///tmp/secret')

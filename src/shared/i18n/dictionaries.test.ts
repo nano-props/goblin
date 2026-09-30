@@ -46,8 +46,6 @@ describe('i18n dictionaries', () => {
     expect(ja['workspace-picker.open-remote-username-label']).toBe('ユーザー名')
     expect(ko['workspace-picker.open-remote-private-key-label']).toBe('개인 키')
     expect(ja['workspace-picker.open-remote-private-key-label']).toBe('秘密鍵')
-    expect(ko['workspace-picker.open-remote-private-key-choose']).toBe('개인 키 선택')
-    expect(ja['workspace-picker.open-remote-private-key-choose']).toBe('秘密鍵を選択')
     expect(ko['workspace-picker.open-remote-path-label']).toBe('원격 경로')
     expect(ja['workspace-picker.open-remote-path-label']).toBe('リモートパス')
   })
@@ -61,7 +59,6 @@ describe('i18n dictionaries', () => {
       'workspace-unavailable.close',
       'empty.body',
       'workspace-route.not-found-title',
-      'drop.body',
       'workspace-picker.recent-save-failed',
     ] as const satisfies readonly DictKey[]
     for (const key of workspaceKeys) {

@@ -6,11 +6,6 @@ describe('isClientEffectIntent', () => {
     expect(isClientEffectIntent({ type: 'server-command-reset-requested' })).toBe(false)
   })
 
-  test('accepts tab close without a window-close variant', () => {
-    expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-requested' })).toBe(true)
-    expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-or-window-requested' })).toBe(false)
-  })
-
   test('accepts workspace pane tab intents with a known tab type', () => {
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(true)
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })).toBe(true)
@@ -22,14 +17,6 @@ describe('isClientEffectIntent', () => {
   })
 
   test('validates payload-bearing intent variants', () => {
-    expect(isClientEffectIntent({ type: 'cycle-workspace-requested', direction: 1 })).toBe(true)
-    expect(isClientEffectIntent({ type: 'cycle-workspace-requested', direction: 0 })).toBe(false)
-    expect(isClientEffectIntent({ type: 'open-settings-requested', page: 'about' })).toBe(true)
-    expect(isClientEffectIntent({ type: 'open-settings-requested', page: 'missing' })).toBe(false)
-    expect(isClientEffectIntent({ type: 'theme-pref-set-requested', pref: 'dark' })).toBe(true)
-    expect(isClientEffectIntent({ type: 'theme-pref-set-requested', pref: 'sepia' })).toBe(false)
-    expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'zh' })).toBe(true)
-    expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'fr' })).toBe(false)
     expect(
       isClientEffectIntent({
         type: 'terminal-bell-click',
@@ -64,23 +51,6 @@ describe('isClientEffectIntent', () => {
           },
           presentation: { kind: 'git-worktree' },
         },
-      }),
-    ).toBe(false)
-  })
-
-  test('accepts only valid recent repo entries', () => {
-    expect(
-      isClientEffectIntent({
-        type: 'open-recent-workspace-requested',
-        entry: { id: 'goblin+file:///tmp/repo' },
-      }),
-    ).toBe(true)
-    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { id: '' } })).toBe(false)
-    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { id: 'remote:repo' } })).toBe(false)
-    expect(
-      isClientEffectIntent({
-        type: 'open-recent-workspace-requested',
-        entry: { kind: 'local', id: 'goblin+file:///tmp/repo' },
       }),
     ).toBe(false)
   })

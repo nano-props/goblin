@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { defineComponent } from 'vue'
@@ -32,8 +31,6 @@ beforeEach(() => {
   settingsActionsMocks.setFetchInterval.mockClear()
   settingsActionsMocks.setFetchInterval.mockResolvedValue(120)
 
-  settingsActionsMocks.setTerminalNotificationsEnabled.mockClear()
-  settingsActionsMocks.setTerminalNotificationsEnabled.mockResolvedValue(undefined)
   settingsActionsMocks.setShortcutsDisabled.mockClear()
   settingsActionsMocks.setShortcutsDisabled.mockResolvedValue(undefined)
   settingsActionsMocks.setTerminalNotificationsEnabled.mockClear()

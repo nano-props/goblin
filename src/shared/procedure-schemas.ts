@@ -1,9 +1,4 @@
-// Procedure input schemas shared between the HTTP route layer and the
-// native bridge IPC layer. Each transport validates payloads with
-// `parseHttpInput` (see `#/server/common/http-validate.ts`) or
-// `parseIpcInput` using the schemas
-// declared here, so the request contract is defined once.
-
+// Shared procedure input schemas, validated at the server HTTP boundary.
 import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isValidBranchInput } from '#/shared/refnames.ts'
@@ -22,7 +17,6 @@ import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
-import { ClientWorkspaceStateSchema } from '#/shared/client-workspace-state-schema.ts'
 import { EDITOR_APP_VALUES, LANG_PREF_VALUES, TERMINAL_APP_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
 import { FetchIntervalSecSchema } from '#/shared/settings-response-schema.ts'
 

@@ -178,10 +178,6 @@ const AuthenticatedAppShell = defineComponent({
       currentWorkspaceId: hydratedRouteWorkspaceId,
       currentWorkspacePaneCommandTarget,
       closeAllOverlays: overlays.closeAllOverlays,
-      openWorkspacePathDialog: overlays.openWorkspacePathDialog,
-      openCloneRepo: overlays.openCloneRepo,
-      openRemoteWorkspace: overlays.openRemoteWorkspace,
-      openCreateWorktree: () => navigation.value.openCreateWorktree(),
       isOverlayOpen: () => overlays.anyOpen.value,
       isWorkspaceShortcutSuppressed: () => overlays.anyOpen.value,
     })

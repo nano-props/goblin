@@ -20,7 +20,6 @@ import type { TerminalSessionSummary } from '#/web/terminal/components/types.ts'
 
 // RTL has no reusable harness for tab-strip geometry, scroll memory, and terminal item adaptation.
 const testHostEnvironment = globalThis as typeof globalThis & {
-  goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
 const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect
@@ -50,7 +49,6 @@ beforeEach(() => {
     value: vi.fn(),
   })
   testHostEnvironment.__GOBLIN_BOOTSTRAP__ = {
-    runtime: { kind: 'web', bridgeVersion: 1, capabilities: [] },
     initialServer: null,
   }
 })

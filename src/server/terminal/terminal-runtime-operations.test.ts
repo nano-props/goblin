@@ -56,17 +56,17 @@ describe('server terminal runtime operations', () => {
 
     host.unregisterSocket('client_browser', USER_1, browserSocket)
 
-    const electronSocket = appRealtimeSocket()
-    host.registerSocket('client_electron', USER_1, electronSocket)
+    const returningSocket = appRealtimeSocket()
+    host.registerSocket('client_returning', USER_1, returningSocket)
 
-    const reopened = await createLocalWorktreeTerminal(host, 'client_electron', USER_1, 'primary')
+    const reopened = await createLocalWorktreeTerminal(host, 'client_returning', USER_1, 'primary')
     expect(reopened.ok).toBe(true)
     if (!reopened.ok) return
     expect(reopened.action).toBe('reused')
     expect(reopened.terminalSessionId).toBe(first.terminalSessionId)
     expect(reopened).toMatchObject({ controller: null, terminalRuntimeGeneration: 0, canonicalSize: null })
     await expect(
-      host.attach('client_electron', USER_1, {
+      host.attach('client_returning', USER_1, {
         terminalRuntimeSessionId: reopened.terminalRuntimeSessionId,
         terminalRuntimeGeneration: 0,
         cols: 102,
@@ -74,19 +74,19 @@ describe('server terminal runtime operations', () => {
       }),
     ).resolves.toMatchObject({ ok: true, frame: 'stream', canonicalSize: { cols: 102, rows: 33 } })
 
-    const sessions = await host.listSessions('client_electron', USER_1, {
+    const sessions = await host.listSessions('client_returning', USER_1, {
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessions).toEqual([
       expect.objectContaining({
         terminalSessionId: first.terminalSessionId,
-        controller: { clientId: 'client_electron', status: 'connected' },
+        controller: { clientId: 'client_returning', status: 'connected' },
         canonicalSize: { cols: 102, rows: 33 },
       }),
     ])
 
-    host.unregisterSocket('client_electron', USER_1, electronSocket)
+    host.unregisterSocket('client_returning', USER_1, returningSocket)
     shutdown()
   })
 

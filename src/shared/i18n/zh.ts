@@ -1,6 +1,5 @@
 // 简体中文字典。键必须与 en.ts 完全一致。
 // 风格：按钮/菜单短句、提示句加句号；品牌名（Goblin / GitHub / Finder）不翻译。
-
 import type { DictKey } from '#/shared/i18n/en.ts'
 
 export const zh: Record<DictKey, string> = {
@@ -11,7 +10,7 @@ export const zh: Record<DictKey, string> = {
   // ---- 应用顶栏 ------------------------------------------------------------
   'app-chrome.open': '打开',
   'app-chrome.menu': '菜单',
-  'app-chrome.settings': '设置 (⌘,)',
+  'app-chrome.settings': '设置',
   'app-chrome.settings-tooltip': '设置',
   'app-chrome.notifications': '通知',
 
@@ -23,13 +22,14 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.placeholder': '选择工作区',
   'workspace-picker.open-local': '打开工作区…',
   'workspace-picker.open-remote': '打开远程工作区…',
+  'workspace-open.invalid-path': '链接必须包含一个绝对目录路径（最多 4096 个字符）。',
+  'workspace-open.retry': '重试',
   'workspace-picker.open-title': '打开工作区',
-  'workspace-picker.open-description': '输入本地路径，或选择一个文件夹。',
+  'workspace-picker.open-description': '输入服务器上的目录路径。',
   'workspace-picker.open-path-label': '文件夹路径',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
   'workspace-picker.open-path-no-matches': '没有匹配的文件夹',
   'workspace-picker.open-presentation-failed': '工作区已打开，但界面未能切换到该工作区',
-  'workspace-picker.open-path-choose': '选择…',
   'workspace-picker.open-local-confirm': '打开工作区',
   'workspace-picker.open-opening': '正在打开…',
   'workspace-picker.clone': '克隆新仓库…',
@@ -38,7 +38,6 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.clone-url-label': '仓库 URL',
   'workspace-picker.clone-url-placeholder': 'https://github.com/owner/repo.git',
   'workspace-picker.clone-parent-label': '保存到',
-  'workspace-picker.clone-parent-choose': '选择…',
   'workspace-picker.clone-directory-label': '文件夹名',
   'workspace-picker.clone-directory-placeholder': 'repo',
   'workspace-picker.clone-directory-invalid': '请输入单个文件夹名，不能包含 /、\\ 或 :。',
@@ -56,7 +55,6 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.open-remote-port-label': '端口',
   'workspace-picker.open-remote-username-label': '用户名',
   'workspace-picker.open-remote-private-key-label': '私钥',
-  'workspace-picker.open-remote-private-key-choose': '选择私钥',
   'workspace-picker.open-remote-path-label': '远程路径',
   'workspace-picker.open-remote-path-placeholder': '/home/user/repo 或 ~/repo',
   'workspace-picker.open-remote-test-connection': '测试连接',
@@ -130,15 +128,12 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '未打开工作区',
-  'empty.body': '从边栏选择工作区，或拖入文件夹。',
+  'empty.body': '从边栏打开工作区。',
   'route.not-found-title': '未找到页面',
   'route.not-found-home': '返回首页',
   'workspace-route.not-found-title': '未找到工作区',
 
   // ---- Drag and drop -----------------------------------------------------
-  'drop.title': '松手打开工作区',
-  'drop.body': '把文件夹拖到 Goblin 任意位置。',
-  'drop.open-failed': '无法打开工作区',
   'workspace-picker.recent-save-failed': '工作区已打开，但最近记录未更新',
 
   // ---- Workspace pane tabs ------------------------------------------------
@@ -505,6 +500,12 @@ export const zh: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.workspace-git-unavailable': '此工作区无法使用 Git 功能',
   'error.workspace-operation-failed': '工作区操作失败',
+  'error.workspace-locator-malformed': '工作区路径无效。',
+  'error.workspace-transport-unsupported': '不支持此工作区连接方式。',
+  'error.workspace-path-not-found': '目录不存在，请检查服务器上的路径。',
+  'error.workspace-path-not-directory': '该路径不是目录。',
+  'error.workspace-permission-denied': '权限不足，请检查服务器上的目录访问权限。',
+  'error.workspace-transport-unavailable': '工作区不可用，请检查服务器和目录后重试。',
   'error.workspace-open-failed': '打开工作区失败',
   'error.workspace-close-failed': '关闭工作区失败',
   'error.failed-read-repo': '读取仓库失败',
@@ -663,9 +664,8 @@ export const zh: Record<DictKey, string> = {
   'settings.web.token-copy': '复制令牌',
   'settings.web.token-copied': '令牌已复制到剪贴板。',
   'settings.web.token-copy-failed': '复制到剪贴板失败。',
-  'settings.web.token-read-failed': '无法读取令牌状态，请重新打开设置后重试。',
 
-  'settings.web.token-pending-restart-hint': '显示的令牌和二维码将在下次启动 Goblin 时生效；当前令牌在此之前仍然有效。',
+  'settings.web.token-sharing-hint': '二维码包含当前有效的访问令牌，可在其他设备上扫码登录。',
   'settings.web.lan': '网络',
   'settings.web.lan-urls': '局域网访问地址',
   'settings.web.lan-urls-hint': '同一局域网中的其他设备可使用这些地址访问 Goblin。',
@@ -694,9 +694,6 @@ export const zh: Record<DictKey, string> = {
   'settings.apps.status.not-detected': '未检测到',
   'settings.fetch': '自动同步',
   'settings.fetch-hint': '后台同步当前仓库的远端更新；关闭后仅手动刷新。',
-  'settings.general.open-from-terminal-title': '从终端打开',
-  'settings.general.open-from-terminal-body': '在 macOS 上，你可以从终端或脚本里直接把本地仓库路径交给 Goblin 打开。',
-  'settings.general.open-from-terminal-command': 'open -b goblin.app /path/to/repo',
   'settings.fetch.off': '关闭',
   'settings.fetch.30s': '30 秒',
   'settings.fetch.1m': '1 分钟',
@@ -738,32 +735,13 @@ export const zh: Record<DictKey, string> = {
   'help.section.app': '应用',
   'help.row.next-branch': '下一个分支 / 提交',
   'help.row.prev-branch': '上一个分支 / 提交',
-  'help.row.next-workspace': '下一个工作区',
-  'help.row.prev-workspace': '上一个工作区',
-  'help.row.view-status': '状态',
-  'help.row.view-changes': '变更',
-  'help.row.view-log': '提交历史',
-  'help.row.view-terminal': '终端',
-  'help.row.new-terminal': '新建终端标签页',
-  'help.row.create-worktree': '新工作树',
   'help.row.select-workspace-tab': '选择标签页',
   'help.row.switch-workspace-pane-tab': '上一个 / 下一个工作区标签',
-  'help.row.open-local-workspace': '打开工作区',
-  'help.row.clone-repo': '克隆仓库',
-  'help.row.activate-window': '唤出 Goblin 窗口',
-  'help.row.close-workspace-tab': '关闭工作区标签页',
-  'help.row.close-window': '关闭窗口',
-  'help.row.refresh': '刷新工作区',
   'help.row.reload-page': '重新加载页面',
-  'help.row.settings': '设置',
   'help.row.this-help': '当前帮助',
   'help.row.dismiss': '关闭弹层 / 退出当前非文本控件',
 
-  // ---- Embedded server -----------------------------------------------------
-  'embedded-server.fatal-exit.title': 'Goblin 服务器已停止',
-  'embedded-server.fatal-exit.body': '嵌入式服务器意外停止 ({exitDetail})。请重新启动 Goblin。',
-  'embedded-server.fatal-exit.body-with-detail':
-    '嵌入式服务器意外停止 ({exitDetail})。请重新启动 Goblin。\n\n最后一次服务器错误：\n{stderr}',
+  // ---- Server -----------------------------------------------------
 
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': '取消',

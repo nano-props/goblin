@@ -12,7 +12,6 @@ import type {
   TerminalResizeResult,
   TerminalRestartInput,
   TerminalRestartResult,
-  TerminalSessionInput,
   TerminalSessionClosedEvent,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -23,7 +22,6 @@ import type {
   TerminalSessionsSnapshot,
   TerminalSessionsChangedEvent,
 } from '#/shared/terminal-types.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   WorkspacePaneTabsChangedRealtimeMessage,
   WorkspacePaneTabsListInput,

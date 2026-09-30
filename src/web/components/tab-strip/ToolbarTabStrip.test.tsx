@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-
-import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'

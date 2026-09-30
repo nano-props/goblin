@@ -1,6 +1,5 @@
 // Dedicated Bun PTY subprocess; owns handles and forwards data/exit events.
 // Foreground labels are best-effort OS observations, separate from terminal titles.
-
 import {
   spawnTerminalPtyRuntime,
   type SpawnTerminalPtyRuntimeResult,
@@ -20,7 +19,7 @@ type PtySpawnOutcome = SpawnTerminalPtyRuntimeResult
 export interface PtyWorkerRuntimeOptions {
   emit(message: PtyWorkerMessage): void
   /**
-   * Injectable spawn implementation. Defaults to a real `pty.spawn`
+   * Injectable spawn implementation. Defaults to the Bun PTY adapter
    * call wrapped in a try/catch so the worker surfaces a structured
    * `pty-spawn-result { ok: false }` on every failure path rather
    * than dying. Tests pass a stub to exercise the failure path

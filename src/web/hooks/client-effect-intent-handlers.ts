@@ -1,46 +1,12 @@
-import { toast } from 'vue-sonner'
-import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { presentWorkspaceRefreshOutcome } from '#/web/workspaces/runtime/refresh-feedback.ts'
-import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
-import { themeStore } from '#/web/stores/theme.ts'
-import { i18nStore } from '#/web/stores/i18n.ts'
-import { clearRecentWorkspaceHistory } from '#/web/settings/actions.ts'
-import {
-  reportCloseWorkspaceFailure,
-  reportOpenWorkspacePostOpenError,
-  reportOpenWorkspacePostOpenEffects,
-  reportOpenWorkspaceUncertainty,
-} from '#/web/lib/open-workspace-result-feedback.ts'
-import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
-import { externalOpenLog } from '#/web/logger.ts'
-import {
-  runCloseCurrentWorkspacePaneTabCommand,
-  runNewTerminalTabCommand,
-  runShowWorkspacePaneTabCommand,
-  runTerminalPrimaryActionCommand,
-} from '#/web/commands/workspace-commands.ts'
-import {
-  createAppLevelIntentPlan,
-  createTerminalBellIntentPlan,
-  createWorkspaceIntentPlan,
-  type ClientAppIntent,
-  type ClientWorkspaceIntent,
-} from '#/web/hooks/client-effect-intent-plans.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
+import { createTerminalBellIntentPlan, createWorkspaceIntentPlan } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
-import type { OpenWorkspaceResult, WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
-import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
-import {
-  workspacePaneCommandCoordinates,
-  type WorkspacePaneCommandTarget,
-} from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { ClientEffectIntent, RepoViewClientIntent } from '#/shared/client-effect-intents.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { commitWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-navigation.ts'
 import { surfaceWorkspacePaneTerminalDestinationOutcome } from '#/web/workspace-pane/workspace-pane-terminal-destination-feedback.ts'
-import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 
 interface TerminalBellIntentDeps {
   navigation: AppNavigationActions
@@ -48,26 +14,12 @@ interface TerminalBellIntentDeps {
   terminalBellWorkspace: WorkspaceState | null
 }
 
-interface AppClientIntentDeps {
-  navigation: AppNavigationActions
-  openWorkspacePathDialog: () => void
-  openCloneRepo: () => void
-  openRemoteWorkspace: () => void
-  overlayBlocked: boolean
-  openWorkspaceMembership: (input: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
-  resetLayout: () => void
-  t: (key: string) => string
-}
-
 interface WorkspaceClientIntentDeps {
   navigation: AppNavigationActions
   currentWorkspace: WorkspaceState | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
-  openCreateWorktree: () => void
   overlayBlocked: boolean
   workspaceShortcutSuppressed: boolean
-  terminalFocused: boolean
-  toggleZenMode: () => void
   t: (key: string) => string
 }
 
@@ -95,128 +47,19 @@ export function handleTerminalBellClickIntent(
   )
 }
 
-export async function handleAppLevelClientIntent(event: ClientAppIntent, deps: AppClientIntentDeps): Promise<void> {
-  // App-level intents are allowed even when no workspace is visible.
-  const plan = createAppLevelIntentPlan(event, {
-    overlayBlocked: deps.overlayBlocked,
-  })
-  switch (plan.kind) {
-    case 'noop':
-      return
-    case 'open-settings':
-      deps.navigation.openSettings(plan.page)
-      return
-    case 'set-theme-pref':
-      await themeStore.getState().setPref(plan.pref)
-      return
-    case 'set-lang-pref':
-      await i18nStore.getState().setPref(plan.pref)
-      return
-    case 'clear-recent-workspaces':
-      await clearRecentWorkspaceHistory()
-      return
-    case 'ensure-recent-workspace-open': {
-      const navigationGeneration = beginAppNavigation()
-      const result = await deps.openWorkspaceMembership(plan.entry)
-      if (result.ok) {
-        reportOpenWorkspacePostOpenEffects(result, deps.t)
-        if (!appNavigationIsCurrent(navigationGeneration)) return
-        deps.navigation.activateWorkspace(result.workspaceId, { navigationGeneration })
-      } else {
-        reportOpenWorkspaceUncertainty(result, deps.t)
-      }
-      return
-    }
-    case 'open-workspace':
-      deps.openWorkspacePathDialog()
-      return
-    case 'open-workspace-path':
-      deps.openWorkspacePathDialog()
-      return
-    case 'open-clone-repo':
-      deps.openCloneRepo()
-      return
-    case 'open-remote-workspace':
-      deps.openRemoteWorkspace()
-      return
-    case 'reset-layout':
-      deps.resetLayout()
-      return
-  }
-}
-
 export async function handleWorkspaceClientIntent(
-  event: ClientWorkspaceIntent,
+  event: RepoViewClientIntent,
   deps: WorkspaceClientIntentDeps,
 ): Promise<boolean> {
-  // Workspace intents are route-aware and may be gated by overlays, shortcut
-  // suppression, or terminal focus before they execute.
-  const currentWorkspace = deps.currentWorkspace
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.overlayBlocked,
     workspaceShortcutSuppressed: deps.workspaceShortcutSuppressed,
-    terminalFocused: deps.terminalFocused,
-    currentWorkspaceId: currentWorkspace?.id ?? null,
-    currentWorkspaceRuntimeId: currentWorkspace?.workspaceRuntimeId ?? null,
-    currentWorkspaceCapability: currentWorkspace?.capability ?? null,
-    currentWorkspaceCanExecute: currentWorkspace ? workspaceCanExecute(currentWorkspace) : false,
+    currentWorkspaceId: deps.currentWorkspace?.id ?? null,
     currentWorkspacePaneCommandTarget: deps.currentWorkspacePaneCommandTarget,
   })
   switch (plan.kind) {
     case 'noop':
       return true
-    case 'create-worktree': {
-      if (!currentWorkspace || currentWorkspace.capability.kind !== 'git') return true
-      const branchAction = projectBranchActionOperation(
-        currentWorkspace.capability.git.operations.branchAction,
-        getRepoOperationsQueryData(currentWorkspace.id, currentWorkspace.workspaceRuntimeId)?.operations,
-      )
-      if (branchAction.phase !== 'idle') {
-        toast.error(deps.t('action.create-worktree-busy'))
-        return true
-      }
-      deps.openCreateWorktree()
-      return true
-    }
-    case 'new-terminal-tab':
-      // Cmd+T / File → New Terminal Tab is a generic entry — the new
-      // terminal should append to the end of the strip rather than being
-      // anchored to the currently-active tab.
-      // A worktree-removal pending surface is only a best-effort projection,
-      // not an admission barrier for a shortcut already dispatched here. The
-      // server orders both operations by physical worktree: an earlier terminal
-      // create may finish and is then closed by removal quiescence, while an
-      // already-admitted removal rejects a later create.
-      return runNewTerminalTabCommand({
-        workspaceId: plan.workspaceId,
-        target: plan.target,
-        navigation: deps.navigation,
-        t: deps.t,
-      })
-    case 'close-workspace-pane-tab':
-      await runCloseCurrentWorkspacePaneTabCommand({
-        workspaceId: plan.workspaceId,
-        target: plan.target,
-        navigation: deps.navigation,
-      })
-      return true
-    case 'close-workspace': {
-      const closeResult = await deps.navigation.closeWorkspace(plan.workspaceId)
-      reportCloseWorkspaceFailure(closeResult, deps.t)
-      return closeResult.ok
-    }
-    case 'cycle-workspace':
-      deps.navigation.cycleWorkspace(plan.direction)
-      return true
-    case 'refresh-workspace':
-      const refreshOutcome = await runWorkspaceRefresh(
-        { get: workspacesStore.getState, set: workspacesStore.setState },
-        plan.workspaceId,
-        {
-          workspaceRuntimeId: plan.workspaceRuntimeId,
-        },
-      )
-      return presentWorkspaceRefreshOutcome(refreshOutcome, deps.t)
     case 'show-workspace-pane-tab':
       if (plan.tab === 'terminal') {
         return runTerminalPrimaryActionCommand({
@@ -232,15 +75,5 @@ export async function handleWorkspaceClientIntent(
         tab: plan.tab,
         navigation: deps.navigation,
       })
-    case 'terminal-primary-action':
-      return runTerminalPrimaryActionCommand({
-        workspaceId: plan.workspaceId,
-        target: plan.target,
-        navigation: deps.navigation,
-        t: deps.t,
-      })
-    case 'toggle-zen-mode':
-      deps.toggleZenMode()
-      return true
   }
 }

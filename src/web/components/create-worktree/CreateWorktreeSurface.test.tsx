@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import {
   createRepoBranch,
   createRepoWorktreeSnapshotForTest,
@@ -25,12 +24,11 @@ const WORKTREE_PATH = '/tmp/goblin-repo'
 
 vi.mock('#/web/repos/client.ts', () => ({ getRepoRemoteBranches: vi.fn() }))
 
-const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { __GOBLIN_BOOTSTRAP__?: unknown }
 
 beforeEach(() => {
   appQueryClient.clear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: { kind: 'web', bridgeVersion: 1, capabilities: [] },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
 

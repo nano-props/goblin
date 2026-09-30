@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
@@ -9,8 +8,7 @@ import {
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalAttachResult,
@@ -121,11 +119,6 @@ describe('AppRuntimeProjectionProvider', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
-        runtime: {
-          kind: 'web',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [],
-        },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
     })

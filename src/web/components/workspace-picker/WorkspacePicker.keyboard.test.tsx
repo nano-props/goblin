@@ -96,11 +96,8 @@ const labels = {
   open: 'Open',
   placeholder: 'Select workspace',
   openLocal: 'Open local repository…',
-  openLocalShortcut: '⌘O',
   openRemote: 'Open remote repository…',
-  openRemoteShortcut: '⌘⇧R',
   clone: 'Clone repository…',
-  cloneShortcut: '⌘⇧O',
   unavailable: 'Unavailable',
 }
 

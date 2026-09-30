@@ -2,7 +2,7 @@ import { Settings } from '@lucide/vue'
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { GitWorkspaceNavigator } from '#/web/components/GitWorkspaceNavigator.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import { WorkspaceRootNavigator } from '#/web/components/workspace-navigator/WorkspaceRootNavigator.tsx'
@@ -70,7 +70,7 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
             <div
               class={SIDEBAR_TOP_CLASS}
               data-testid="workspace-shell-sidebar-top"
-              style={{ height: `${TITLE_BAR_HEIGHT_PX}px` }}
+              style={{ height: `${WORKSPACE_TOOLBAR_HEIGHT_PX}px` }}
             />
           ) : null}
           <WorkspaceShellPrimaryActions

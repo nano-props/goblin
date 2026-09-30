@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import type {
@@ -26,7 +25,6 @@ const mocks = vi.hoisted(() => ({
   ),
   closeMock: vi.fn(),
   listWorkspaceTabsMock: vi.fn(),
-  setBadgeMock: vi.fn(),
   clientIdMock: vi.fn(() => 'client_local'),
 }))
 
@@ -170,7 +168,6 @@ vi.mock('#/web/terminal/components/TerminalSession.ts', () => {
 
   return { TerminalSession: MockTerminalSession }
 })
-
 import {
   TerminalSessionProjection,
   setTerminalSessionProjectionForTests,
@@ -323,7 +320,6 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.workspacePaneTabsAfterSnapshotCommitMock.mockClear()
     mocks.listWorkspaceTabsMock.mockReset()
     mocks.listWorkspaceTabsMock.mockResolvedValue([])
-    mocks.setBadgeMock.mockReset()
     mocks.clientIdMock.mockClear()
     projection = new TerminalSessionProjection()
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
@@ -709,8 +705,6 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
-  test('clears the native badge when the projection starts', () => {})
-
   test('keeps the filesystem target pending while create is in flight', async () => {
     const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReturnValueOnce(promise)
@@ -806,7 +800,6 @@ describe('TerminalSessionProjection create flow', () => {
 
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {
     const terminalSessionId = await projection.createTerminal(terminalBase())
-    mocks.setBadgeMock.mockClear()
     terminalSessionProjectionAccess(projection).bellState.handleBell(
       {
         terminalSessionId,

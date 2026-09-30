@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { QueryClient } from '@tanstack/vue-query'
 import { fireEvent } from '@testing-library/vue'
@@ -53,11 +52,6 @@ async function renderPage(options: { lanInfo?: LanInfo } = {}) {
 
 function seedWebBootstrap() {
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'web',
-      bridgeVersion: 1,
-      capabilities: [],
-    },
     initialServer: null,
   }
   setClientBridgeForTests({

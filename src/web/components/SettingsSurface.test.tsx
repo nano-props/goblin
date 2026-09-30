@@ -2,7 +2,6 @@
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
-
 import { QueryClient } from '@tanstack/vue-query'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -11,7 +10,6 @@ import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { terminalClient } from '#/web/terminal/client-facade.ts'
 import type { VNode } from 'vue'
@@ -21,7 +19,7 @@ const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }))
 
-function defaultIpcResult(path: string, input?: unknown) {
+function settingsResponse(path: string, input?: unknown) {
   if (path === 'githubCli.get' || path === 'githubCli.refresh') {
     const requestedHosts = (input as { hosts?: string[] } | undefined)?.hosts
     const hosts = (requestedHosts && requestedHosts.length > 0 ? requestedHosts : ['github.example.com']).reduce<
@@ -65,19 +63,18 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
-const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { __GOBLIN_BOOTSTRAP__?: unknown }
 const sendTestNotification = vi.fn(async () => true)
-const invokeIpc = vi.fn(async ({ path, input }: { path: string; input?: unknown }) => defaultIpcResult(path, input))
 const fetchMock = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
   const rawBody = typeof init?.body === 'string' && init.body.length > 0 ? init.body : ''
   const body = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {}
   let result: unknown = null
-  if (url.pathname === '/api/settings/github-cli/refresh') result = defaultIpcResult('githubCli.refresh', body)
+  if (url.pathname === '/api/settings/github-cli/refresh') result = settingsResponse('githubCli.refresh', body)
   else if (url.pathname === '/api/settings/github-cli') {
-    result = defaultIpcResult('githubCli.get', body)
-  } else if (url.pathname === '/api/settings') result = defaultIpcResult('settings.get')
-  else if (url.pathname === '/api/settings/external-apps') result = defaultIpcResult('externalApps.get')
+    result = settingsResponse('githubCli.get', body)
+  } else if (url.pathname === '/api/settings') result = settingsResponse('settings.get')
+  else if (url.pathname === '/api/settings/external-apps') result = settingsResponse('externalApps.get')
   return {
     ok: true,
     json: async () => result,
@@ -91,10 +88,6 @@ beforeEach(() => {
   vi.spyOn(terminalClient, 'sendTestNotification').mockImplementation(sendTestNotification)
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
-  invokeIpc.mockClear()
-  invokeIpc.mockImplementation(async ({ path, input }: { path: string; input?: unknown }) =>
-    defaultIpcResult(path, input),
-  )
   fetchMock.mockClear()
   // Host info used to live in the bootstrap payload; it now lives
   // on the public `/api/host` endpoint and the client-side
@@ -106,11 +99,6 @@ beforeEach(() => {
     error: null,
   })
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'web',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: WEB_CLIENT_CAPABILITIES,
-    },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
 })
@@ -196,13 +184,13 @@ describe('SettingsSurface', () => {
       let result: unknown = null
       if (url.pathname === '/api/settings') {
         result = {
-          ...defaultIpcResult('settings.get'),
+          ...settingsResponse('settings.get'),
           terminalNotificationsEnabled: true,
         }
       } else if (url.pathname === '/api/settings/github-cli') {
-        result = defaultIpcResult('githubCli.get', body)
+        result = settingsResponse('githubCli.get', body)
       } else if (url.pathname === '/api/settings/external-apps') {
-        result = defaultIpcResult('externalApps.get')
+        result = settingsResponse('externalApps.get')
       }
       return {
         ok: true,
@@ -252,9 +240,9 @@ describe('SettingsSurface', () => {
       } else if (url.pathname === '/api/settings/github-cli') {
         result = { available: false, version: null, detectedAt: 0, hosts: {} }
       } else if (url.pathname === '/api/settings') {
-        result = defaultIpcResult('settings.get')
+        result = settingsResponse('settings.get')
       } else if (url.pathname === '/api/settings/external-apps') {
-        result = defaultIpcResult(init?.method === 'POST' ? 'externalApps.refresh' : 'externalApps.get')
+        result = settingsResponse(init?.method === 'POST' ? 'externalApps.refresh' : 'externalApps.get')
       }
       return {
         ok: true,

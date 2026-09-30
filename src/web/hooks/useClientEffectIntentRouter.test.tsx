@@ -6,14 +6,12 @@ import {
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   createRepoWorktreeSnapshotForTest,
-  createRepoBranch,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { defineComponent, ref } from 'vue'
-
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -22,8 +20,6 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { themeStore } from '#/web/stores/theme.ts'
-import { i18nStore } from '#/web/stores/i18n.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import {
   observedAppNavigationActionsForTest,
@@ -36,16 +32,11 @@ import {
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
-import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
-import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
@@ -55,21 +46,8 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import { CodedError } from '#/shared/coded-error.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
-
-const commandGenerationMocks = vi.hoisted(() => ({ advance: vi.fn() }))
-
-const appDataClientMocks = vi.hoisted(() => ({
-  clearRecentWorkspaceHistory: vi.fn(async () => {}),
-  removeWorkspaceFromSession: vi.fn(async () => {}),
-}))
-
-vi.mock('#/web/settings/actions.ts', () => ({
-  clearRecentWorkspaceHistory: appDataClientMocks.clearRecentWorkspaceHistory,
-  removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
-}))
 
 vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
   subscribeServerClientIntentIngress: (cb: (event: ClientEffectIntent) => void) => {
@@ -84,9 +62,6 @@ vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
 const intentListeners = new Set<(event: ClientEffectIntent) => void>()
 let serverIntentSubscriptionStarts = 0
 const closeAllOverlays = vi.fn()
-const openWorkspacePathDialogSpy = vi.fn()
-const openCloneRepoSpy = vi.fn()
-const openRemoteWorkspaceSpy = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
 let currentWorkspaceId: WorkspaceId | null = null
@@ -99,26 +74,15 @@ const activateWorkspaceSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
 const commitFilesystemWorkspacePaneRouteSpy = vi.fn()
-const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
   resetWorkspacesStore()
   setClientBridgeForTests(null)
   closeAllOverlays.mockClear()
-  openWorkspacePathDialogSpy.mockClear()
-  openCloneRepoSpy.mockClear()
-  openRemoteWorkspaceSpy.mockClear()
   activateWorkspaceSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   commitFilesystemWorkspacePaneRouteSpy.mockClear()
-  appDataClientMocks.clearRecentWorkspaceHistory.mockReset()
-  appDataClientMocks.clearRecentWorkspaceHistory.mockResolvedValue(undefined)
-  appDataClientMocks.removeWorkspaceFromSession.mockReset()
-  appDataClientMocks.removeWorkspaceFromSession.mockResolvedValue(undefined)
-  consumeExternalOpenPathsSpy.mockReset()
-  consumeExternalOpenPathsSpy.mockResolvedValue([])
-  commandGenerationMocks.advance.mockClear()
   overlayOpen = false
   workspaceShortcutSuppressed = false
   currentWorkspaceId = null
@@ -185,24 +149,6 @@ afterEach(() => {
 })
 
 describe('useClientEffectIntentRouter', () => {
-  test('dispatches global dialogs while workspace bootstrap is still restoring', async () => {
-    currentWorkspaceId = null
-    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'open-workspace-path-requested' })
-      emitIntent({ type: 'clone-repo-requested' })
-      emitIntent({ type: 'open-remote-workspace-requested' })
-    })
-
-    await waitFor(() => {
-      expect(openWorkspacePathDialogSpy).toHaveBeenCalledOnce()
-      expect(openCloneRepoSpy).toHaveBeenCalledOnce()
-      expect(openRemoteWorkspaceSpy).toHaveBeenCalledOnce()
-    })
-  })
-
   test('admits a cold-start terminal bell only after bootstrap restores its workspace authority', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
@@ -250,27 +196,27 @@ describe('useClientEffectIntentRouter', () => {
     currentWorkspaceId = workspaceId
     await renderHookHost()
     await flushTestUpdates(() => {
-      emitIntent({ type: 'close-workspace-requested' })
+      emitIntent({ type: 'show-workspace-pane-tab-requested', tab: 'history' })
     })
 
     await flushTestUpdates(() => {
       authenticatedBootstrapState.value = { status: 'failed', message: 'restore failed for test' }
     })
-    expect(closeRepoSpy).not.toHaveBeenCalled()
+    expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith('workspace-restore.failed')
 
     await flushTestUpdates(() => {
       authenticatedBootstrapState.value = { status: 'restoring-workspace' }
       authenticatedBootstrapState.value = { status: 'ready' }
     })
-    expect(closeRepoSpy).not.toHaveBeenCalled()
+    expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
   test('does not retain a workspace-only intent when the ready route has no workspace target', async () => {
     currentWorkspaceId = null
     const host = await renderHookHost()
     await flushTestUpdates(() => {
-      emitIntent({ type: 'close-workspace-requested' })
+      emitIntent({ type: 'show-workspace-pane-tab-requested', tab: 'history' })
     })
 
     const repo = seedRepoWithReadModelForTest({
@@ -281,7 +227,7 @@ describe('useClientEffectIntentRouter', () => {
     currentWorkspaceId = repo.id
     await flushTestUpdates(() => host.rerender(<IntentIngressTestHost />))
 
-    expect(closeRepoSpy).not.toHaveBeenCalled()
+    expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
   test('keeps one ingress subscription across route renders and reads the latest route state', async () => {
@@ -294,12 +240,25 @@ describe('useClientEffectIntentRouter', () => {
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
       ],
     })
+    installWorkspacePaneTabsTestBridge({})
     const host = await renderHookHost()
 
     expect(serverIntentSubscriptionStarts).toBe(1)
     expect(intentListeners.size).toBe(1)
 
     currentWorkspaceId = repo.id
+    currentBranchName = 'main'
+    currentFilesystemTarget = gitWorktreePaneFilesystemTarget({
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      worktreePath: '/tmp/repo-worktree',
+      head: { kind: 'branch', branchName: 'main' },
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+    })
     await flushTestUpdates(async () => {
       await host.rerender(<IntentIngressTestHost />)
     })
@@ -308,12 +267,14 @@ describe('useClientEffectIntentRouter', () => {
     expect(intentListeners.size).toBe(1)
 
     await flushTestUpdates(() => {
-      emitIntent({ type: 'close-workspace-requested' })
+      emitIntent({ type: 'show-workspace-pane-tab-requested', tab: 'history' })
     })
 
     await waitFor(() => {
-      expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
-      expect(workspacesStore.getState().workspaces[repo.id]).toBeUndefined()
+      expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: repo.id }),
+        { kind: 'static', tab: 'history' },
+      )
     })
   })
 
@@ -405,185 +366,7 @@ describe('useClientEffectIntentRouter', () => {
     )
   })
 
-  test('close-repo menu action delegates to navigation close', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/repo',
-      currentBranch: 'main',
-      currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
-      ],
-    })
-    currentWorkspaceId = repo.id
-
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'close-workspace-requested' })
-    })
-
-    await waitFor(() => {
-      expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
-      expect(workspacesStore.getState().workspaces[repo.id]).toBeUndefined()
-    })
-  })
-
-  test('close-repo menu action reports shared membership write failures', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/repo',
-      currentBranch: 'main',
-      currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
-      ],
-    })
-    currentWorkspaceId = repo.id
-    appDataClientMocks.removeWorkspaceFromSession.mockRejectedValueOnce(new Error('workspace write failed'))
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'close-workspace-requested' })
-    })
-
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.workspace-close-failed'))
-    expect(workspacesStore.getState().workspaces[repo.id]).toBeDefined()
-  })
-
-  test('zen mode menu action toggles the zen mode state', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/repo',
-      currentBranch: 'main',
-      currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
-      ],
-    })
-    currentWorkspaceId = repo.id
-
-    await renderHookHost()
-
-    expect(workspacesStore.getState().zenMode).toBe(false)
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'workspace-zen-mode-toggle-requested' })
-    })
-
-    await waitFor(() => {
-      expect(workspacesStore.getState().zenMode).toBe(true)
-    })
-  })
-
-  test('current repo menu actions use the visible routed repo rather than the restored repo id', async () => {
-    const restoredRepo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/restored-repo',
-      currentBranch: 'main',
-      currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('main', '/tmp/restored-repo-worktree', { isPrimary: false, isLocked: false }),
-      ],
-    })
-    const visibleRepo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/visible-repo',
-      currentBranch: 'feature',
-      currentBranchName: 'feature',
-      branchSnapshots: [createBranchSnapshot('feature')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('feature', '/tmp/visible-repo-worktree', {
-          isPrimary: false,
-          isLocked: false,
-        }),
-      ],
-    })
-    workspacesStore.setState((state) => ({
-      ...state,
-      workspaces: {
-        [restoredRepo.id]: restoredRepo,
-        [visibleRepo.id]: visibleRepo,
-      },
-      workspaceOrder: [restoredRepo.id, visibleRepo.id],
-      restoredWorkspaceId: restoredRepo.id,
-      workspaceMembershipReady: true,
-    }))
-    currentWorkspaceId = visibleRepo.id
-
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'close-workspace-requested' })
-    })
-
-    await waitFor(() => {
-      expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
-      expect(workspacesStore.getState().workspaces[visibleRepo.id]).toBeUndefined()
-    })
-    expect(workspacesStore.getState().workspaces[restoredRepo.id]).toBeDefined()
-  })
-
-  test('open-recent-workspace opens without store activation and then delegates activation to navigation', async () => {
-    const recentWorkspaceId = workspaceIdForTest('goblin+file:///tmp/recent-workspace')
-    workspacesStore.setState({
-      openWorkspaceMembership: vi.fn(() =>
-        Promise.resolve({
-          ok: true as const,
-          workspaceId: recentWorkspaceId,
-        }),
-      ),
-    })
-
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({
-        type: 'open-recent-workspace-requested',
-        entry: { id: recentWorkspaceId },
-      })
-    })
-
-    await waitFor(() => {
-      expect(workspacesStore.getState().openWorkspaceMembership).toHaveBeenCalledWith({
-        id: recentWorkspaceId,
-      })
-      expect(activateWorkspaceSpy).toHaveBeenCalledWith(recentWorkspaceId)
-    })
-  })
-
-  test('does not let an earlier open-recent result replace a later navigation intent', async () => {
-    const first = Promise.withResolvers<OpenWorkspaceResult>()
-    const second = Promise.withResolvers<OpenWorkspaceResult>()
-    const firstWorkspaceId = workspaceIdForTest('goblin+file:///tmp/first-recent-workspace')
-    const secondWorkspaceId = workspaceIdForTest('goblin+file:///tmp/second-recent-workspace')
-    workspacesStore.setState({
-      openWorkspaceMembership: vi
-        .fn()
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => second.promise),
-    })
-
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'open-recent-workspace-requested', entry: { id: firstWorkspaceId } })
-      emitIntent({ type: 'open-recent-workspace-requested', entry: { id: secondWorkspaceId } })
-    })
-    second.resolve({ ok: true, workspaceId: secondWorkspaceId })
-    await waitFor(() => expect(activateWorkspaceSpy).toHaveBeenCalledWith(secondWorkspaceId))
-    first.resolve({
-      ok: false,
-      kind: 'uncertain',
-      message: 'error.operation-outcome-uncertain',
-    })
-    await flushTestUpdates(() => {})
-
-    expect(activateWorkspaceSpy).toHaveBeenCalledTimes(1)
-    expect(toast.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
-      id: 'workspace-open-outcome-uncertain',
-    })
-  })
-
-  test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
+  test('workspace view commands are suppressed while settings-like routes are active', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
@@ -596,188 +379,18 @@ describe('useClientEffectIntentRouter', () => {
     })
     currentWorkspaceId = repo.id
     workspaceShortcutSuppressed = true
-    const defaultWorkspacePaneSize = workspacesStore.getState().workspacePaneSize
-    workspacesStore.getState().setWorkspacePaneSize(defaultWorkspacePaneSize + 10)
 
     await renderHookHost()
 
     await flushTestUpdates(() => {
       emitIntent({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })
-      emitIntent({ type: 'terminal-primary-action-requested' })
-      emitIntent({ type: 'workspace-zen-mode-toggle-requested' })
-      emitIntent({ type: 'close-workspace-requested' })
-      emitIntent({ type: 'layout-reset-requested' })
+      emitIntent({ type: 'show-workspace-pane-tab-requested', tab: 'history' })
     })
 
-    await waitFor(() => {
-      expect(workspacesStore.getState().workspacePaneSize).toBe(defaultWorkspacePaneSize)
-    })
     const state = workspacesStore.getState()
     expect(preferredWorkspacePaneTab(repo.id)).toBe('status')
     expect(state.zenMode).toBe(false)
-    expect(closeRepoSpy).not.toHaveBeenCalled()
-  })
-
-  test('native new-terminal intent preserves a static route opener on a worktree target', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/repo',
-      currentBranch: 'main',
-      currentBranchName: 'main',
-      preferredWorkspacePaneTab: 'status',
-      branches: [createRepoBranch('main')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
-      ],
-      workspacePaneTabsByBranch: {
-        main: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneStaticTabEntry('history'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-        ],
-      },
-    })
-    currentWorkspaceId = repo.id
-    currentBranchName = 'main'
-    currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
-    currentFilesystemTarget = gitWorktreePaneFilesystemTarget({
-      workspaceId: repo.id,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      worktreePath: '/tmp/repo-worktree',
-      head: { kind: 'branch', branchName: 'main' },
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-      },
-    })
-    terminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.workspaceRuntimeId)
-    const terminalFilesystemTargetKey = `${repo.id}\0goblin+file:///tmp/repo-worktree`
-    let visibleSessionIds = ['term-111111111111111111111']
-    const workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge({})
-    workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-111111111111111111111')
-    const createTerminal = vi.fn((base: TerminalSessionBase) => {
-      const terminalSessionId = 'term-222222222222222222222'
-      const coordinates = terminalSessionCoordinates(base)
-      if (base.target.kind !== 'git-worktree') throw new Error('expected Git worktree terminal fixture')
-      visibleSessionIds = [...visibleSessionIds, terminalSessionId]
-      workspacePaneTabsTestBridge.addRuntimeTab({
-        workspaceId: coordinates.workspaceId,
-        workspaceRuntimeId: coordinates.workspaceRuntimeId,
-        worktreePath: terminalExecutionPath(base.target),
-        terminalSessionId,
-      })
-      workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
-      return Promise.resolve(terminalSessionId)
-    })
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () =>
-        terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey, visibleSessionIds),
-      createTerminal,
-      createTerminalWithAdmission: vi.fn(async (base) => ({
-        terminalSessionId: await createTerminal(base),
-        presentation: base.presentation,
-        requestRole: 'leader' as const,
-        resourceDisposition: 'created' as const,
-        runtimeProjectionApplied: true,
-      })),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(() => Promise.resolve({ kind: 'not-committed' as const, message: null })),
-    })
-    renderInJsdom(<IntentIngressTestHost />)
-    seedInitialObservedWorkspacePaneRouteForTest({
-      workspaceId: repo.id,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      branchName: 'main',
-      worktreePath: '/tmp/repo-worktree',
-      route: { kind: 'static', tab: 'status' },
-    })
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'terminal-new-tab-requested' })
-    })
-
-    await waitFor(() => {
-      expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: '/tmp/repo-worktree' },
-        }),
-        { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
-      )
-    })
-  })
-
-  test('theme menu intents update theme through the client store', async () => {
-    const setPref = vi.fn(() => Promise.resolve())
-    themeStore.setState((state) => ({ ...state, setPref }))
-
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'theme-pref-set-requested', pref: 'dark' })
-    })
-
-    await waitFor(() => {
-      expect(setPref).toHaveBeenCalledWith('dark')
-    })
-  })
-
-  test('does not block an unrelated dialog behind a pending settings intent', async () => {
-    const write = Promise.withResolvers<void>()
-    themeStore.setState((state) => ({ ...state, setPref: vi.fn(() => write.promise) }))
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'theme-pref-set-requested', pref: 'dark' })
-      emitIntent({ type: 'open-workspace-path-requested' })
-    })
-
-    expect(openWorkspacePathDialogSpy).toHaveBeenCalledOnce()
-    write.resolve()
-  })
-
-  test('language menu intents update i18n through the client store', async () => {
-    const setPref = vi.fn(() => Promise.resolve())
-    i18nStore.setState((state) => ({ ...state, setPref }))
-
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'lang-pref-set-requested', pref: 'ko' })
-    })
-
-    await waitFor(() => {
-      expect(setPref).toHaveBeenCalledWith('ko')
-    })
-  })
-
-  test('clear recent intent clears server-backed recents through the client', async () => {
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'clear-recent-workspaces-requested' })
-    })
-
-    await waitFor(() => {
-      expect(appDataClientMocks.clearRecentWorkspaceHistory).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  test('surfaces an uncertain app intent outcome once', async () => {
-    appDataClientMocks.clearRecentWorkspaceHistory.mockRejectedValueOnce(
-      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'clear recent outcome uncertain' }),
-    )
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'clear-recent-workspaces-requested' })
-    })
-
-    await waitFor(() => {
-      expect(toast.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
-        id: 'intent-operation-outcome-uncertain',
-      })
-    })
+    expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 })
 
@@ -818,10 +431,6 @@ const HookHost = defineComponent({
       currentWorkspaceId: () => currentWorkspaceId,
       currentWorkspacePaneCommandTarget,
       closeAllOverlays,
-      openWorkspacePathDialog: openWorkspacePathDialogSpy,
-      openCloneRepo: openCloneRepoSpy,
-      openRemoteWorkspace: openRemoteWorkspaceSpy,
-      openCreateWorktree: () => {},
       isOverlayOpen: () => overlayOpen,
       isWorkspaceShortcutSuppressed: () => workspaceShortcutSuppressed,
     })
@@ -857,47 +466,5 @@ function currentWorkspacePaneCommandTarget(): WorkspacePaneCommandTarget | null 
       workspace.workspaceRuntimeId,
     ),
     workspacePaneRoute: currentWorkspacePaneRoute,
-  }
-}
-
-function terminalFilesystemTargetSnapshot(
-  terminalFilesystemTargetKey: string,
-  terminalSessionIds: readonly string[],
-): TerminalFilesystemTargetSnapshot {
-  const selectedKey =
-    workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey] ?? null
-  const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
-    type: 'terminal' as const,
-    terminalSessionId,
-    terminalFilesystemTargetKey,
-    index: index + 1,
-    title: `terminal ${index + 1}`,
-    phase: 'open' as const,
-    selected: terminalSessionId === selectedKey,
-    hasBell: false,
-    hasRecentOutput: false,
-  }))
-  const selectedSession = sessions.find((session) => session.terminalSessionId === selectedKey) ?? null
-  return {
-    terminalFilesystemTargetKey,
-    selectedDescriptor: selectedSession
-      ? {
-          terminalSessionId: selectedSession.terminalSessionId,
-          index: selectedSession.index,
-          target: {
-            kind: 'git-worktree' as const,
-            workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/repo')!,
-            workspaceRuntimeId:
-              workspacesStore.getState().workspaces['goblin+file:///tmp/repo']?.workspaceRuntimeId ?? '',
-            root: canonicalWorkspaceLocator('goblin+file:///tmp/repo-worktree')!,
-          },
-          presentation: { kind: 'git-worktree' as const },
-        }
-      : null,
-    sessions,
-    count: sessions.length,
-    bellCount: 0,
-    outputActiveCount: 0,
-    createPending: false,
   }
 }

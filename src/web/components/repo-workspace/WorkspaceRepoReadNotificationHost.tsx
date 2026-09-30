@@ -1,6 +1,6 @@
 import { computed, defineComponent, ref, Teleport } from 'vue'
 import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoReadNotificationCard } from '#/web/components/repo-workspace/RepoReadNotificationCard.tsx'
 import type { RepoReadNotificationCardProps } from '#/web/components/repo-workspace/RepoReadNotificationCard.tsx'
@@ -109,7 +109,7 @@ export const WorkspaceRepoReadNotificationHost = defineComponent<WorkspaceRepoRe
             role={notification.kind === 'unavailable' ? 'alert' : 'status'}
             aria-live={notification.kind === 'unavailable' ? 'assertive' : 'polite'}
             class="fixed left-4 right-4 z-40 min-[601px]:left-auto min-[601px]:w-[420px]"
-            style={{ top: `${TITLE_BAR_HEIGHT_PX + 12}px` }}
+            style={{ top: `${WORKSPACE_TOOLBAR_HEIGHT_PX + 12}px` }}
           >
             <RepoReadNotificationCard
               kind={notification.kind}

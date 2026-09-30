@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
@@ -32,7 +31,6 @@ function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
-    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
     initialServer: null,
     ...overrides,
   }

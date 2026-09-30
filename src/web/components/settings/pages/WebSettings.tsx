@@ -1,6 +1,6 @@
 import { Copy } from '@lucide/vue'
 import { defineComponent, onMounted, onScopeDispose, ref, watch } from 'vue'
-import type { FunctionalComponent, PropType } from 'vue'
+import type { FunctionalComponent } from 'vue'
 import { toast } from 'vue-sonner'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -110,7 +110,7 @@ export const WebSettings = defineComponent({
                 }
               />
             </SettingsList>
-            <div class="px-4 py-2 text-sm text-muted-foreground">{t('settings.web.token-rotation-hint')}</div>
+            <div class="px-4 py-2 text-sm text-muted-foreground">{t('settings.web.token-sharing-hint')}</div>
           </SettingsGroup>
 
           {showNetworkGroup ? (

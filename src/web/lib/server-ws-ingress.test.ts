@@ -1,7 +1,6 @@
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 // @vitest-environment jsdom
-
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION, type ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
@@ -139,7 +138,6 @@ function installBootstrap(initialServer: ClientBootstrapSnapshot['initialServer'
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
-      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer,
     } satisfies ClientBootstrapSnapshot,
   })

@@ -137,7 +137,7 @@ repo picker, branch action menu, file action menu, or future sidebar control.
 - Do not fix anchor stability by eagerly closing child menus on parent leave.
 - Do not replace custom transient parents with a Reka primitive solely to get
   hover behavior; custom parents may own sizing, animation retention, inert
-  state, title-bar behavior, and resize interaction.
+  state, toolbar behavior, and resize interaction.
 
 ## Accessibility
 

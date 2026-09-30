@@ -1,6 +1,5 @@
 import type { ILinkHandler } from '@xterm/xterm'
 import { vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -541,11 +540,6 @@ export function resetTerminalSessionHarness() {
 
   setClientBridgeForTests({
     getBootstrap: () => ({
-      runtime: {
-        kind: 'web',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...WEB_CLIENT_CAPABILITIES],
-      },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
 

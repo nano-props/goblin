@@ -8,7 +8,7 @@ import { repoPullRequestsQueryPrefix } from '#/web/repos/query-keys.ts'
 import {
   REPO_ID,
   branch,
-  ipcHandlers,
+  serverHandlers,
   refreshStoreAccess,
   repoSnapshotResponse,
   resetRefreshTest,
@@ -35,9 +35,9 @@ describe('manual workspace refresh', () => {
       status: [{ path: '/tmp/repository', branch: 'main', isMain: true, entries: [] }],
       loadedAt: Date.now(),
     }))
-    ipcHandlers['repo.fetch'] = fetch
-    ipcHandlers['repo.snapshot'] = snapshot
-    ipcHandlers['repo.worktreeStatus'] = status
+    serverHandlers['repo.fetch'] = fetch
+    serverHandlers['repo.snapshot'] = snapshot
+    serverHandlers['repo.worktreeStatus'] = status
     const refetchPullRequests = vi.spyOn(appQueryClient, 'refetchQueries')
 
     await expect(
@@ -66,10 +66,10 @@ describe('manual workspace refresh', () => {
     })
     const pending = new Promise<void>(() => {})
     vi.spyOn(appQueryClient, 'refetchQueries').mockReturnValue(pending)
-    ipcHandlers['repo.snapshot'] = vi.fn(async () =>
+    serverHandlers['repo.snapshot'] = vi.fn(async () =>
       repoSnapshotResponse({ branches: [branch('main')], current: 'main' }),
     )
-    ipcHandlers['repo.worktreeStatus'] = vi.fn(({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => ({
+    serverHandlers['repo.worktreeStatus'] = vi.fn(({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => ({
       workspaceRuntimeId,
       status: [],
       loadedAt: Date.now(),
@@ -83,15 +83,15 @@ describe('manual workspace refresh', () => {
   test('fetches a repository with remotes before refreshing the read models', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     const order: string[] = []
-    ipcHandlers['repo.fetch'] = async () => {
+    serverHandlers['repo.fetch'] = async () => {
       order.push('fetch')
       return { ok: true, message: 'ok' }
     }
-    ipcHandlers['repo.snapshot'] = async () => {
+    serverHandlers['repo.snapshot'] = async () => {
       order.push('snapshot')
       return repoSnapshotResponse({ branches: [branch('main')], current: 'main' })
     }
-    ipcHandlers['repo.worktreeStatus'] = ({ workspaceRuntimeId: runtimeId }: { workspaceRuntimeId: string }) => {
+    serverHandlers['repo.worktreeStatus'] = ({ workspaceRuntimeId: runtimeId }: { workspaceRuntimeId: string }) => {
       order.push('status')
       return { workspaceRuntimeId: runtimeId, status: [], loadedAt: Date.now() }
     }
@@ -106,11 +106,11 @@ describe('manual workspace refresh', () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     const snapshot = vi.fn()
     const status = vi.fn()
-    ipcHandlers['repo.fetch'] = async () => {
+    serverHandlers['repo.fetch'] = async () => {
       throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost after fetch' })
     }
-    ipcHandlers['repo.snapshot'] = snapshot
-    ipcHandlers['repo.worktreeStatus'] = status
+    serverHandlers['repo.snapshot'] = snapshot
+    serverHandlers['repo.worktreeStatus'] = status
 
     await expect(runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
       ok: false,
@@ -130,8 +130,8 @@ describe('manual workspace refresh', () => {
           resolveFetch = resolve
         }),
     )
-    ipcHandlers['repo.fetch'] = fetch
-    ipcHandlers['repo.snapshot'] = () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' })
+    serverHandlers['repo.fetch'] = fetch
+    serverHandlers['repo.snapshot'] = () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' })
 
     const first = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     const second = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
@@ -145,7 +145,7 @@ describe('manual workspace refresh', () => {
   test('does not apply completion effects to a reopened runtime', async () => {
     const firstRuntimeId = seedRepo([branch('main')], 'repo-runtime-first')
     let resolveFetch!: (result: { ok: true; message: string }) => void
-    ipcHandlers['repo.fetch'] = () =>
+    serverHandlers['repo.fetch'] = () =>
       new Promise((resolve) => {
         resolveFetch = resolve
       })

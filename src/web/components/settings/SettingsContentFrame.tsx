@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 
 export const SettingsContentFrame = defineComponent<{ topInset?: number; title: string }>({
   name: 'SettingsContentFrame',
@@ -11,7 +11,7 @@ export const SettingsContentFrame = defineComponent<{ topInset?: number; title: 
 
   setup(props, { slots }) {
     return () => {
-      const chromeHeight = (props.topInset ?? 0) > 0 ? props.topInset : TITLE_BAR_HEIGHT_PX
+      const chromeHeight = (props.topInset ?? 0) > 0 ? props.topInset : WORKSPACE_TOOLBAR_HEIGHT_PX
       return (
         <section class="flex min-w-0 flex-1 flex-col bg-background">
           <div class="shrink-0 bg-background" aria-hidden style={{ height: `${chromeHeight}px` }} />

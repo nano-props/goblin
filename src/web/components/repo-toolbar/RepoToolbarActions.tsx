@@ -1,11 +1,8 @@
 import { computed, defineComponent } from 'vue'
 import type { FunctionalComponent } from 'vue'
 import { GitBranchPlus } from '@lucide/vue'
-import { formatAccelerator } from '#/shared/accelerator.ts'
 import type { BranchViewMode } from '#/shared/api-types.ts'
-import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
@@ -167,7 +164,6 @@ const CreateWorktreeRowActionView = defineComponent<CreateWorktreeRowActionViewP
   props: ['disabled', 'selected', 'onActivate'],
   setup(props) {
     const t = useT()
-    const shortcutLabel = formatAccelerator(CREATE_WORKTREE_SHORTCUT)
     return () => {
       const label = t('action.create-worktree-title')
       return (
@@ -175,12 +171,11 @@ const CreateWorktreeRowActionView = defineComponent<CreateWorktreeRowActionViewP
           onClick={props.onActivate}
           disabled={props.disabled}
           selected={props.selected}
-          aria-label={`${label} (${shortcutLabel})`}
+          aria-label={label}
           data-testid="create-worktree-button"
           size="dense"
           class="group"
           leading={<GitBranchPlus size={16} />}
-          trailing={<InlineShortcut shortcut={shortcutLabel} showOnHover={true} ariaHidden={true} />}
         >
           {label}
         </SidebarRowButton>

@@ -7,7 +7,6 @@
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
 // is suppressed — including `?`, otherwise pressing it with Settings
 // open would stack the Help modal on top.
-
 import { onScopeDispose, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -24,23 +23,13 @@ import { gitBranchPaneTargetLease } from '#/web/workspace-pane/workspace-pane-ta
 import { getRuntimeShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
-  runCloseCurrentWorkspacePaneTabCommand,
   runMoveWorkspacePaneTabCommand,
-  runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { translate } from '#/web/stores/i18n-vue.ts'
-import { toast } from 'vue-sonner'
-import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
-import {
-  workspacePaneCommandCoordinates,
-  type WorkspacePaneCommandTarget,
-} from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
-import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
-import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   gitWorkspaceNavigatorRowMatchesIdentity,
   gitWorkspaceNavigatorRows,
@@ -61,7 +50,6 @@ interface Options {
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void
-  openCreateWorktree: () => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -175,57 +163,10 @@ export function useKeyboard(options: Options) {
       const workspaceId = toValue(options.currentWorkspaceId)
       const paneTarget = toValue(options.currentWorkspacePaneCommandTarget)
       const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
-      const rendererOwnedShortcut =
-        tabIndex !== null || (!e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
-      if (rendererOwnedShortcut) {
+      if (tabIndex !== null) {
         e.preventDefault()
         e.stopPropagation()
         if (workspaceShortcutsSuppressed) return
-      }
-      if (!e.shiftKey && e.code === 'KeyT') {
-        if (!paneTarget) return
-        const workspace = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
-        if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
-          return
-        // Cmd+T is a generic entry → new terminal appends to the end.
-        void runNewTerminalTabCommand({
-          workspaceId,
-          target: paneTarget,
-          navigation,
-          t: translate,
-        })
-        return
-      }
-      if (!e.shiftKey && e.code === 'KeyN') {
-        const repo = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
-        if (
-          !repo ||
-          !workspaceCanExecute(repo) ||
-          repo.capability.kind !== 'git' ||
-          !workspaceWorktreesAvailable(repo.capability.probe)
-        )
-          return
-        const branchAction = projectBranchActionOperation(
-          repo.capability.git.operations.branchAction,
-          getRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId)?.operations,
-        )
-        if (branchAction.phase === 'idle') {
-          options.openCreateWorktree()
-        } else {
-          toast.error(translate('action.create-worktree-busy'))
-        }
-        return
-      }
-      if (!e.shiftKey && e.code === 'KeyW') {
-        if (!paneTarget) return
-        void runCloseCurrentWorkspacePaneTabCommand({
-          workspaceId,
-          target: paneTarget,
-          navigation,
-        })
-        return
-      }
-      if (tabIndex !== null) {
         if (!paneTarget) return
         void runSelectWorkspacePaneTabByIndexCommand({
           workspaceId,

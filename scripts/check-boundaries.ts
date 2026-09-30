@@ -86,7 +86,6 @@ const RULES: Rule[] = [
         'restoreServerWorkspace',
         'removeWorkspaceEntry',
         'setI18nPref',
-        'setLanEnabled',
         'setRecentWorkspaceExternalApp',
         'setSettingsFetchInterval',
         'setShortcutsDisabled',

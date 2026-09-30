@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-
 import { defineComponent, ref } from 'vue'
 import { userEvent } from '@testing-library/user-event'
 import { screen, waitFor } from '@testing-library/vue'
@@ -11,7 +10,7 @@ import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ZenModeSidebarChrome } from '#/web/components/workspace-layout/ZenModeSidebarChrome.tsx'
-import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
@@ -73,7 +72,7 @@ describe('ZenModeSidebarChrome', () => {
     const zenSurface = screen.getByTestId('mock-zen-reveal-surface')
     const overlay = screen.getByTestId('zen-mode-toggle-overlay')
     expect(controls.dataset.workspaceId).toBe(WORKSPACE_ID)
-    expect(overlay.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+    expect(overlay.style.height).toBe(`${WORKSPACE_TOOLBAR_HEIGHT_PX}px`)
     expect(controls.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenSurface.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(controls.closest('[data-interactive]')).not.toBeNull()
@@ -97,7 +96,7 @@ describe('ZenModeSidebarChrome', () => {
 
     const hitArea = zenModeSidebarHitArea(container)
     expect(hitArea?.className).toContain('pointer-events-auto')
-    expect(hitArea?.style.top).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+    expect(hitArea?.style.top).toBe(`${WORKSPACE_TOOLBAR_HEIGHT_PX}px`)
     expect(hitArea?.hasAttribute('data-interactive')).toBe(false)
 
     expect(hitArea?.hasAttribute('data-zen-reveal-surface')).toBe(false)
@@ -302,8 +301,8 @@ describe('ZenModeSidebarChrome', () => {
     expect(resizeVisual.hasAttribute('data-interactive')).toBe(false)
     expect(resizeVisual.querySelector('span')).not.toBeNull()
 
-    expect(resizeHandle.style.top).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
-    expect(resizeHandle.style.height).toBe(`calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`)
+    expect(resizeHandle.style.top).toBe(`${WORKSPACE_TOOLBAR_HEIGHT_PX}px`)
+    expect(resizeHandle.style.height).toBe(`calc(100% - ${WORKSPACE_TOOLBAR_HEIGHT_PX}px)`)
 
     await flushTestUpdates(() => {
       resizeHandle.dispatchEvent(new MouseEvent('mouseenter'))

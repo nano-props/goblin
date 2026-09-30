@@ -14,11 +14,11 @@
   },
   "scripts": {
     "dev": "bun scripts/dev.ts",
-    "start": "bun run build && ./dist/goblin",
+    "start": "bun run build && ./dist/goblin serve",
     "build": "bun run build:web && bun run build:server",
     "build:web": "vite build",
     "build:server": "bun scripts/build-server.ts",
-    "start:server": "bun src/server/main.ts",
+    "start:server": "bun src/server/main.ts serve",
     "reset-token": "bun scripts/reset-token.ts",
     "check:boundaries": "bun scripts/check-boundaries.ts",
     "check:no-html-injection": "bun scripts/check-no-html-injection.ts",

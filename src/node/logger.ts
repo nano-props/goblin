@@ -1,5 +1,4 @@
 // Shared structured logger for server and system code.
-
 import { pino, type Logger } from 'pino'
 import { installStdioErrorGuard } from '#/node/stdio-error-guard.ts'
 
@@ -34,16 +33,7 @@ export const nodeLogger: Logger = pino({
 
 // Subsystems import a pre-tagged child so ownership is present on every record.
 export const serverNodeLog = nodeLogger.child({ tag: 'server' })
-export const windowNodeLog = nodeLogger.child({ tag: 'window' })
-export const windowStateNodeLog = nodeLogger.child({ tag: 'window-state' })
-export const clientSurfaceRegistryNodeLog = nodeLogger.child({ tag: 'client-surface-registry' })
-export const menuNodeLog = nodeLogger.child({ tag: 'menu' })
-export const themeNodeLog = nodeLogger.child({ tag: 'theme' })
-export const shortcutsNodeLog = nodeLogger.child({ tag: 'shortcuts' })
-export const terminalNodeLog = nodeLogger.child({ tag: 'terminal' })
-export const clientNodeLog = nodeLogger.child({ tag: 'client' })
 export const ghosttyNodeLog = nodeLogger.child({ tag: 'ghostty' })
 export const pullRequestsNodeLog = nodeLogger.child({ tag: 'pull-requests' })
 export const serverRepoNodeLog = nodeLogger.child({ tag: 'server-repo' })
-export const i18nNodeLog = nodeLogger.child({ tag: 'i18n' })
 export const accessTokenNodeLog = nodeLogger.child({ tag: 'access-token' })

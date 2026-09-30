@@ -69,7 +69,7 @@ describe('buildCorsOriginPredicate', () => {
     expect(predicate('not-a-url')).toBe(false)
   })
 
-  test('allows an absent origin (Electron IPC, same-origin fetches)', () => {
+  test('allows an absent origin for CLI clients and same-origin fetches', () => {
     expect(predicate(undefined)).toBe(true)
   })
 })

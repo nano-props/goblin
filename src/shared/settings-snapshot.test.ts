@@ -41,7 +41,7 @@ describe('settings snapshot partitions', () => {
       workspaceSettings: [],
     })
 
-    expect(runtimeSettingsSnapshotFromSettingsSnapshot(snapshot)).toMatchObject({})
+    expect(runtimeSettingsSnapshotFromSettingsSnapshot(snapshot)).toEqual(prefs)
     expect(snapshot).not.toHaveProperty('session')
     expect(snapshot).not.toHaveProperty('workspace')
   })

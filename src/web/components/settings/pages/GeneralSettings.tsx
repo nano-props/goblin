@@ -3,7 +3,6 @@ import { Laptop, Moon, Sun } from '@lucide/vue'
 import type { LucideIcon } from '@lucide/vue'
 import {
   SettingsGroup,
-  SettingsCard,
   SettingsList,
   SettingsRow,
   SettingsSelect,
@@ -96,18 +95,6 @@ export const GeneralSettings = defineComponent({
               }
             />
           </SettingsList>
-        </SettingsGroup>
-        <SettingsGroup
-          label={t('settings.general.open-from-terminal-title')}
-          hint={t('settings.general.open-from-terminal-body')}
-        >
-          <SettingsCard>
-            <div class="px-4 py-3">
-              <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-snug text-muted-foreground">
-                {t('settings.general.open-from-terminal-command')}
-              </pre>
-            </div>
-          </SettingsCard>
         </SettingsGroup>
       </>
     )

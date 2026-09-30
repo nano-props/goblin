@@ -1,6 +1,4 @@
 // Workspace-pane tab bridge and canonical tab-operation behavior for web tests.
-
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
@@ -12,7 +10,6 @@ import type {
 import { workspacePaneTabsWithUpdateOperation } from '#/shared/workspace-pane-tabs-operations.ts'
 import {
   gitWorktreeWorkspacePaneTabsTarget,
-  requiredGitWorkspacePaneTabsTarget,
   runtimeWorkspacePaneTarget,
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
@@ -138,11 +135,6 @@ export function installWorkspacePaneTabsTestBridge(
   }
   setClientBridgeForTests({
     getBootstrap: () => ({
-      runtime: {
-        kind: 'web',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [],
-      },
       homeDir: '/Users/test',
       platform: 'web',
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },

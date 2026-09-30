@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -13,7 +12,6 @@ describe('remote client web helpers', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: {
-          runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {
@@ -25,7 +23,7 @@ describe('remote client web helpers', () => {
     })
   })
 
-  test('loads ssh hosts from embedded server in web host mode', async () => {
+  test('loads ssh hosts from server in web host mode', async () => {
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({ hosts: [{ alias: 'prod' }], hasInclude: true }),
@@ -41,7 +39,7 @@ describe('remote client web helpers', () => {
     )
   })
 
-  test('tests remote repository through embedded server in web host mode', async () => {
+  test('tests remote repository through server in web host mode', async () => {
     const target = {
       id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
       alias: 'prod',

@@ -42,8 +42,21 @@ membership and persistence failures may not.
 
 ### Browser document lifecycle
 
-The server is started independently of the browser. Closing a tab detaches its
-client; it does not stop the server or retire server-owned terminal sessions.
+`goblin serve` starts the server independently of the browser. Running `goblin`
+without a command displays help. `goblin open [directory]` only opens a
+browser-addressable `/open?path=<encoded-directory>` URL; it does not authenticate
+or call the server. The bounded `path` is an absolute directory on the server,
+with relative CLI arguments resolved against the CLI working directory.
+
+The `/open` page mounts only after browser authentication and workspace restore.
+It automatically opens the requested directory through the existing workspace
+membership flow, then replaces the command URL with the normal workspace URL.
+Login preserves the pending URL. Invalid paths and open failures remain on the
+page for deliberate recovery. Navigation failure preserves successful membership
+and retries only navigation. Leaving the page prevents a late completion from
+redirecting the user; opening is not rolled back.
+
+Closing a tab detaches its client; it does not stop the server or retire server-owned terminal sessions.
 Client workspace presentation is persisted continuously in localStorage after
 restore succeeds. Page lifecycle events offer only a best-effort final flush;
 authoritative server state never depends on an unloading document.
@@ -64,7 +77,7 @@ authoritative server state never depends on an unloading document.
 - The server persists workspace membership and restart-durable static pane
   layout. Live runtime sessions remain projection-only.
 - The client persists only client-owned presentation and navigation state in
-  the storage appropriate to its host.
+  browser localStorage.
 - Client and server state never become one combined session payload or a
   client-to-server whole-state write.
 - Client persistence stays closed until restore and local hydration complete.

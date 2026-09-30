@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
@@ -11,7 +10,6 @@ import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
-import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const mocks = vi.hoisted(() => ({
   getLocalDirectoryPathSuggestions: vi.fn(),
@@ -21,23 +19,15 @@ vi.mock('#/web/workspaces/client.ts', () => ({
   getLocalDirectoryPathSuggestions: mocks.getLocalDirectoryPathSuggestions,
 }))
 
-let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const testWindow = window as unknown as {
-  goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
 
 beforeEach(() => {
-  ipcCalls = []
   mocks.getLocalDirectoryPathSuggestions.mockReset()
   mocks.getLocalDirectoryPathSuggestions.mockResolvedValue([])
   setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: {
-      kind: 'web',
-      bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: WEB_CLIENT_CAPABILITIES,
-    },
     initialServer: null,
   }
   // Host info used to live in the bootstrap payload; it now lives

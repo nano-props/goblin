@@ -61,7 +61,7 @@ export const CloneRepositoryDialog = defineComponent<Props>({
         !pending.value,
     )
 
-    // The open dialog owns one abort scope for chooser and clone requests.
+    // The open dialog owns one abort scope for clone requests.
     watch(
       () => props.open,
       (open, _previous, onCleanup) => {

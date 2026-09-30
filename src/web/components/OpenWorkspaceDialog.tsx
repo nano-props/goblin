@@ -1,6 +1,5 @@
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
-
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
@@ -15,7 +14,7 @@ import {
   reportOpenWorkspacePostOpenEffects,
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
-import { tildify, untildify } from '#/web/lib/paths.ts'
+import { untildify } from '#/web/lib/paths.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 interface Props {
@@ -43,7 +42,7 @@ export const OpenWorkspaceDialog = defineComponent<Props>({
       prefix: path,
     })
 
-    // The open dialog owns the chooser and open-workspace request lifetime.
+    // The open dialog owns the path suggestions and open-workspace request lifetime.
     watch(
       () => props.open,
       (open, _previous, onCleanup) => {

@@ -7,19 +7,16 @@ import {
 } from '#/shared/clipboard-paste.ts'
 
 const mocks = vi.hoisted(() => ({
-  pathForDroppedFile: vi.fn<(file: File) => string>(),
   saveClipboardFiles: vi.fn<(files: File[]) => Promise<string[]>>(),
 }))
 
 vi.mock('#/web/app/shell-client.ts', () => ({
-  pathForDroppedFile: mocks.pathForDroppedFile,
   saveClipboardFiles: mocks.saveClipboardFiles,
 }))
 
 describe('resolvePastedFiles', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.pathForDroppedFile.mockReturnValue('')
     mocks.saveClipboardFiles.mockResolvedValue([])
   })
 
@@ -29,8 +26,7 @@ describe('resolvePastedFiles', () => {
     expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
   })
 
-  test('falls through to blob save for files with no resolvable path', async () => {
-    mocks.pathForDroppedFile.mockReturnValue('')
+  test('uploads browser files and returns their server paths', async () => {
     mocks.saveClipboardFiles.mockResolvedValue(['/tmp/x.bin'])
     const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
     const f = new File([new Uint8Array([1])], 'x.bin')
@@ -89,7 +85,6 @@ describe('resolvePastedFiles', () => {
   })
 
   test('rejects when the backend returns fewer paths than requested', async () => {
-    mocks.pathForDroppedFile.mockReturnValue('')
     mocks.saveClipboardFiles.mockResolvedValue(['/tmp/only.bin'])
     const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
     const a = new File([new Uint8Array([1])], 'a.bin')

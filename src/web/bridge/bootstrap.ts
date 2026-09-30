@@ -1,24 +1,15 @@
-import type { ClientBootstrapSnapshot, ClientRuntimeSnapshot } from '#/shared/bootstrap.ts'
-import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
+import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 
 /** Bootstrap for a browser client before selecting a server. */
 const EMPTY_BOOTSTRAP: ClientBootstrapSnapshot = {
-  runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
   initialServer: null,
 }
 
-function isClientRuntimeSnapshot(value: unknown): value is ClientRuntimeSnapshot {
-  if (!isRecord(value) || !hasExactKeys(value, ['kind', 'bridgeVersion', 'capabilities'])) return false
-  const candidate = value as Partial<ClientRuntimeSnapshot>
-  if (candidate.bridgeVersion !== CLIENT_BRIDGE_VERSION || !Array.isArray(candidate.capabilities)) return false
-  return candidate.kind === 'web' && arraysEqual(candidate.capabilities, WEB_CLIENT_CAPABILITIES)
-}
-
 function isClientBootstrapSnapshot(value: unknown): value is ClientBootstrapSnapshot {
-  if (!isRecord(value) || !hasExactKeys(value, ['runtime', 'initialServer'])) return false
+  if (!isRecord(value) || !hasExactKeys(value, ['initialServer'])) return false
   const candidate = value as Partial<ClientBootstrapSnapshot>
-  return isClientRuntimeSnapshot(candidate.runtime) && isInitialServerSnapshot(candidate.initialServer)
+  return isInitialServerSnapshot(candidate.initialServer)
 }
 
 function isInitialServerSnapshot(value: unknown): boolean {
@@ -54,10 +45,6 @@ function hasExactRequiredKeys(value: Record<string, unknown>, required: readonly
   return required.every((key) => Object.hasOwn(value, key))
 }
 
-function arraysEqual(left: readonly unknown[], right: readonly unknown[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index])
-}
-
 function normalizeServerUrl(value: string): string {
   try {
     return new URL(value, window.location.href).toString()
@@ -90,8 +77,6 @@ export function readQueryBootstrap(): ClientBootstrapSnapshot | null {
   if (!accessToken) return null
   const url = normalizeServerUrl(params.get('goblinServerUrl')?.trim() || window.location.origin)
   return {
-    ...EMPTY_BOOTSTRAP,
-    runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
     initialServer: { url, accessToken },
   }
 }

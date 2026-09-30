@@ -14,7 +14,7 @@ const options = {
   reject: false,
 } as const
 
-const server = execa(process.execPath, ['--watch', 'src/server/main.ts'], options)
+const server = execa(process.execPath, ['--watch', 'src/server/main.ts', 'serve'], options)
 const web = execa('vite', ['--host', webHost, '--port', webPort, '--strictPort'], { ...options, preferLocal: true })
 console.log(`[dev] Open http://${webHost}:${webPort}; use the access token printed by the server.`)
 

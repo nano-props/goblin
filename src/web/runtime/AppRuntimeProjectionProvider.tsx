@@ -96,8 +96,8 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
       },
     })
     // Complete membership recovery belongs to the authenticated app lifecycle,
-    // even without an active workspace route; re-declare it after a command
-    // reset so interrupted recovery cannot leave projections stale.
+    // even without an active workspace route. Server invalidations refresh the
+    // projection after membership has been restored.
     useRepoStoreInvalidationRefresh(() => {
       if (workspacesStore.getState().workspaceMembershipReady) projectionRecovery.request()
     })
