@@ -13,7 +13,12 @@ const result = await Bun.build({
   entrypoints: ['src/server/main.ts'],
   target: 'bun',
   minify: true,
-  compile: { outfile: 'dist/goblin', assets: ['dist/web'], autoloadDotenv: false, autoloadBunfig: false },
+  compile: {
+    outfile: 'dist/goblin',
+    assets: ['dist/web', 'package.json'],
+    autoloadDotenv: false,
+    autoloadBunfig: false,
+  },
 })
 if (!result.success) throw new AggregateError(result.logs, 'Goblin executable build failed')
 console.log('Built dist/goblin (Bun runtime, browser assets, server, PTY worker, g command, SSH scripts)')
