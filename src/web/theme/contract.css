@@ -6,7 +6,7 @@
  * 2. `--color-*` semantic aliases: Tailwind v4 / shadcn utility names
  *    used by components (`bg-background`, `text-muted-foreground`, …).
  * 3. integration tokens: CSS hooks for surfaces that are not Tailwind
- *    utilities, currently Electron startup/window chrome and xterm.
+ *    utilities, such as xterm.
  */
 
 @theme {

@@ -185,13 +185,12 @@ describe('WorkspacePane terminal routes', () => {
     })
   })
 
-  test('keeps the desktop removal surface draggable', () => {
+  test('shows removal status without terminal actions', () => {
     const { container } = renderWorktreeRemovalScenario({
       slug: 'removing-desktop',
       initialRemoval: { phase: 'running', target: 'current' },
     })
 
-    expect(container.querySelector('[data-title-bar-chrome-region="drag"]')).not.toBeNull()
     expect(screen.getByRole('status').textContent).toContain('action.remove-worktree-removing-title')
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.queryByRole('button', { name: 'terminal.new' })).toBeNull()

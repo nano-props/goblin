@@ -21,7 +21,7 @@ the canonical spec; `AGENTS.md` defers to it for testing conventions.
 
 Vitest runs across two projects declared in `vitest.config.ts`:
 
-- `node` (default): everything under `src/{main,server,shared,system}`. No
+- `node` (default): everything under `src/{server,shared,system}`. No
   DOM is loaded.
 - `jsdom`: every file under `src/web/**`, the top-level
   `src/vitest-storage-shim.test.ts` canary, and any test that needs
@@ -51,7 +51,7 @@ Always reach for the library tool before writing one yourself:
 | Fake timers                                         | `vi.useFakeTimers(...)` via `useFakeTimers()` in §7                                                                                        |
 | Async waits                                         | `vi.waitFor`, RTL `waitFor`, `vi.advanceTimersByTimeAsync`                                                                                 |
 | Single canonical `WebSocket` mock                   | `installWebSocketMock({ autoOpen })` in §5. Do **not** define another `MockWebSocket` in a test or helper; one harness owns that boundary. |
-| Drive IPC request/response over the socket          | `installGoblinTestBridge(handlers)` in §5 — wires the shared `MockWebSocket.send` to a JSON router; tests only supply `handlers`.          |
+| Drive server request/response over the socket       | `installGoblinTestBridge(handlers)` in §5 — wires the shared `MockWebSocket.send` to a JSON router; tests only supply `handlers`.          |
 
 A hand-rolled helper is allowed only when none of the above fit. Put the
 helper in `src/test-utils/` (cross-cutting) or `src/web/test-utils/`
@@ -163,7 +163,7 @@ capabilities needed by the behavior suites.
 
 ### `src/web/test-utils/bridge.ts`
 
-- `installGoblinTestBridge(handlers)` — installs the bootstrap/native host
+- `installGoblinTestBridge(handlers)` — installs the browser bootstrap
   boundary, shared WebSocket router, and a path-keyed `fetch` stub. It clears
   any explicit client-bridge override so tests exercise the runtime-selected
   transport. `handlers` is `Record<string, (input) => unknown>` mapping host
@@ -179,7 +179,7 @@ capabilities needed by the behavior suites.
 ### `src/web/test-utils/host-bootstrap.ts`
 
 - `installHostBootstrap()` — sets `window.__GOBLIN_BOOTSTRAP__`,
-  `window.goblinNative`, and `window.location` for tests that need a fake host
+  and `window.location` for tests that need a fake host
   environment.
 
 ## 6. Mocks policy

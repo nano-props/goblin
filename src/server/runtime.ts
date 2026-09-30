@@ -20,9 +20,8 @@ interface ServerRuntimeBaseOptions extends Omit<
   | 'serverHost'
   | 'serverPort'
 > {
-  gCommandEntry?: string
+  webRoot?: string
   gCommandBinDir?: string
-  gCommandNodePath?: string
   serverHost: string
   serverPort: number
 }
@@ -91,13 +90,11 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
     }
     terminalRuntime = createServerTerminalRuntime({
       ptySupervisor: options.ptySupervisor,
-      gCommand: options.gCommandEntry
+      gCommand: options.gCommandBinDir
         ? {
             serverUrl: formatServerUrl(options.serverHost, options.serverPort),
             accessToken: options.accessToken,
-            entryPath: options.gCommandEntry,
             binDir: options.gCommandBinDir,
-            nodePath: options.gCommandNodePath,
           }
         : undefined,
     })
@@ -111,6 +108,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
   }
 
   const app = createApp({
+    webRoot: options.webRoot,
     version: options.version,
     startedAt: options.startedAt,
     accessToken: options.accessToken,

@@ -5,75 +5,9 @@
 import type { DictKey } from '#/shared/i18n/en.ts'
 
 export const ja: Record<DictKey, string> = {
-  // ---- Menu --------------------------------------------------------------
-  'menu.file': 'ファイル',
-  'menu.edit': '編集',
-  'menu.view': '表示',
-  'menu.window': 'ウインドウ',
-  'menu.help': 'ヘルプ',
-
-  // ---- Menu — App (macOS) ------------------------------------------------
-  'menu.app.about': '{name} について',
-  'menu.app.services': 'サービス',
-  'menu.app.hide': '{name} を隠す',
-  'menu.app.hide-others': 'ほかを隠す',
-  'menu.app.show-all': 'すべてを表示',
-  'menu.app.quit': '{name} を終了',
-  'menu.app.settings': '設定…',
-
-  // ---- Menu — Window (macOS) ---------------------------------------------
-  'menu.window.minimize': 'しまう',
-  'menu.window.zoom': '拡大/縮小',
-  'menu.window.front': 'すべてを手前に移動',
-
-  // ---- Menu — File -------------------------------------------------------
-  'menu.file.open-local-workspace': 'ワークスペースを開く…',
-  'menu.file.open-local-workspace-path': 'パスでワークスペースを開く…',
-  'menu.file.open-remote-workspace': 'リモートワークスペースを開く…',
-  'menu.file.clone-repo': 'リポジトリをクローン…',
-  'menu.file.create-worktree': '新しいワークツリー…',
-  'menu.file.open-recent': '最近使った項目を開く',
-  'menu.file.no-recent': '最近使ったワークスペースはありません',
-  'menu.file.clear-recent': 'メニューを消去',
-  'menu.file.open-in-browser': 'ブラウザで開く',
-  'menu.file.open-data-folder': 'データフォルダを開く',
-  'menu.file.open-data-folder.mac': 'Finderでデータフォルダを開く',
-  'menu.file.open-data-folder.win': 'エクスプローラーでデータフォルダを開く',
-  'menu.file.close-window': 'ウィンドウを閉じる',
-  'menu.file.close-workspace-tab': 'ワークスペースタブを閉じる',
-  'menu.file.close-workspace': 'ワークスペースを閉じる',
-  'menu.file.settings': '設定…',
-  'menu.file.quit': '終了',
-  'menu.client-intent-delivery-failed':
-    'アプリウィンドウが変更されたか読み込みに失敗したため、操作を送信できませんでした。もう一度お試しください。',
-
-  // ---- Menu — Edit -------------------------------------------------------
-  'menu.edit.undo': '取り消す',
-  'menu.edit.redo': 'やり直す',
-  'menu.edit.cut': 'カット',
-  'menu.edit.copy': 'コピー',
-  'menu.edit.paste': 'ペースト',
-  'menu.edit.paste-match-style': 'スタイルを合わせてペースト',
   'menu.edit.delete': '削除',
-  'menu.edit.select-all': 'すべてを選択',
 
-  // ---- Menu — View -------------------------------------------------------
-  'menu.view.status': 'ステータス',
-  'menu.view.history': '履歴',
-  'menu.view.changes': '変更',
-  'menu.view.terminal': 'ターミナル',
   'menu.view.refresh': 'ワークスペースを更新',
-  'menu.view.reload-page': 'ページを再読み込み',
-  'menu.view.toggle-full-screen': 'フルスクリーンを切り替え',
-  'menu.view.toggle-dev-tools': '開発者ツールを切替',
-
-  // ---- Menu — Window (goblin-specific) --------------------------------------
-  'menu.window.next-workspace': '次のワークスペース',
-  'menu.window.prev-workspace': '前のワークスペース',
-  'menu.window.reset-window': 'ウィンドウをリセット',
-
-  // ---- Menu — Help -------------------------------------------------------
-  'menu.help.shortcuts': 'キーボードショートカット',
 
   // ---- アプリトップバー ------------------------------------------------------------
   'app-chrome.open': '開く',
@@ -754,9 +688,7 @@ export const ja: Record<DictKey, string> = {
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': '更新',
   'settings.nav.shortcuts': 'ショートカット',
-  'settings.lan.enabled': 'LANアクセスを許可',
-  'settings.lan.enabled-hint': 'ローカルネットワーク上の他のデバイスからGoblinへのアクセスを許可します。',
-  'settings.lan.restart-hint': 'この設定はGoblinを再起動後に有効になります。',
+
   'settings.web.title': 'リモートアクセス',
   'settings.nav.web': 'リモートアクセス',
   'settings.web.server': 'サーバー',
@@ -773,18 +705,14 @@ export const ja: Record<DictKey, string> = {
   'settings.web.token-copied': 'トークンをクリップボードにコピーしました。',
   'settings.web.token-copy-failed': 'クリップボードへのコピーに失敗しました。',
   'settings.web.token-read-failed': 'トークン状態を読み取れませんでした。設定を開き直して再試行してください。',
-  'settings.web.token-rotate': 'トークンを再生成',
-  'settings.web.token-rotated': '新しいトークンを保存しました。Goblin の次回起動後に有効になります。',
-  'settings.web.token-rotate-failed': 'トークンの再生成に失敗しました。',
-  'settings.web.token-rotation-hint':
-    '下のQRコードには現在有効なトークンが含まれています。スキャンすると対象デバイスのゲートに自動入力されます。',
+
   'settings.web.token-pending-restart-hint':
     '表示されたトークンとQRコードは Goblin の次回起動時に有効になります。それまでは現在のトークンが有効です。',
   'settings.web.lan': 'ネットワーク',
   'settings.web.lan-urls': 'LANアドレス',
   'settings.web.lan-urls-hint':
     '同じローカルネットワーク上の他のデバイスは、これらのアドレスでGoblinにアクセスできます。',
-  'settings.lan.local-only': '現在、このデバイスからのみアクセスできます。',
+
   'settings.web.qr': 'QRコード',
   'settings.web.qr-scan': 'QRコード',
   'settings.about': '情報',
@@ -837,17 +765,7 @@ export const ja: Record<DictKey, string> = {
     '  IdentityFile ~/.ssh/id_ed25519\n',
   'settings.shortcuts': 'キーボードショートカット',
   'settings.shortcuts-disable-app': 'アプリのショートカットを無効化',
-  'settings.shortcuts-disable-global': 'グローバルショートカットを無効化',
-  'settings.global-shortcut': 'グローバルショートカット',
-  'settings.global-shortcut-hint': '新しい組み合わせを押してください。Esc でキャンセル。',
-  'settings.global-shortcut-disabled-hint': '保存済み、現在はオフ。',
-  'settings.global-shortcut-record': 'グローバルショートカットを変更',
-  'settings.global-shortcut-recording': 'キーを押してください…',
-  'settings.global-shortcut-reset': 'リセット',
-  'settings.global-shortcut-conflict': '登録できません。使用中の可能性があります。',
-  'settings.global-shortcut-projection-failed':
-    '設定は保存されましたが、アプリのショートカットを更新できませんでした。適用するにはアプリを開き直してください。',
-  'settings.global-shortcut-invalid': 'Command、Control、Option とキーを組み合わせてください。',
+
   'settings.open-github': 'GitHub でプロジェクトを開く',
   'about.app': 'Goblin',
   'about.version': 'バージョン',

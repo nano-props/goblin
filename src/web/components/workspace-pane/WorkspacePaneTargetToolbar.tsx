@@ -56,7 +56,7 @@ interface WorkspacePaneTargetToolbarProps {
   workspacePaneId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   statusCount: number | undefined
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onBackToNavigator?: () => void
 }
 
@@ -77,7 +77,7 @@ WorkspacePaneTargetToolbar.props = [
   'workspacePaneId',
   'workspacePaneRoute',
   'statusCount',
-  'trafficLightOffset',
+  'navigationOffset',
   'onBackToNavigator',
 ]
 
@@ -89,7 +89,7 @@ const WorkspacePaneFilesystemTargetToolbar = defineComponent<WorkspacePaneFilesy
     'workspacePaneId',
     'workspacePaneRoute',
     'statusCount',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToNavigator',
   ],
 
@@ -111,7 +111,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     'workspacePaneId',
     'workspacePaneRoute',
     'statusCount',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToNavigator',
     'externalAppItems',
   ],
@@ -236,7 +236,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
             workspacePaneId={props.workspacePaneId}
             activeTabIdentity={activeTabIdentity.value}
             createAction={props.target.capabilities.terminal.available ? runtimeTabCreateAction.value : null}
-            trafficLightOffset={props.trafficLightOffset ?? false}
+            navigationOffset={props.navigationOffset ?? false}
             onBackToNavigator={props.onBackToNavigator}
             trailingActions={
               retryTabsAction || showExternalAppLauncher ? (

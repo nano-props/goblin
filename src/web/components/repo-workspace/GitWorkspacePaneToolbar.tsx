@@ -24,7 +24,7 @@ interface GitWorkspacePaneToolbarProps {
   workspacePaneId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   workspacePaneTabModel: WorkspacePaneTabModel
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onBackToGitWorkspaceNavigator?: () => void
 }
 
@@ -36,7 +36,7 @@ export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarPr
     'workspacePaneId',
     'workspacePaneRoute',
     'workspacePaneTabModel',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToGitWorkspaceNavigator',
   ],
 
@@ -47,8 +47,8 @@ export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarPr
       const branch = props.detail.branch
       if (!branch) {
         return (
-          <WorkspaceToolbar draggable={!compact.value} trafficLightOffset={props.trafficLightOffset ?? false}>
-            <WorkspaceToolbarLeadingSpacer reserve={props.trafficLightOffset ?? false} />
+          <WorkspaceToolbar expanded={!compact.value} navigationOffset={props.navigationOffset ?? false}>
+            <WorkspaceToolbarLeadingSpacer reserve={props.navigationOffset ?? false} />
             <WorkspaceToolbarPrimary />
           </WorkspaceToolbar>
         )
@@ -74,7 +74,7 @@ export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarPr
           workspacePaneId={props.workspacePaneId}
           workspacePaneRoute={props.workspacePaneRoute}
           statusCount={props.detail.statusCount}
-          trafficLightOffset={props.trafficLightOffset ?? false}
+          navigationOffset={props.navigationOffset ?? false}
           onBackToNavigator={props.onBackToGitWorkspaceNavigator}
         />
       )

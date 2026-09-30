@@ -183,7 +183,7 @@ const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHa
     'detail',
     'workspacePaneId',
     'workspacePaneRoute',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToGitWorkspaceNavigator',
   ],
 
@@ -201,7 +201,7 @@ const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHa
         workspacePaneId={props.workspacePaneId}
         workspacePaneRoute={props.workspacePaneRoute}
         workspacePaneTabModel={workspacePaneTabModel.value}
-        trafficLightOffset={props.trafficLightOffset}
+        navigationOffset={props.navigationOffset}
         onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
       />
     )
@@ -294,7 +294,7 @@ export function renderToolbar(options: {
   worktree?: boolean
   collapsed?: boolean
   createPending?: boolean
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   remote?: Partial<RepoRemoteInfo>
   workspaceRuntimeId?: string
   /**
@@ -484,7 +484,7 @@ export function renderToolbar(options: {
               detail={detail}
               workspacePaneId="workspace"
               workspacePaneRoute={workspacePaneRoute}
-              trafficLightOffset={options.trafficLightOffset}
+              navigationOffset={options.navigationOffset}
             />
           </TerminalSessionReadScope>
         </TerminalSessionCommandScope>
@@ -528,7 +528,7 @@ export function renderToolbar(options: {
                 detail={getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(nextRepo))}
                 workspacePaneId="workspace"
                 workspacePaneRoute={workspacePaneRoute}
-                trafficLightOffset={options.trafficLightOffset}
+                navigationOffset={options.navigationOffset}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>

@@ -20,8 +20,6 @@ export type ClientEffectIntent =
   | { type: 'open-remote-workspace-requested' }
   | { type: 'clone-repo-requested' }
   | { type: 'create-worktree-requested' }
-  | { type: 'app-quitting' }
-  | { type: 'server-command-reset-requested' }
   | { type: 'terminal-new-tab-requested' }
   | { type: 'workspace-pane-close-tab-requested' }
   | { type: 'close-workspace-requested' }
@@ -37,7 +35,6 @@ export type ClientEffectIntent =
   | { type: 'clear-recent-workspaces-requested' }
   | { type: 'open-recent-workspace-requested'; entry: WorkspaceSessionEntry }
   | TerminalBellClickIntent
-  | { type: 'external-open-enqueued' }
 
 export type ClientEffectIntentType = ClientEffectIntent['type']
 
@@ -49,8 +46,6 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'open-remote-workspace-requested':
     case 'clone-repo-requested':
     case 'create-worktree-requested':
-    case 'app-quitting':
-    case 'server-command-reset-requested':
     case 'terminal-new-tab-requested':
     case 'workspace-pane-close-tab-requested':
     case 'close-workspace-requested':
@@ -59,7 +54,6 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'workspace-zen-mode-toggle-requested':
     case 'layout-reset-requested':
     case 'clear-recent-workspaces-requested':
-    case 'external-open-enqueued':
       return true
     case 'cycle-workspace-requested':
       return event.direction === 1 || event.direction === -1

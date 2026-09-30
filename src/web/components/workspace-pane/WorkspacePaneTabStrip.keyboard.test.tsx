@@ -103,7 +103,6 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     )
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal chrome')
 
-    expect(tabChrome.dataset.titleBarChromeRegion).toBe('interactive')
     expect(dndMocks.useSortable).toHaveBeenCalledTimes(2)
     const sortableInput = dndMocks.useSortable.mock.calls[0]?.[0] as {
       id: () => string

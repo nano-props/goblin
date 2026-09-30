@@ -11,8 +11,6 @@ Goblin has several places where the same English word can plausibly mean differe
 The main collisions this spec resolves are:
 
 - `slot` as both a workspace-pane UI identity and a terminal business object
-- `main` as both Electron's main process and "the primary thing"
-- `shell` as both an OS shell and a BrowserWindow / native-host concern
 - `Repository*` vs `Repo*`
 - vague suffixes like `manager`, `service`, `registry`, and `helpers`
 
@@ -47,14 +45,12 @@ If a name fails any step above, rename it before adding more code around it.
 
 ## Canonical cross-cutting terms
 
-| Concept                              | Canonical              | Rule                                                                            |
-| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------- |
-| Browser/Electron UI side             | `client`               | Use `client` as the architecture term even though code lives in `src/web/`.     |
-| Electron main-process side           | `native host`          | Use `native host` in names and docs; keep `src/main/` only for alias stability. |
-| Server spawned by the native host    | `embedded server`      | Do not introduce `local server` as a competing term.                            |
-| Aggregate runtime object             | `runtime`              | Reserve for a facade that wires a feature or app runtime together.              |
-| Authoritative persistence / IO layer | `source`               | Prefer `repos/source.ts` over `repos/backend.ts`.                               |
-| Outside-UI intent envelope           | `client effect intent` | Use the existing term consistently.                                             |
+| Concept                              | Canonical              | Rule                                                                        |
+| ------------------------------------ | ---------------------- | --------------------------------------------------------------------------- |
+| Browser UI side                      | `client`               | Use `client` as the architecture term even though code lives in `src/web/`. |
+| Aggregate runtime object             | `runtime`              | Reserve for a facade that wires a feature or app runtime together.          |
+| Authoritative persistence / IO layer | `source`               | Prefer `repos/source.ts` over `repos/backend.ts`.                           |
+| Outside-UI intent envelope           | `client effect intent` | Use the existing term consistently.                                         |
 
 ## State classes
 
@@ -171,29 +167,6 @@ Selected mappings:
 | Client workspace state             | `ClientWorkspaceState`            | `SessionState`        |
 | Native shortcut registration state | `NativeShortcutRegistrationState` | `ServerSettingsState` |
 
-### Native host
-
-Canonical rules:
-
-- Use `native host` for the Electron main-process side.
-- Use `primaryWindow`, not `mainWindow`, for the principal BrowserWindow and default native activation target. `primary` names that role; it does not require other surfaces to be called `secondary`.
-- Keep `primaryWindow` inside the native-host boundary. Browser-client routing, navigation, and query state run in both Electron renderer pages and plain browser tabs, so name them for the client app rather than an Electron window.
-- Use `*-ipc` for plain IPC handlers.
-- Use `embedded server` for the server process the native host spawns.
-
-Selected mappings:
-
-| Concept                     | Canonical                                 | Deprecated                          |
-| --------------------------- | ----------------------------------------- | ----------------------------------- |
-| Primary window              | `primaryWindow` / `activatePrimaryWindow` | `mainWindow` / `activateMainWindow` |
-| Client surface registry     | `client-surface-registry.ts`              | `window-registry.ts`                |
-| Window security policy      | `window-security.ts`                      | `window-shell.ts`                   |
-| Embedded server lifecycle   | `embedded-server-lifecycle.ts`            | `server-manager.ts`                 |
-| Native host IPC router      | `native-host-ipc-router.ts`               | `ipc.ts`                            |
-| Clipboard IPC handler       | `clipboard-ipc.ts`                        | `clipboard-bridge.ts`               |
-| Access-token IPC handler    | `access-token-ipc.ts`                     | `access-token-bridge.ts`            |
-| Server-to-native projection | `native-host-projection.ts`               | `native-shell-projection.ts`        |
-
 ## Review checklist
 
 Reject or rename changes that:
@@ -202,8 +175,6 @@ Reject or rename changes that:
 - use `slot` for a terminal business object
 - use `session` for controller ownership
 - add `Repository*` names to internal repo code
-- introduce `main*` names that really mean `native host` or `primaryWindow`
-- introduce `primaryWindow*` names for browser-client concepts that do not depend on Electron window identity
 - use `runtime`, `manager`, `service`, or `registry` as a vague bucket instead of a real boundary
 - use `SessionState` for anything other than persisted workspace session state
 

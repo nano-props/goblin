@@ -9,7 +9,6 @@ import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/termin
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
-import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { reportCloseWorkspaceFailure } from '#/web/lib/open-workspace-result-feedback.ts'
 import { useShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
@@ -67,15 +66,9 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
         terminalBellCount: terminalBellCounts.value[workspace.id] ?? 0,
       })),
     )
-    const { openWorkspaceMembership } = workspacesStore.getState()
 
     async function openLocalWorkspace(): Promise<void> {
-      await openWorkspaceFromDialog({
-        openWorkspaceMembership,
-        activateWorkspace: navigation.activateWorkspace,
-        openWorkspacePathDialog: props.onOpenWorkspacePathDialog,
-        t,
-      })
+      props.onOpenWorkspacePathDialog()
     }
 
     async function closeWorkspace(workspaceId: WorkspaceId): Promise<void> {

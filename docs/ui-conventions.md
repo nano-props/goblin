@@ -12,7 +12,6 @@ Use this doc for UI language and presentation rules.
   fallback data. Do not turn missing enrichment into an empty, zero, clean, or
   otherwise successful state.
 
-- Use Title Case for native menu items.
 - Use sentence case for buttons, actions, headings, and help text.
 - Use lowercase for status chips such as `open`, `dirty`, and `no upstream`.
 - Preserve official casing such as `GitHub`, `VS Code`, and `PR`.

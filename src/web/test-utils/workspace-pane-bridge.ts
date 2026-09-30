@@ -57,7 +57,6 @@ export function installWorkspacePaneTabsTestBridge(
     updateWorkspaceTabs?: (
       input: WorkspacePaneTabsUpdateInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
-    onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): {
   addRuntimeTab: (
@@ -138,8 +137,6 @@ export function installWorkspacePaneTabsTestBridge(
     return serverSnapshot()
   }
   setClientBridgeForTests({
-    kind: () => 'web',
-    hasCapability: () => false,
     getBootstrap: () => ({
       runtime: {
         kind: 'web',
@@ -150,16 +147,9 @@ export function installWorkspacePaneTabsTestBridge(
       platform: 'web',
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
-    invokeIpc: async ({ path }) => {
-      throw new Error(`Unhandled IPC path: ${path}`)
-    },
-    abortIpc: async () => false,
-    onEffectIntent: options.onEffectIntent ?? (() => () => {}),
-    pathForFile: () => '',
+
     saveClipboardFiles: async () => [],
-    getAccessTokenProjection: async () => ({ accessToken: 'test-access-token', activation: 'current' }),
-    rotateAccessToken: async () => ({ accessToken: 'test-access-token', activation: 'after-restart' }),
-    host: () => null,
+
     appRealtime: () => ({
       kickReconnect: () => {},
       onRecovered: () => () => {},
@@ -193,7 +183,7 @@ export function installWorkspacePaneTabsTestBridge(
       recoverSessions: async () => ({ revision: 0, sessions: [] }),
       notifyBell: async () => true,
       sendTestNotification: async () => true,
-      setBadge: () => {},
+
       onOutput: () => () => {},
       onBell: () => () => {},
       onTitle: () => () => {},

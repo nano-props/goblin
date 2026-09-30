@@ -2,7 +2,6 @@ import { computed, defineComponent, nextTick, onMounted, onScopeDispose, ref, wa
 import type { CSSProperties, ComputedRef, FunctionalComponent, Ref, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
-import { NativeDragPlate } from '#/web/components/title-bar-chrome-region.tsx'
 import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-boundary.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { ZenModeSidebarResizeRail } from '#/web/components/workspace-layout/ZenModeSidebarResizeRail.tsx'
@@ -374,7 +373,6 @@ const ZenModeSidebarReveal = defineComponent<ZenModeSidebarRevealProps>({
       const width =
         measuredWidthPx === null ? workspaceSidebarWidthExpression(props.sidebarSize) : `${measuredWidthPx}px`
       const style: CSSProperties = { width }
-      const dragPlateStyle: CSSProperties = { width, height: `${TITLE_BAR_HEIGHT_PX}px` }
       const interactive = panelInteractive.value
 
       return (
@@ -423,31 +421,11 @@ const ZenModeSidebarReveal = defineComponent<ZenModeSidebarRevealProps>({
               />
             </FloatingSurfaceBoundary>
           </div>
-          <ZenModeSidebarDragPlate mounted={interactive} style={dragPlateStyle} onSurfaceEnter={props.onSurfaceEnter} />
         </div>
       )
     }
   },
 })
-
-interface ZenModeSidebarDragPlateProps {
-  mounted: boolean
-  style: CSSProperties
-  onSurfaceEnter: () => void
-}
-
-const ZenModeSidebarDragPlate: FunctionalComponent<ZenModeSidebarDragPlateProps> = (props) =>
-  props.mounted ? (
-    <NativeDragPlate
-      data-testid="zen-mode-sidebar-drag-plate"
-      data-zen-reveal-surface=""
-      class="z-30"
-      style={props.style}
-      onMouseenter={props.onSurfaceEnter}
-    />
-  ) : null
-
-ZenModeSidebarDragPlate.props = ['mounted', 'style', 'onSurfaceEnter']
 
 function useRootFontSizePx(): Readonly<Ref<number>> {
   const rootFontSizePx = ref(16)

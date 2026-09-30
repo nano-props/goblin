@@ -4,7 +4,6 @@ import type {
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { emitClientLocalEvent } from '#/web/bridge/local-events.ts'
-import { readNativeBridge } from '#/web/bridge/native.ts'
 
 export interface TerminalNotificationProvider {
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
@@ -12,17 +11,6 @@ export interface TerminalNotificationProvider {
 }
 
 export function createTerminalNotificationProvider(): TerminalNotificationProvider {
-  const bridge = readNativeBridge()
-  if (bridge) {
-    return {
-      notifyBell: (input) => bridge.terminal.notifyBell(input),
-      sendTestNotification: (input) => bridge.terminal.sendTestNotification(input),
-    }
-  }
-  return createBrowserTerminalNotificationProvider()
-}
-
-function createBrowserTerminalNotificationProvider(): TerminalNotificationProvider {
   return {
     notifyBell(input) {
       return showBrowserNotification(input.title, input.body, () => {

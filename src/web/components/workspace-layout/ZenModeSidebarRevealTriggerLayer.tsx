@@ -2,7 +2,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { FunctionalComponent } from 'vue'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
-import { TitleBarInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
+import { InteractiveRegion } from '#/web/components/interactive-region.tsx'
 
 interface ZenModeSidebarRevealTriggerProps {
   workspaceId?: WorkspaceId
@@ -38,13 +38,13 @@ const ZenModeSidebarRevealTrigger: FunctionalComponent<ZenModeSidebarRevealTrigg
   onZenRevealTriggerEnter,
 }) => {
   return (
-    <TitleBarInteractiveRegion>
+    <InteractiveRegion>
       <WorkspaceNavigationControls
         workspaceId={workspaceId}
         zenRevealTriggerEnabled={zenRevealTriggerEnabled}
         onZenRevealTriggerEnter={onZenRevealTriggerEnter}
       />
-    </TitleBarInteractiveRegion>
+    </InteractiveRegion>
   )
 }
 ZenModeSidebarRevealTrigger.props = ['workspaceId', 'zenRevealTriggerEnabled', 'onZenRevealTriggerEnter']

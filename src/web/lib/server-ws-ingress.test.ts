@@ -125,23 +125,6 @@ describe('server websocket ingress', () => {
     dispose()
     ingress.resetForTests()
   })
-
-  test('closes the active socket and suppresses reconnect when app shutdown starts', async () => {
-    useFakeTimers()
-    const ingress = await createIngress('/ws/example')
-    const dispose = ingress.subscribe(() => {})
-    const socket = wsMock.instances[0]
-    if (!socket) throw new Error('missing socket')
-    const { markAppQuitting } = await import('#/web/app/lifecycle.ts')
-
-    await markAppQuitting()
-    await advanceTimersAndFlush(300)
-
-    expect(socket.readyState).toBe(wsMock.CLOSED)
-    expect(wsMock.instances).toHaveLength(1)
-    dispose()
-    ingress.resetForTests()
-  })
 })
 
 async function createIngress(

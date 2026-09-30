@@ -33,11 +33,7 @@ describe('i18n dictionaries', () => {
     }
   })
 
-  test('localizes menu and remote workspace copy for non-English dictionaries', () => {
-    expect(zh['menu.file.open-remote-workspace']).toBe('打开远程工作区…')
-    expect(ko['menu.file.open-remote-workspace']).toBe('원격 작업 공간 열기…')
-    expect(ja['menu.file.open-remote-workspace']).toBe('リモートワークスペースを開く…')
-
+  test('localizes remote workspace copy for non-English dictionaries', () => {
     expect(zh['workspace-picker.open-remote']).toBe('打开远程工作区…')
     expect(ko['workspace-picker.open-remote']).toBe('원격 작업 공간 열기…')
     expect(ja['workspace-picker.open-remote']).toBe('リモートワークスペースを開く…')

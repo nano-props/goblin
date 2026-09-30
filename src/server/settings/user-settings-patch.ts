@@ -1,5 +1,4 @@
 import type { UserSettings } from '#/shared/settings.ts'
-import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme } from '#/shared/color-theme.ts'
 import {
   isBoolean,
@@ -18,9 +17,6 @@ export interface ValidatedUserSettingsPatch {
   fetchIntervalSec?: number
   terminalNotificationsEnabled?: boolean
   shortcutsDisabled?: boolean
-  globalShortcutDisabled?: boolean
-  globalShortcut?: string
-  lanEnabled?: boolean
 }
 
 export interface UserSettingsPatchPlan {
@@ -42,17 +38,6 @@ export function validateUserSettingsPatch(patch: UserSettingsPatch): ValidatedUs
     'terminal notifications setting',
   )
   const shortcutsDisabled = optionalCommandValue(patch.shortcutsDisabled, isBoolean, 'shortcuts setting')
-  const globalShortcutDisabled = optionalCommandValue(
-    patch.globalShortcutDisabled,
-    isBoolean,
-    'global shortcut disabled setting',
-  )
-  const globalShortcut =
-    patch.globalShortcut === undefined ? undefined : parseAllowedGlobalShortcut(patch.globalShortcut)
-  if (patch.globalShortcut !== undefined && globalShortcut === null) {
-    throw new TypeError('invalid global shortcut')
-  }
-  const lanEnabled = optionalCommandValue(patch.lanEnabled, isBoolean, 'LAN setting')
   return {
     lang,
     theme,
@@ -60,9 +45,6 @@ export function validateUserSettingsPatch(patch: UserSettingsPatch): ValidatedUs
     fetchIntervalSec,
     terminalNotificationsEnabled,
     shortcutsDisabled,
-    globalShortcutDisabled,
-    globalShortcut: globalShortcut ?? undefined,
-    lanEnabled,
   }
 }
 
@@ -78,9 +60,6 @@ export function planUserSettingsPatch(
     fetchIntervalSec: patch.fetchIntervalSec ?? data.fetchIntervalSec,
     terminalNotificationsEnabled: patch.terminalNotificationsEnabled ?? data.terminalNotificationsEnabled,
     shortcutsDisabled: patch.shortcutsDisabled ?? data.shortcutsDisabled,
-    globalShortcutDisabled: patch.globalShortcutDisabled ?? data.globalShortcutDisabled,
-    globalShortcut: patch.globalShortcut ?? data.globalShortcut,
-    lanEnabled: patch.lanEnabled ?? data.lanEnabled,
   }
   const changed = !sameUserSettings(userSettingsFromData(data), userSettingsFromData(next))
   return {
@@ -98,9 +77,6 @@ export function userSettingsFromData(data: UserSettingsData): UserSettings {
     fetchIntervalSec: data.fetchIntervalSec,
     terminalNotificationsEnabled: data.terminalNotificationsEnabled,
     shortcutsDisabled: data.shortcutsDisabled,
-    globalShortcutDisabled: data.globalShortcutDisabled,
-    globalShortcut: data.globalShortcut,
-    lanEnabled: data.lanEnabled,
   }
 }
 
@@ -111,10 +87,7 @@ function sameUserSettings(left: UserSettings, right: UserSettings): boolean {
     left.colorTheme === right.colorTheme &&
     left.fetchIntervalSec === right.fetchIntervalSec &&
     left.terminalNotificationsEnabled === right.terminalNotificationsEnabled &&
-    left.shortcutsDisabled === right.shortcutsDisabled &&
-    left.globalShortcutDisabled === right.globalShortcutDisabled &&
-    left.globalShortcut === right.globalShortcut &&
-    left.lanEnabled === right.lanEnabled
+    left.shortcutsDisabled === right.shortcutsDisabled
   )
 }
 

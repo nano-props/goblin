@@ -22,12 +22,6 @@
     "skipLibCheck": true,
     "types": ["node", "bun"]
   },
-  "include": [
-    "src/main/**/*.ts",
-    "src/server/**/*.ts",
-    "src/preload/**/*.js",
-    "src/preload/**/*.cjs",
-    "scripts/**/*.ts"
-  ],
+  "include": ["src/shared/raw-assets.d.ts", "src/server/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "dist", "release", "src/web"]
 }

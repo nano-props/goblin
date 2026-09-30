@@ -1,4 +1,3 @@
-import { isAppQuitting, subscribeAppQuitting } from '#/web/app/lifecycle.ts'
 import { createWebSocketLifecycle } from '#/web/lib/websocket-lifecycle.ts'
 import {
   ClientRealtimeRequestError,
@@ -70,7 +69,6 @@ export function createClientRealtimeSocketConnection<
   let reconnectTimer: number | null = null
   let realtimeOpenTimeout: ReturnType<typeof setTimeout> | null = null
   let livenessProbeTimer: ReturnType<typeof globalThis.setInterval> | null = null
-  let quitting = isAppQuitting()
   let nextOutageId = 0
   let activeOutageId: number | null = null
   let pendingSocketOpenRequests = 0
@@ -86,7 +84,7 @@ export function createClientRealtimeSocketConnection<
       return new WebSocket(connection.url)
     },
     shouldOpen() {
-      return typeof WebSocket !== 'undefined' && !quitting
+      return typeof WebSocket !== 'undefined'
     },
     shouldKeepOpen: shouldKeepSocketOpen,
     closeReason: `${socketLabel} closed`,
@@ -120,21 +118,6 @@ export function createClientRealtimeSocketConnection<
     onUnavailableSocketDropped() {
       clearSocketGenerationState()
     },
-  })
-
-  subscribeAppQuitting(() => {
-    quitting = true
-    clearReconnectTimer()
-    clearRealtimeOpenTimeout()
-    clearPendingHealthProbes()
-    rejectPendingSocketRequests(
-      new ClientRealtimeRequestError(`${socketLabel} closed`, {
-        kind: 'app-quitting',
-        delivery: 'indeterminate',
-        outageId: null,
-      }),
-    )
-    socketLifecycle.closeAndForget()
   })
 
   return {
@@ -198,7 +181,7 @@ export function createClientRealtimeSocketConnection<
   }
 
   function scheduleReconnect() {
-    if (reconnectTimer !== null || !shouldKeepSocketOpen() || quitting) return
+    if (reconnectTimer !== null || !shouldKeepSocketOpen()) return
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = null
       reconcileSocketDemand('open-now')
@@ -207,7 +190,7 @@ export function createClientRealtimeSocketConnection<
 
   function reconcileSocketDemand(intent: SocketDemandIntent): void {
     const hasDemand = shouldKeepSocketOpen()
-    if (quitting || !hasDemand) {
+    if (!hasDemand) {
       clearReconnectTimer()
       socketLifecycle.requestIdleClose()
       return
@@ -225,7 +208,6 @@ export function createClientRealtimeSocketConnection<
   }
 
   function kickReconnect() {
-    if (quitting) return
     if (!options.hasRealtimeSubscribers()) return
     if (typeof WebSocket === 'undefined') return
     socketLifecycle.forgetUnavailableSocket()
@@ -248,7 +230,7 @@ export function createClientRealtimeSocketConnection<
 
   function scheduleRealtimeOpenTimeout(): void {
     if (realtimeOpenTimeout !== null) return
-    if (quitting || !options.hasRealtimeSubscribers()) return
+    if (!options.hasRealtimeSubscribers()) return
     const current = socketLifecycle.active()
     if (!current || current.socket.readyState !== WebSocket.CONNECTING) return
     realtimeOpenTimeout = setTimeout(() => {

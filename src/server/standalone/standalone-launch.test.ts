@@ -1,12 +1,11 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   bootstrapServer: vi.fn(),
   getLanUrls: vi.fn(),
   isLanAddress: vi.fn(),
-  prepareNodePtyDarwinRuntime: vi.fn(),
+  dispose: vi.fn(),
+  createGoblinCommandLauncher: vi.fn(),
   qrToString: vi.fn(),
   readOrCreateAccessToken: vi.fn(),
   fileExists: vi.fn(() => false),
@@ -25,9 +24,8 @@ vi.mock('#/shared/lan-addresses.ts', () => ({
   isLanAddress: mocks.isLanAddress,
 }))
 
-vi.mock('#/system/node-pty-runtime.ts', () => ({
-  prepareNodePtyDarwinRuntime: mocks.prepareNodePtyDarwinRuntime,
-}))
+vi.mock('#/server/terminal/g-command.ts', () => ({ createGoblinCommandLauncher: mocks.createGoblinCommandLauncher }))
+vi.mock('node:fs', () => ({ existsSync: mocks.fileExists }))
 
 vi.mock('qrcode', () => ({
   default: { toString: mocks.qrToString },
@@ -35,10 +33,7 @@ vi.mock('qrcode', () => ({
 
 import { launchStandaloneServer } from '#/server/standalone/standalone-launch.ts'
 
-const repoRoot = path.resolve(import.meta.dirname, '../../..')
-const runtimeEntryDir = path.join(repoRoot, 'src/server/entrypoints')
-const packageVersion = (JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as { version: string })
-  .version
+const layout = { command: ['/app/goblin'], webRoot: '/app/web', version: '0.0.0-test' }
 const originalCwd = process.cwd()
 const environmentKeys = [
   'GOBLIN_SERVER_HOST',
@@ -68,6 +63,7 @@ describe('standalone server launch boundary', () => {
     mocks.qrToString.mockResolvedValue('generic-qr-code')
     mocks.readOrCreateAccessToken.mockResolvedValue('generic-persisted-token')
     mocks.fileExists.mockReturnValue(false)
+    mocks.createGoblinCommandLauncher.mockReturnValue({ binDir: '/tmp/example-bin', dispose: mocks.dispose })
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   })
@@ -83,72 +79,69 @@ describe('standalone server launch boundary', () => {
   })
 
   test('projects CLI configuration into the shared worker-backed server bootstrap', async () => {
-    await launchStandaloneServer(
-      { repoRoot, runtimeEntryDir },
-      [
-        '--host',
-        '127.0.0.1',
-        '--port',
-        '43210',
-        '--data-dir',
-        '/tmp/goblin-test-data',
-        '--token',
-        'generic-explicit-token',
-      ],
-      mocks.fileExists,
-    )
+    const server = await launchStandaloneServer(layout, [
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '43210',
+      '--data-dir',
+      '/tmp/goblin-test-data',
+      '--token',
+      'generic-explicit-token',
+    ])
 
-    expect(process.cwd()).toBe(repoRoot)
     expect(process.env.GOBLIN_SERVER_DATA_DIR).toBe('/tmp/goblin-test-data')
     expect(process.env.GOBLIN_SERVER_ACCESS_TOKEN).toBe('generic-explicit-token')
-    expect(process.env.npm_package_version).toBe(packageVersion)
-    expect(mocks.prepareNodePtyDarwinRuntime).toHaveBeenCalledWith({
-      packageRoot: path.join(repoRoot, 'node_modules/node-pty'),
-    })
     expect(mocks.bootstrapServer).toHaveBeenCalledWith({
-      ptyWorkerEntry: path.join(runtimeEntryDir, 'pty-worker.ts'),
-      gCommandEntry: path.join(runtimeEntryDir, 'g-command.ts'),
+      workerCommand: ['/app/goblin', '--pty-worker'],
+      gCommandBinDir: '/tmp/example-bin',
+      webRoot: '/app/web',
+      version: '0.0.0-test',
     })
+    await server.stop()
+    expect(mocks.dispose).toHaveBeenCalledOnce()
     expect(mocks.readOrCreateAccessToken).not.toHaveBeenCalled()
     expect(mocks.qrToString).not.toHaveBeenCalled()
-    expect(mocks.fileExists).toHaveBeenCalledWith(path.join(repoRoot, 'dist/web/index.html'))
-    expect(console.warn).toHaveBeenCalledWith(
-      '[embedded-server] web assets missing; run `bun run build:web` for the web UI',
-    )
+    expect(mocks.fileExists).toHaveBeenCalledWith('/app/web/index.html')
+    expect(console.warn).toHaveBeenCalledWith('[server] web assets missing; run `bun run build:web` for the web UI')
   })
 
   test('loads QR presentation only when the bound host has LAN URLs', async () => {
     mocks.getLanUrls.mockReturnValue(['http://192.0.2.10:43211'])
 
-    await launchStandaloneServer(
-      { repoRoot, runtimeEntryDir },
-      ['--host', '0.0.0.0', '--port', '43211', '--data-dir', '/tmp/goblin-lan-test-data'],
-      mocks.fileExists,
-    )
+    const server = await launchStandaloneServer(layout, [
+      '--host',
+      '0.0.0.0',
+      '--port',
+      '43211',
+      '--data-dir',
+      '/tmp/goblin-lan-test-data',
+    ])
 
+    await server.stop()
     expect(mocks.readOrCreateAccessToken).toHaveBeenCalledWith('/tmp/goblin-lan-test-data')
     expect(mocks.qrToString).toHaveBeenCalledWith('http://192.0.2.10:43211/?accessToken=generic-persisted-token', {
       type: 'terminal',
       small: true,
     })
     expect(console.log).toHaveBeenCalledWith(
-      '[embedded-server] LAN URL: http://192.0.2.10:43211/?accessToken=generic-persisted-token',
+      '[server] LAN URL: http://192.0.2.10:43211/?accessToken=generic-persisted-token',
     )
   })
 
   test('does not report missing web assets when the complete web build exists', async () => {
     mocks.fileExists.mockReturnValue(true)
 
-    await launchStandaloneServer(
-      { repoRoot, runtimeEntryDir },
-      ['--host', '127.0.0.1', '--token', 'generic-explicit-token'],
-      mocks.fileExists,
-    )
+    const server = await launchStandaloneServer(layout, ['--host', '127.0.0.1', '--token', 'generic-explicit-token'])
 
-    expect(mocks.fileExists).toHaveBeenNthCalledWith(1, path.join(repoRoot, 'dist/web/index.html'))
-    expect(mocks.fileExists).toHaveBeenNthCalledWith(2, path.join(repoRoot, 'dist/web/boot.js'))
-    expect(console.warn).not.toHaveBeenCalledWith(
-      '[embedded-server] web assets missing; run `bun run build:web` for the web UI',
-    )
+    await server.stop()
+    expect(mocks.fileExists).toHaveBeenNthCalledWith(1, '/app/web/index.html')
+    expect(mocks.fileExists).toHaveBeenNthCalledWith(2, '/app/web/boot.js')
+    expect(console.warn).not.toHaveBeenCalledWith('[server] web assets missing; run `bun run build:web` for the web UI')
+  })
+  test('removes the launcher when bootstrap fails', async () => {
+    mocks.bootstrapServer.mockRejectedValueOnce(new Error('bind failed'))
+    await expect(launchStandaloneServer(layout, ['--token', 'example-token'])).rejects.toThrow('bind failed')
+    expect(mocks.dispose).toHaveBeenCalledOnce()
   })
 })

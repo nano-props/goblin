@@ -53,7 +53,7 @@ export function decodeCurrentClientWorkspaceState(value: unknown): ClientWorkspa
 
 /**
  * Client workspace persistence is the current state object itself. Keep this
- * codec shared by Electron and Web: do not add a version/envelope at either
+ * browser presentation codec: do not add a version/envelope at either
  * storage adapter, because that turns an application update into a boot gate.
  * Evolve the state schema directly and let the startup owner decide how an
  * invalid snapshot recovers.

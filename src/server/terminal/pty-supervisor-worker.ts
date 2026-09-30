@@ -5,7 +5,6 @@
 // spawn request creates the next worker instead of prestarting an empty one.
 
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import { serverNodeLog } from '#/node/logger.ts'
 import {
   createPtyHandle,
@@ -19,7 +18,6 @@ import { StickyCompletion } from '#/server/terminal/sticky-completion.ts'
 import { normalizePtyWorkerMessage, type PtyWorkerMessage } from '#/server/terminal/pty-worker-protocol.ts'
 import type { PtySupervisorDiagnostics, PtySupervisorFailureDiagnostics } from '#/server/terminal/terminal-host.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
-import { resolvePtyWorkerEntry } from '#/server/terminal/pty-worker-entry.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 
 const DEFAULT_SPAWN_ACK_TIMEOUT_MS = 10_000
@@ -64,13 +62,8 @@ interface PtyEventOwnership {
 }
 
 export interface WorkerBackedPtySupervisorOptions {
-  workerEntry?: string
-  /** Resolved at construction when omitted. The default matches the
-   *  layout produced by `bun run build:server` (worker entry sits
-   *  next to the main bundle in `dist/server`). */
-  workerEntryDir?: string
-  fileExists?: typeof existsSync
-  spawnWorker?: (entry: string) => TerminalWorkerChildProcess
+  workerCommand?: readonly string[]
+  spawnWorker?: (command: readonly string[]) => TerminalWorkerChildProcess
   now?: () => number
   spawnAckTimeoutMs?: number
   writeAckTimeoutMs?: number
@@ -245,8 +238,9 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
 
   private ensureWorker(): TerminalWorkerChildProcess {
     if (this.worker) return this.worker
-    const entry = this.resolveWorkerEntry()
-    const worker = this.options.spawnWorker ? this.options.spawnWorker(entry) : defaultSpawnWorker(entry)
+    const command = this.options.workerCommand
+    if (!command?.length) throw new Error('PTY worker command is required')
+    const worker = this.options.spawnWorker ? this.options.spawnWorker(command) : defaultSpawnWorker(command)
     this.workerStartedAt = this.now()
     ptyWorkerLogger.info(
       {
@@ -329,19 +323,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
         if (!settled) return
         this.disposePendingSpawnOwnership(settled)
         settled.resolve({ ok: false, message: message.error })
-        if (message.failure.recoverable && this.sessions.size === 0) {
-          this.recordFailure('spawn-failed', message.error)
-          ptyWorkerLogger.warn(
-            { err: message.error, pendingRequests: this.pendingSpawns.size },
-            'retiring idle PTY worker after recoverable spawn failure',
-          )
-          // A worker-level recovery must never reuse a candidate handle or its
-          // event lease: either may already own buffered output or a completed
-          // exit. Fail every candidate owned by this worker. A later explicit
-          // attach/restart creates a new handle, lease, and worker transaction.
-          this.failPendingSpawns(message.error)
-          this.recycleIdleWorker()
-        }
+        this.recordFailure('spawn-failed', message.error)
       }
       return
     }
@@ -458,14 +440,6 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     }
   }
 
-  private recycleIdleWorker(): void {
-    if (this.sessions.size > 0) return
-    const worker = this.worker
-    this.worker = null
-    if (!worker) return
-    terminateWorkerProcess(worker)
-  }
-
   private invalidateWorkerAfterSendFailure(worker: TerminalWorkerChildProcess, detail: string): void {
     this.invalidateWorker(worker, 'send-failed', detail, `PTY worker unavailable (send-failed: ${detail})`)
   }
@@ -567,18 +541,12 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     if (this.worker) return 'running'
     return 'idle'
   }
-
-  private resolveWorkerEntry(): string {
-    if (this.options.workerEntry) return this.options.workerEntry
-    if (this.options.workerEntryDir) {
-      return resolvePtyWorkerEntry(this.options.workerEntryDir, this.options.fileExists)
-    }
-    throw new Error('PTY worker entry or entry dir is required')
-  }
 }
 
-function defaultSpawnWorker(entry: string): TerminalWorkerChildProcess {
-  return spawn(process.execPath, [entry], {
+function defaultSpawnWorker(command: readonly string[]): TerminalWorkerChildProcess {
+  const [executable, ...args] = command
+  if (!executable) throw new Error('PTY worker executable is required')
+  return spawn(executable, args, {
     env: process.env,
     stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
   })

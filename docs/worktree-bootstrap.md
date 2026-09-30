@@ -70,9 +70,6 @@ setup = "bun install"
 - A failed bootstrap reports only top-level materializations that completed in
   full. It does not infer completion from partial destination contents, and a
   failed or cancelled `setup` is never reported as having run successfully.
-- On Windows, directory `symlink` entries use absolute junctions so the normal
-  non-administrator path works without a privilege fallback. They do not retain
-  relative-link relocation semantics; unsupported targets fail directly.
 - `setup` runs exactly as written.
 
 ## Integrity and execution

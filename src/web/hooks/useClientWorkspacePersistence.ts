@@ -3,7 +3,6 @@ import type { MaybeRefOrGetter } from 'vue'
 import { shallow } from 'zustand/vanilla/shallow'
 import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import { writeClientWorkspaceState } from '#/web/workspaces/persistence/client-state.ts'
-import { subscribeAppQuitting } from '#/web/app/lifecycle.ts'
 import { sessionLog } from '#/web/logger.ts'
 import { clientWorkspaceStateFromRestorableWorkspaceState } from '#/web/workspaces/persistence/restorable-state.ts'
 import { filetreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
@@ -93,7 +92,6 @@ export function useClientWorkspacePersistence({
   // schedules exactly one immediate or debounced write of the complete snapshot.
   // Quit and page-lifecycle flushes below only reduce the chance of losing the
   // final debounce window; they are not an ownership or correctness boundary.
-  const unsubscribeAppQuitting = subscribeAppQuitting(flushLatestClientWorkspace)
   watch(
     [persistenceInput, workspacePaneTabsVersion, filetreeInteractionByScope, () => toValue(routedWorkspaceId)],
     () => {
@@ -132,7 +130,6 @@ export function useClientWorkspacePersistence({
   window.addEventListener('beforeunload', flushClientWorkspaceInBackground)
   document.addEventListener('visibilitychange', flushWhenHidden)
   onScopeDispose(() => {
-    unsubscribeAppQuitting()
     if (debounceTimer !== null) window.clearTimeout(debounceTimer)
     window.removeEventListener('pagehide', flushClientWorkspaceInBackground)
     window.removeEventListener('beforeunload', flushClientWorkspaceInBackground)

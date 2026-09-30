@@ -20,7 +20,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'vue-sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import { provideDocumentClientEffectIntentIngress } from '#/web/hooks/client-effect-intent-ingress.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { themeStore } from '#/web/stores/theme.ts'
@@ -54,7 +53,6 @@ import {
   workspacePaneFilesystemRootPath,
   type WorkspacePaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { CodedError } from '#/shared/coded-error.ts'
@@ -62,10 +60,6 @@ import { CodedError } from '#/shared/coded-error.ts'
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
 const commandGenerationMocks = vi.hoisted(() => ({ advance: vi.fn() }))
-
-vi.mock('#/web/lib/server-command-generation.ts', () => ({
-  advanceServerCommandGeneration: commandGenerationMocks.advance,
-}))
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentWorkspaceHistory: vi.fn(async () => {}),
@@ -77,8 +71,18 @@ vi.mock('#/web/settings/actions.ts', () => ({
   removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
 }))
 
+vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
+  subscribeServerClientIntentIngress: (cb: (event: ClientEffectIntent) => void) => {
+    serverIntentSubscriptionStarts += 1
+    intentListeners.add(cb)
+    return () => {
+      intentListeners.delete(cb)
+    }
+  },
+}))
+
 const intentListeners = new Set<(event: ClientEffectIntent) => void>()
-let nativeIntentSubscriptionStarts = 0
+let serverIntentSubscriptionStarts = 0
 const closeAllOverlays = vi.fn()
 const openWorkspacePathDialogSpy = vi.fn()
 const openCloneRepoSpy = vi.fn()
@@ -122,7 +126,7 @@ beforeEach(() => {
   currentBranchName = null
   currentWorkspacePaneRoute = null
   currentFilesystemTarget = null
-  nativeIntentSubscriptionStarts = 0
+  serverIntentSubscriptionStarts = 0
   vi.mocked(toast.error).mockClear()
   vi.mocked(toast.warning).mockClear()
   setTerminalSessionCommandBridge(null)
@@ -154,26 +158,6 @@ beforeEach(() => {
     openSettings: () => {},
     openCreateWorktree: () => {},
   })
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: currentNativeBridge({
-      invokeIpc: vi.fn(async () => null),
-      abortIpc: vi.fn(async () => true),
-      onIntent: vi.fn((cb: (event: ClientEffectIntent) => void) => {
-        nativeIntentSubscriptionStarts += 1
-        intentListeners.add(cb)
-        return () => {
-          intentListeners.delete(cb)
-        }
-      }),
-      host: {
-        openSettingsWindow: vi.fn(async () => true),
-        openExternalUrl: vi.fn(async () => ({ ok: true, message: '' })),
-        openDirectoryDialog: vi.fn(async () => null),
-        consumeExternalOpenPaths: consumeExternalOpenPathsSpy,
-      },
-    }),
-  })
 })
 
 function readyFilesystemWorkspace(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
@@ -201,18 +185,6 @@ afterEach(() => {
 })
 
 describe('useClientEffectIntentRouter', () => {
-  test('advances the server command generation immediately on every native advance request', async () => {
-    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
-    await renderHookHost()
-
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'server-command-reset-requested' })
-      emitIntent({ type: 'server-command-reset-requested' })
-    })
-
-    expect(commandGenerationMocks.advance).toHaveBeenCalledTimes(2)
-  })
-
   test('dispatches global dialogs while workspace bootstrap is still restoring', async () => {
     currentWorkspaceId = null
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
@@ -324,7 +296,7 @@ describe('useClientEffectIntentRouter', () => {
     })
     const host = await renderHookHost()
 
-    expect(nativeIntentSubscriptionStarts).toBe(1)
+    expect(serverIntentSubscriptionStarts).toBe(1)
     expect(intentListeners.size).toBe(1)
 
     currentWorkspaceId = repo.id
@@ -332,7 +304,7 @@ describe('useClientEffectIntentRouter', () => {
       await host.rerender(<IntentIngressTestHost />)
     })
 
-    expect(nativeIntentSubscriptionStarts).toBe(1)
+    expect(serverIntentSubscriptionStarts).toBe(1)
     expect(intentListeners.size).toBe(1)
 
     await flushTestUpdates(() => {
@@ -681,14 +653,7 @@ describe('useClientEffectIntentRouter', () => {
     terminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.workspaceRuntimeId)
     const terminalFilesystemTargetKey = `${repo.id}\0goblin+file:///tmp/repo-worktree`
     let visibleSessionIds = ['term-111111111111111111111']
-    const workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge({
-      onEffectIntent: (cb) => {
-        intentListeners.add(cb)
-        return () => {
-          intentListeners.delete(cb)
-        }
-      },
-    })
+    const workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge({})
     workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-111111111111111111111')
     const createTerminal = vi.fn((base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
@@ -740,43 +705,6 @@ describe('useClientEffectIntentRouter', () => {
         { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
       )
     })
-  })
-
-  test('drains externally opened repo paths through the centralized intent router', async () => {
-    workspacesStore.setState({
-      openWorkspaceMembership: vi.fn((path: string | { id: string }) =>
-        Promise.resolve({
-          ok: true as const,
-          workspaceId: workspaceIdForTest(typeof path === 'string' ? path : path.id),
-        }),
-      ),
-    })
-    consumeExternalOpenPathsSpy
-      .mockResolvedValueOnce(['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'] as string[])
-      .mockResolvedValueOnce([] as string[])
-
-    await renderHookHost()
-    await flushTestUpdates(() => {
-      emitIntent({ type: 'external-open-enqueued' })
-    })
-
-    await waitFor(() => {
-      expect(workspacesStore.getState().openWorkspaceMembership).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
-      expect(workspacesStore.getState().openWorkspaceMembership).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
-      expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
-    })
-  })
-
-  test('does not drain startup external paths before bootstrap admission', async () => {
-    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
-    await renderHookHost()
-    await flushTestUpdates(() => {})
-    expect(consumeExternalOpenPathsSpy).not.toHaveBeenCalled()
-
-    await flushTestUpdates(() => {
-      authenticatedBootstrapState.value = { status: 'ready' }
-    })
-    await waitFor(() => expect(consumeExternalOpenPathsSpy).toHaveBeenCalledOnce())
   })
 
   test('theme menu intents update theme through the client store', async () => {
@@ -877,7 +805,6 @@ async function renderHookHost() {
 const IntentIngressTestHost = defineComponent({
   name: 'ClientEffectIntentIngressTestHost',
   setup() {
-    provideDocumentClientEffectIntentIngress()
     return () => <HookHost />
   },
 })

@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { createNativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 
 const mocks = vi.hoisted(() => ({
   getUserSettings: vi.fn(),
@@ -27,20 +26,11 @@ describe('server settings snapshot runtime state', () => {
       fetchIntervalSec: 120,
       terminalNotificationsEnabled: false,
       shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      globalShortcut: 'Alt+G',
-      lanEnabled: false,
     })
     mocks.getServerRecentWorkspaces.mockResolvedValue([])
     mocks.getServerWorkspaceSettings.mockResolvedValue([])
 
-    const state = createNativeShortcutRegistrationState()
-    state.globalShortcutRegistered = true
-
     const snapshotMod = await import('#/server/settings/snapshot.ts')
-    await expect(snapshotMod.getSettingsSnapshot(state)).resolves.toMatchObject({
-      globalShortcut: 'Alt+G',
-      globalShortcutRegistered: true,
-    })
+    await expect(snapshotMod.getSettingsSnapshot()).resolves.toMatchObject({})
   })
 })

@@ -5,78 +5,12 @@
 // translated.
 
 export const en = {
-  // ---- Menu (top-level) ---------------------------------------------------
-  'menu.file': 'File',
-  'menu.edit': 'Edit',
-  'menu.view': 'View',
-  'menu.window': 'Window',
-  'menu.help': 'Help',
-
-  // ---- Menu — App (macOS application menu) --------------------------------
-  'menu.app.about': 'About {name}',
-  'menu.app.services': 'Services',
-  'menu.app.hide': 'Hide {name}',
-  'menu.app.hide-others': 'Hide Others',
-  'menu.app.show-all': 'Show All',
-  'menu.app.quit': 'Quit {name}',
-  'menu.app.settings': 'Settings…',
-
-  // ---- Menu — Window (macOS) ----------------------------------------------
-  'menu.window.minimize': 'Minimize',
-  'menu.window.zoom': 'Zoom',
-  'menu.window.front': 'Bring All to Front',
-
-  // ---- Menu — File --------------------------------------------------------
-  'menu.file.open-local-workspace': 'Open Workspace…',
-  'menu.file.open-local-workspace-path': 'Open Workspace by Path…',
-  'menu.file.open-remote-workspace': 'Open Remote Workspace…',
-  'menu.file.clone-repo': 'Clone Repository…',
-  'menu.file.create-worktree': 'New Worktree…',
-  'menu.file.open-recent': 'Open Recent',
-  'menu.file.no-recent': 'No Recent Workspaces',
-  'menu.file.clear-recent': 'Clear Menu',
-  'menu.file.open-in-browser': 'Open in Browser',
-  'menu.file.open-data-folder': 'Open Data Folder',
-  // Platform variants picked at menu-build time in the native host
   // (where `process.platform` is the source of truth — the client is
   // sandboxed and only sees `bootstrap.platform`).
-  'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
-  'menu.file.open-data-folder.win': 'Open Data Folder in Explorer',
-  'menu.file.close-window': 'Close Window',
-  'menu.file.close-workspace-tab': 'Close Workspace Tab',
-  'menu.file.close-workspace': 'Close Workspace',
-  'menu.file.settings': 'Settings…',
-  'menu.file.quit': 'Quit',
-  'menu.client-intent-delivery-failed':
-    'The action could not be sent because the app window changed or failed to load. Please try again.',
 
-  // ---- Menu — Edit --------------------------------------------------------
-  'menu.edit.undo': 'Undo',
-  'menu.edit.redo': 'Redo',
-  'menu.edit.cut': 'Cut',
-  'menu.edit.copy': 'Copy',
-  'menu.edit.paste': 'Paste',
-  'menu.edit.paste-match-style': 'Paste and Match Style',
   'menu.edit.delete': 'Delete',
-  'menu.edit.select-all': 'Select All',
 
-  // ---- Menu — View --------------------------------------------------------
-  'menu.view.status': 'Branch Status',
-  'menu.view.history': 'History',
-  'menu.view.changes': 'Changes',
-  'menu.view.terminal': 'Terminal',
   'menu.view.refresh': 'Refresh Workspace',
-  'menu.view.reload-page': 'Reload Page',
-  'menu.view.toggle-full-screen': 'Toggle Full Screen',
-  'menu.view.toggle-dev-tools': 'Toggle Developer Tools',
-
-  // ---- Menu — Window (goblin-specific) ---------------------------------------
-  'menu.window.next-workspace': 'Next Workspace',
-  'menu.window.prev-workspace': 'Previous Workspace',
-  'menu.window.reset-window': 'Reset Window',
-
-  // ---- Menu — Help --------------------------------------------------------
-  'menu.help.shortcuts': 'Keyboard Shortcuts',
 
   // ---- App chrome --------------------------------------------------------
   'app-chrome.open': 'Open',
@@ -748,9 +682,7 @@ export const en = {
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': 'Refresh',
   'settings.nav.shortcuts': 'Shortcuts',
-  'settings.lan.enabled': 'Allow LAN access',
-  'settings.lan.enabled-hint': 'Allow other devices on your local network to access Goblin.',
-  'settings.lan.restart-hint': 'This setting takes effect after restarting Goblin.',
+
   'settings.web.title': 'Remote access',
   'settings.nav.web': 'Remote access',
   'settings.web.server': 'Server',
@@ -766,17 +698,13 @@ export const en = {
   'settings.web.token-copied': 'Token copied to clipboard.',
   'settings.web.token-copy-failed': 'Could not copy to clipboard.',
   'settings.web.token-read-failed': 'Could not read token state. Reopen settings to try again.',
-  'settings.web.token-rotate': 'Rotate token',
-  'settings.web.token-rotated': 'New token saved. It will take effect after you restart Goblin.',
-  'settings.web.token-rotate-failed': 'Token rotation failed.',
-  'settings.web.token-rotation-hint':
-    'The QR codes below include the currently active token. Scanning them auto-fills the gate on the target device.',
+
   'settings.web.token-pending-restart-hint':
     'The displayed token and QR codes become valid when Goblin next starts. The current token remains active until then.',
   'settings.web.lan': 'Network',
   'settings.web.lan-urls': 'LAN addresses',
   'settings.web.lan-urls-hint': 'Other devices on the same local network can use these addresses to access Goblin.',
-  'settings.lan.local-only': 'Access is currently limited to this device.',
+
   'settings.web.qr': 'QR codes',
   'settings.web.qr-scan': 'QR code',
   'settings.about': 'About',
@@ -829,17 +757,7 @@ export const en = {
     '  IdentityFile ~/.ssh/id_ed25519\n',
   'settings.shortcuts': 'Keyboard shortcuts',
   'settings.shortcuts-disable-app': 'Disable app shortcuts',
-  'settings.shortcuts-disable-global': 'Disable global shortcut',
-  'settings.global-shortcut': 'Global shortcut',
-  'settings.global-shortcut-hint': 'Press a combo. Esc cancels.',
-  'settings.global-shortcut-disabled-hint': 'Saved, currently off.',
-  'settings.global-shortcut-record': 'Change global shortcut',
-  'settings.global-shortcut-recording': 'Press keys…',
-  'settings.global-shortcut-reset': 'Reset',
-  'settings.global-shortcut-conflict': 'Registration failed. It may be in use.',
-  'settings.global-shortcut-projection-failed':
-    'The preference was saved, but the app shortcut could not be updated. Reopen the app to apply it.',
-  'settings.global-shortcut-invalid': 'Use Command, Control, or Option with a key.',
+
   'settings.open-github': 'Open project on GitHub',
   'about.app': 'Goblin',
   'about.version': 'Version',

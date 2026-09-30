@@ -1,11 +1,11 @@
-// Shared structured logger for Electron, server, and system code.
+// Shared structured logger for server and system code.
 
 import { pino, type Logger } from 'pino'
 import { installStdioErrorGuard } from '#/node/stdio-error-guard.ts'
 
 type NodeLogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent'
 
-// The Electron main process inherits stdio from dev terminals such as Ghostty.
+// The server may inherit stdio from an interactive terminal.
 // If that PTY disappears first, later log writes can emit EIO/EBADF/EPIPE; a
 // disconnected log sink should not crash the app.
 installStdioErrorGuard()

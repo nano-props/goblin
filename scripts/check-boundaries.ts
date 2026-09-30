@@ -41,19 +41,9 @@ export interface ImportReference {
 
 const RULES: Rule[] = [
   {
-    fromPrefix: '/src/main/',
-    disallow: ['#/web/', '#/server/'],
-    reason: 'main must only cover native-host concerns; must not import web or server runtime modules',
-  },
-  {
-    fromPrefix: '/src/web/',
-    disallow: ['#/main/'],
-    reason: 'web client must not directly import main; use preload bridge, native IPC, or server contract instead',
-  },
-  {
-    fromPrefix: '/src/server/',
-    disallow: ['electron'],
-    reason: 'server runtime must stay Electron-agnostic; avoid coupling backend capabilities to the desktop shell',
+    fromPrefix: '/src/',
+    disallow: ['electron', '#/main/', '#/preload/'],
+    reason: 'application code must use server/browser contracts without desktop dependencies',
   },
   {
     fromPrefix: '/src/server/',
@@ -71,14 +61,9 @@ const RULES: Rule[] = [
       'server runtime consumes the PtySupervisor capability; bootstrap owns the concrete production implementation',
   },
   {
-    fromPrefix: '/src/shared/',
-    disallow: ['electron'],
-    reason: 'shared layer must be reusable across web/server/main; must not depend on Electron',
-  },
-  {
     fromPrefix: '/src/system/',
-    disallow: ['#/server/', '#/web/', '#/main/'],
-    reason: 'system capabilities must remain independent of server, web, and main application runtimes',
+    disallow: ['#/server/', '#/web/'],
+    reason: 'system capabilities must remain independent of server and web application runtimes',
   },
   {
     fromPrefix: '/src/',
@@ -100,8 +85,6 @@ const RULES: Rule[] = [
         'restoreWorkspaceTabs',
         'restoreServerWorkspace',
         'removeWorkspaceEntry',
-        'setGlobalShortcut',
-        'setGlobalShortcutDisabled',
         'setI18nPref',
         'setLanEnabled',
         'setRecentWorkspaceExternalApp',

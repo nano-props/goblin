@@ -48,7 +48,7 @@ interface BootstrapLoad {
 interface CreateWorktreePagePaneProps {
   repoId: WorkspaceId
   compact?: boolean
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onCancel: () => void
   onCreated: (worktreePath: string, navigationGeneration: AppNavigationGeneration) => void
 }
@@ -64,7 +64,7 @@ interface GitCreateWorktreePagePaneProps extends Omit<CreateWorktreePagePaneProp
 export const CreateWorktreePagePane = defineComponent<CreateWorktreePagePaneProps>({
   name: 'CreateWorktreePagePane',
   inheritAttrs: false,
-  props: ['repoId', 'compact', 'trafficLightOffset', 'onCancel', 'onCreated'],
+  props: ['repoId', 'compact', 'navigationOffset', 'onCancel', 'onCreated'],
   setup(props) {
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const workspace = computed<GitCreateWorktreeWorkspace | null>(() => {
@@ -83,17 +83,17 @@ export const CreateWorktreePagePane = defineComponent<CreateWorktreePagePaneProp
     return () => {
       const currentWorkspace = workspace.value
       const compact = props.compact ?? false
-      const trafficLightOffset = props.trafficLightOffset ?? false
+      const navigationOffset = props.navigationOffset ?? false
       return currentWorkspace ? (
         <GitCreateWorktreePagePane
           workspace={currentWorkspace}
           compact={compact}
-          trafficLightOffset={trafficLightOffset}
+          navigationOffset={navigationOffset}
           onCancel={props.onCancel}
           onCreated={props.onCreated}
         />
       ) : (
-        <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={props.onCancel}>
+        <CreateWorktreePageShell compact={compact} navigationOffset={navigationOffset} onBack={props.onCancel}>
           {showLoadingSkeleton.value ? <WorkspacePageLoadingBody /> : <WorkspacePageQuietLoadingBody />}
         </CreateWorktreePageShell>
       )
@@ -104,7 +104,7 @@ export const CreateWorktreePagePane = defineComponent<CreateWorktreePagePaneProp
 const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps>({
   name: 'GitCreateWorktreePagePane',
   inheritAttrs: false,
-  props: ['workspace', 'compact', 'trafficLightOffset', 'onCancel', 'onCreated'],
+  props: ['workspace', 'compact', 'navigationOffset', 'onCancel', 'onCreated'],
   setup(props) {
     const snapshotReadModel = useRepoSnapshotReadModel(
       () => props.workspace.id,
@@ -259,14 +259,14 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
       const currentLiveRepo = props.workspace
       const snapshot = snapshotReadModel.data.value?.snapshot
       const compact = props.compact ?? false
-      const trafficLightOffset = props.trafficLightOffset ?? false
+      const navigationOffset = props.navigationOffset ?? false
       const holdLoadingPage = !pageReady.value || showLoadingSkeleton.value
 
       if (!snapshot && snapshotReadModel.isError.value) {
         const snapshotError = snapshotReadModel.error.value
         const messageKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError ?? '')
         return (
-          <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={props.onCancel}>
+          <CreateWorktreePageShell compact={compact} navigationOffset={navigationOffset} onBack={props.onCancel}>
             <RepoStatusFailureView
               messageKey={messageKey || 'error.failed-read-repo'}
               retrying={snapshotReadModel.isFetching.value}
@@ -278,7 +278,7 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
 
       if (holdLoadingPage || !snapshot) {
         return (
-          <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={props.onCancel}>
+          <CreateWorktreePageShell compact={compact} navigationOffset={navigationOffset} onBack={props.onCancel}>
             {showLoadingSkeleton.value ? <WorkspacePageLoadingBody /> : <WorkspacePageQuietLoadingBody />}
           </CreateWorktreePageShell>
         )
@@ -312,7 +312,7 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
       )
 
       return (
-        <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={props.onCancel}>
+        <CreateWorktreePageShell compact={compact} navigationOffset={navigationOffset} onBack={props.onCancel}>
           <ScrollPane>
             <CreateWorktreePageBody
               repo={projectedRepo}
@@ -329,13 +329,13 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
 
 interface CreateWorktreePageShellProps {
   compact: boolean
-  trafficLightOffset: boolean
+  navigationOffset: boolean
   onBack: () => void
 }
 
 const CreateWorktreePageShell = defineComponent<CreateWorktreePageShellProps>({
   name: 'CreateWorktreePageShell',
-  props: ['compact', 'trafficLightOffset', 'onBack'],
+  props: ['compact', 'navigationOffset', 'onBack'],
   setup(props, { slots }) {
     const t = useT()
     return () => (
@@ -343,7 +343,7 @@ const CreateWorktreePageShell = defineComponent<CreateWorktreePageShellProps>({
         icon={GitBranchPlus}
         label={t('action.create-worktree-title')}
         compact={props.compact}
-        trafficLightOffset={props.trafficLightOffset}
+        navigationOffset={props.navigationOffset}
         onBack={props.onBack}
       >
         {slots.default?.()}

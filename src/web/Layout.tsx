@@ -10,7 +10,6 @@ import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/app/bootstrap/authenticated.ts'
 import { useBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
-import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { createAppNavigationActions } from '#/web/app/navigation/actions.ts'
@@ -39,7 +38,6 @@ import type { WorkspaceNavigationRouteContext } from '#/web/app/navigation/works
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
-import { provideDocumentClientEffectIntentIngress } from '#/web/hooks/client-effect-intent-ingress.ts'
 
 const INACTIVE_REPO_QUERY_WORKSPACE_ID = requiredWorkspaceId('goblin+file:///inactive-repo-query')
 
@@ -65,7 +63,6 @@ export const Layout = defineComponent({
     const route = useRoute()
     const bootstrapLoading = useBootstrapLoadingPresentation()
     useAppHistoryPresentationObserver()
-    provideDocumentClientEffectIntentIngress()
 
     return () => (
       <ErrorBoundary resetKey={route.fullPath} onError={bootstrapLoading.hide}>
@@ -243,10 +240,6 @@ const AuthenticatedWorkspaceShell = defineComponent<{ runtime: AuthenticatedAppR
   setup(props) {
     const runtime = props.runtime
     const overlays = runtime.overlays
-    const workspaceDrop = useWorkspaceDrop({
-      blocked: overlays.anyOpen,
-      navigation: runtime.navigation,
-    })
 
     return () => {
       const currentNavigation = runtime.navigation.value
@@ -263,16 +256,9 @@ const AuthenticatedWorkspaceShell = defineComponent<{ runtime: AuthenticatedAppR
             navigateToSettingsShortcuts={runtime.navigateToSettingsShortcuts}
             navigateToIndex={runtime.navigateToIndex}
           />
-          <div
-            class="relative flex h-full flex-col"
-            onDragenter={workspaceDrop.onDragEnter}
-            onDragover={workspaceDrop.onDragOver}
-            onDragleave={workspaceDrop.onDragLeave}
-            onDrop={workspaceDrop.onDrop}
-          >
+          <div class="relative flex h-full flex-col">
             <RouterView />
             <WorkspaceContextOverlays
-              workspaceDrop={workspaceDrop}
               navigation={currentNavigation}
               hydratedRouteWorkspaceId={runtime.hydratedRouteWorkspaceId.value}
               currentWorkspaceRuntimeId={runtime.commandWorkspaceRuntimeId.value}

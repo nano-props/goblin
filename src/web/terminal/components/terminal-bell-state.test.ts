@@ -30,14 +30,6 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('terminal bell state', () => {
-  test('publishes the initial unread count from the source of truth', () => {
-    const onBadgeChange = vi.fn()
-
-    createTerminalBellState(vi.fn(), onBadgeChange)
-
-    expect(onBadgeChange).toHaveBeenCalledWith(0)
-  })
-
   test('marks background bells unread and requests a system notification when enabled', async () => {
     const notify = vi.fn()
     vi.spyOn(document, 'hasFocus').mockReturnValue(false)
@@ -45,7 +37,7 @@ describe('terminal bell state', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellState(notify, vi.fn())
+    const controller = createTerminalBellState(notify)
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
@@ -67,7 +59,7 @@ describe('terminal bell state', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellState(notify, vi.fn())
+    const controller = createTerminalBellState(notify)
 
     controller.handleBell(descriptor, {
       processName: 'zsh',
@@ -93,7 +85,7 @@ describe('terminal bell state', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellState(vi.fn(), vi.fn())
+    const controller = createTerminalBellState(vi.fn())
     const workspaceDescriptor = terminalDescriptorForTest({
       terminalSessionId: 'term-222222222222222222222',
       index: 1,
@@ -116,7 +108,7 @@ describe('terminal bell state', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
     )
-    const controller = createTerminalBellState(notify, vi.fn())
+    const controller = createTerminalBellState(notify)
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
@@ -133,7 +125,7 @@ describe('terminal bell state', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellState(notify, vi.fn())
+    const controller = createTerminalBellState(notify)
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: true })
     await Promise.resolve()
@@ -151,7 +143,7 @@ describe('terminal bell state', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellState(notify, vi.fn())
+    const controller = createTerminalBellState(notify)
 
     now.mockReturnValueOnce(10_000)
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
@@ -170,7 +162,7 @@ describe('terminal bell state', () => {
   })
 
   test('supports clearing and removing tracked bell state', () => {
-    const controller = createTerminalBellState(vi.fn(), vi.fn())
+    const controller = createTerminalBellState(vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     expect(controller.hasBell(descriptor.terminalSessionId)).toBe(true)
@@ -190,7 +182,7 @@ describe('terminal bell state', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
-    const controller = createTerminalBellState(vi.fn(), vi.fn())
+    const controller = createTerminalBellState(vi.fn())
 
     now.mockReturnValueOnce(20_000)
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })

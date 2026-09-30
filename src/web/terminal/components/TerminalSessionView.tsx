@@ -676,7 +676,6 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
 
 function showTerminalTakeoverFailure(error: unknown, t: (key: string) => string): void {
   if (error instanceof ClientRealtimeRequestError) {
-    if (error.kind === 'app-quitting') return
     if (error.delivery === 'indeterminate') {
       toast.warning(t('terminal.takeover-delivery-uncertain'))
       return

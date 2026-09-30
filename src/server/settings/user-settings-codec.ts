@@ -29,7 +29,6 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { toSafeCanonicalWorkspaceId, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import { MAX_RECENT_WORKSPACES, defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 
@@ -40,9 +39,6 @@ export interface UserSettingsData {
   fetchIntervalSec: number
   terminalNotificationsEnabled: boolean
   shortcutsDisabled: boolean
-  globalShortcutDisabled: boolean
-  globalShortcut: string
-  lanEnabled: boolean
   workspace: ServerWorkspaceState
   recentWorkspaces: WorkspaceSessionEntry[]
   workspaceSettings: WorkspaceSettingsEntry[]
@@ -198,13 +194,9 @@ export function currentSettingsData(raw: Record<string, unknown>): UserSettingsD
     !isColorTheme(raw.colorTheme) ||
     !isFetchInterval(raw.fetchIntervalSec) ||
     !isBoolean(raw.terminalNotificationsEnabled) ||
-    !isBoolean(raw.shortcutsDisabled) ||
-    !isBoolean(raw.globalShortcutDisabled) ||
-    !isBoolean(raw.lanEnabled)
+    !isBoolean(raw.shortcutsDisabled)
   )
     return null
-  const globalShortcut = parseAllowedGlobalShortcut(raw.globalShortcut)
-  if (!globalShortcut || globalShortcut !== raw.globalShortcut) return null
   const decoded: UserSettingsData = {
     lang: raw.lang,
     theme: raw.theme,
@@ -212,9 +204,7 @@ export function currentSettingsData(raw: Record<string, unknown>): UserSettingsD
     fetchIntervalSec: raw.fetchIntervalSec === 0 ? 0 : raw.fetchIntervalSec,
     terminalNotificationsEnabled: raw.terminalNotificationsEnabled,
     shortcutsDisabled: raw.shortcutsDisabled,
-    globalShortcutDisabled: raw.globalShortcutDisabled,
-    globalShortcut,
-    lanEnabled: raw.lanEnabled,
+
     workspace: normalizeWorkspace(raw.workspace),
     recentWorkspaces: normalizeRecentWorkspaces(raw.recentWorkspaces),
     workspaceSettings: normalizeWorkspaceSettings(raw.workspaceSettings),
@@ -226,9 +216,7 @@ export function currentSettingsData(raw: Record<string, unknown>): UserSettingsD
     fetchIntervalSec: raw.fetchIntervalSec === 0 ? 0 : raw.fetchIntervalSec,
     terminalNotificationsEnabled: raw.terminalNotificationsEnabled,
     shortcutsDisabled: raw.shortcutsDisabled,
-    globalShortcutDisabled: raw.globalShortcutDisabled,
-    globalShortcut: raw.globalShortcut,
-    lanEnabled: raw.lanEnabled,
+
     workspace: raw.workspace,
     recentWorkspaces: raw.recentWorkspaces,
     workspaceSettings: raw.workspaceSettings,

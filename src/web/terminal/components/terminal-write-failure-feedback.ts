@@ -21,7 +21,6 @@ export function createTerminalWriteFailureReporter(): TerminalWriteFailureReport
   return {
     report({ terminalRuntimeSessionId, failure }) {
       const error = failure.kind === 'error' ? failure.error : null
-      if (error instanceof ClientRealtimeRequestError && error.kind === 'app-quitting') return
       const outageId = error instanceof ClientRealtimeRequestError ? error.outageId : null
       if (outageId !== null && outageId <= highestReportedOutageId) return
       if (outageId !== null) highestReportedOutageId = outageId

@@ -11,13 +11,7 @@ const settingsActionsMocks = vi.hoisted(() => ({
   refreshExternalAppsDetection: vi.fn(async () => {}),
   refreshGitHubCliDetection: vi.fn(async () => {}),
   setFetchInterval: vi.fn(async () => 120),
-  setGlobalShortcut: vi.fn(async (accelerator: string) => ({
-    kind: 'projected' as const,
-    accelerator,
-    registered: true,
-  })),
-  setGlobalShortcutDisabled: vi.fn(async () => {}),
-  setLanEnabled: vi.fn(async () => {}),
+
   setShortcutsDisabled: vi.fn(async () => {}),
   setTerminalNotificationsEnabled: vi.fn(async () => {}),
 }))
@@ -37,16 +31,9 @@ beforeEach(() => {
   feedbackMocks.warning.mockClear()
   settingsActionsMocks.setFetchInterval.mockClear()
   settingsActionsMocks.setFetchInterval.mockResolvedValue(120)
-  settingsActionsMocks.setGlobalShortcut.mockClear()
-  settingsActionsMocks.setGlobalShortcut.mockImplementation(async (accelerator) => ({
-    kind: 'projected',
-    accelerator,
-    registered: true,
-  }))
-  settingsActionsMocks.setGlobalShortcutDisabled.mockClear()
-  settingsActionsMocks.setGlobalShortcutDisabled.mockResolvedValue(undefined)
-  settingsActionsMocks.setLanEnabled.mockClear()
-  settingsActionsMocks.setLanEnabled.mockResolvedValue(undefined)
+
+  settingsActionsMocks.setTerminalNotificationsEnabled.mockClear()
+  settingsActionsMocks.setTerminalNotificationsEnabled.mockResolvedValue(undefined)
   settingsActionsMocks.setShortcutsDisabled.mockClear()
   settingsActionsMocks.setShortcutsDisabled.mockResolvedValue(undefined)
   settingsActionsMocks.setTerminalNotificationsEnabled.mockClear()
@@ -68,22 +55,12 @@ describe('runtime settings controllers', () => {
     expect(feedbackMocks.error).not.toHaveBeenCalled()
   })
 
-  test('runs LAN settings writes through settings mutations', async () => {
-    const { useLanSettingsController } = await import('#/web/settings/runtime-lan.ts')
-    const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
-
-    result.value.setLanEnabled(true)
-    await vi.waitFor(() => expect(settingsActionsMocks.setLanEnabled).toHaveBeenCalledWith(true))
-
-    expect(feedbackMocks.error).not.toHaveBeenCalled()
-  })
-
   test('surfaces a rejected settings write once at the settings interaction boundary', async () => {
-    settingsActionsMocks.setLanEnabled.mockRejectedValueOnce(new Error('settings unavailable'))
-    const { useLanSettingsController } = await import('#/web/settings/runtime-lan.ts')
-    const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
+    settingsActionsMocks.setTerminalNotificationsEnabled.mockRejectedValueOnce(new Error('settings unavailable'))
+    const { useFetchSettingsController } = await import('#/web/settings/runtime-fetch.ts')
+    const { result } = renderComposableInJsdom(() => useFetchSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    result.value.setLanEnabled(true)
+    result.value.setTerminalNotificationsEnabled(true)
 
     await vi.waitFor(() => {
       expect(feedbackMocks.error).toHaveBeenCalledWith(expect.any(String), { id: 'settings-write-failed' })
@@ -92,13 +69,13 @@ describe('runtime settings controllers', () => {
   })
 
   test('surfaces an uncertain settings write without reporting a rejection', async () => {
-    settingsActionsMocks.setLanEnabled.mockRejectedValueOnce(
+    settingsActionsMocks.setTerminalNotificationsEnabled.mockRejectedValueOnce(
       new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'settings outcome uncertain' }),
     )
-    const { useLanSettingsController } = await import('#/web/settings/runtime-lan.ts')
-    const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
+    const { useFetchSettingsController } = await import('#/web/settings/runtime-fetch.ts')
+    const { result } = renderComposableInJsdom(() => useFetchSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    result.value.setLanEnabled(true)
+    result.value.setTerminalNotificationsEnabled(true)
 
     await vi.waitFor(() => {
       expect(feedbackMocks.warning).toHaveBeenCalledWith(expect.any(String), {
@@ -114,20 +91,8 @@ describe('runtime settings controllers', () => {
       wrapper: AppVueQueryClientScope,
     })
 
-    const onShortcutSaved = vi.fn()
     result.value.setShortcutsDisabled(true)
-    result.value.setGlobalShortcutDisabled(true)
-    result.value.setGlobalShortcut('CommandOrControl+Shift+K', onShortcutSaved)
-    await vi.waitFor(() => {
-      expect(settingsActionsMocks.setShortcutsDisabled).toHaveBeenCalledWith(true)
-      expect(settingsActionsMocks.setGlobalShortcutDisabled).toHaveBeenCalledWith(true)
-      expect(settingsActionsMocks.setGlobalShortcut).toHaveBeenCalledWith('CommandOrControl+Shift+K')
-      expect(onShortcutSaved).toHaveBeenCalledWith({
-        kind: 'projected',
-        accelerator: 'CommandOrControl+Shift+K',
-        registered: true,
-      })
-    })
+    await vi.waitFor(() => expect(settingsActionsMocks.setShortcutsDisabled).toHaveBeenCalledWith(true))
 
     expect(feedbackMocks.error).not.toHaveBeenCalled()
   })

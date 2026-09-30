@@ -1,6 +1,4 @@
-// Install the runtime host globals (`window.__GOBLIN_BOOTSTRAP__`,
-// `window.goblinNative`, `window.location`) used by tests that
-// pretend to run inside the Electron shell or a web shell host.
+// Install the browser bootstrap and location globals used by tests.
 //
 // The Vitest worker setup (`vitest.setup.ts`) already installs
 // `localStorage` / `sessionStorage` shims, a no-op `ResizeObserver`,
@@ -15,13 +13,13 @@
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 interface HostBootstrapOptions {
-  runtime?: 'electron' | 'web'
+  runtime?: 'web'
   initialServer?: { url: string; accessToken: string }
   bridgeVersion?: number
 }
 
 export function installHostBootstrap(options: HostBootstrapOptions = {}): void {
-  const runtime = options.runtime ?? 'electron'
+  const runtime = options.runtime ?? 'web'
   const initialServer = options.initialServer ?? {
     url: 'http://127.0.0.1:32100/',
     accessToken: 'secret',
@@ -43,10 +41,5 @@ export function installHostBootstrap(options: HostBootstrapOptions = {}): void {
       origin: new URL(initialServer.url).origin,
       search: '',
     },
-  })
-
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: undefined,
   })
 }

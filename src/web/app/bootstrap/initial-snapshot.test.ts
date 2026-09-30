@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { WEB_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
@@ -11,12 +11,12 @@ function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientB
   }
 }
 
-function electronBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
+function browserBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
     runtime: {
-      kind: 'electron',
+      kind: 'web',
       bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
+      capabilities: [...WEB_CLIENT_CAPABILITIES],
     },
     initialServer: null,
     ...overrides,
@@ -32,7 +32,7 @@ describe('client bootstrap', () => {
   })
 
   test('reads bootstrap snapshots from the goblin bridge', async () => {
-    const bootstrap: ClientBootstrapSnapshot = electronBootstrap({
+    const bootstrap: ClientBootstrapSnapshot = browserBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     Object.defineProperty(globalThis, 'window', {
@@ -89,21 +89,10 @@ describe('client bootstrap', () => {
     })
     const bridgeModule = await import('#/web/bridge/client.ts')
     bridgeModule.setClientBridgeForTests({
-      kind: () => 'web',
-      hasCapability: () => false,
       getBootstrap: () => bootstrap,
-      invokeIpc: async () => null,
-      abortIpc: async () => false,
-      onEffectIntent: () => () => {},
-      pathForFile: () => '',
+
       saveClipboardFiles: () => Promise.resolve([]),
-      getAccessTokenProjection: async () => {
-        throw new Error('unused token projection')
-      },
-      rotateAccessToken: async () => {
-        throw new Error('unused token rotation')
-      },
-      host: () => null,
+
       appRealtime: () => ({
         kickReconnect: () => {},
         onRecovered: () => () => {},
@@ -118,7 +107,7 @@ describe('client bootstrap', () => {
         recoverSessions: async () => ({ revision: 0, sessions: [] }),
         notifyBell: async () => false,
         sendTestNotification: async () => false,
-        setBadge: () => {},
+
         onOutput: () => () => {},
         onBell: () => () => {},
         onTitle: () => () => {},
@@ -143,7 +132,7 @@ describe('client bootstrap', () => {
     expect(getInitialBootstrap()).toEqual(bootstrap)
   })
 
-  test('reads injected web bootstrap when the Electron bridge is unavailable', async () => {
+  test('reads injected web bootstrap for a browser client', async () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
@@ -159,7 +148,7 @@ describe('client bootstrap', () => {
     expect(getInitialBootstrap()).toEqual(bootstrap)
   })
 
-  test('reads injected web bootstrap from the html json script when the Electron bridge is unavailable', async () => {
+  test('reads injected web bootstrap from the html json script for a browser client', async () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
@@ -196,8 +185,8 @@ describe('client bootstrap', () => {
   test.each([
     ['a future bridge version', { runtime: { kind: 'web', bridgeVersion: 2, capabilities: [] }, initialServer: null }],
     [
-      'an incomplete Electron capability set',
-      { runtime: { kind: 'electron', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] }, initialServer: null },
+      'an unsupported runtime',
+      { runtime: { kind: 'desktop', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] }, initialServer: null },
     ],
     [
       'an invalid initial server',

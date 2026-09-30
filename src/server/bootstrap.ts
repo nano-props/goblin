@@ -26,18 +26,17 @@ export interface BootstrappedServer {
 }
 
 export interface BootstrapServerOptions {
-  /** Path to the PTY worker entry owned by this server runtime. */
-  ptyWorkerEntry: string
-  /** Path to the Node entrypoint used by the built-in `g` terminal command. */
-  gCommandEntry?: string
+  workerCommand: readonly string[]
+  gCommandBinDir: string
+  webRoot: string
+  version: string
   exit?: (code: number) => void
 }
 
 /**
  * Resolve the access token for the server. The `GOBLIN_SERVER_ACCESS_TOKEN`
  * env var wins when set (CI / tests / an explicit override), otherwise we
- * read (or create) the file in the server's data dir. This is the same
- * file the Electron main reads, so the two processes see the same value.
+ * read (or create) the file in the server's data directory.
  */
 async function resolveAccessToken(): Promise<string> {
   const override = process.env.GOBLIN_SERVER_ACCESS_TOKEN?.trim()
@@ -51,11 +50,12 @@ export async function bootstrapServer(options: BootstrapServerOptions): Promise<
   const port = parsePort(process.env.GOBLIN_SERVER_PORT)
   const accessToken = await resolveAccessToken()
   const runtime = createServerRuntime({
-    version: process.env.npm_package_version?.trim() || '0.1.0',
+    version: options.version,
     startedAt,
     accessToken,
-    ptySupervisor: new WorkerBackedPtySupervisor({ workerEntry: options.ptyWorkerEntry }),
-    gCommandEntry: options.gCommandEntry,
+    ptySupervisor: new WorkerBackedPtySupervisor({ workerCommand: options.workerCommand }),
+    gCommandBinDir: options.gCommandBinDir,
+    webRoot: options.webRoot,
     serverHost: hostname,
     serverPort: port,
   })

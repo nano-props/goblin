@@ -1,6 +1,6 @@
 import type { CSSProperties, FunctionalComponent } from 'vue'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
-import { TitleBarInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
+import { InteractiveRegion } from '#/web/components/interactive-region.tsx'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
@@ -43,7 +43,7 @@ export const ZenModeSidebarResizeRail: FunctionalComponent<ZenModeSidebarResizeR
       >
         <ResizeHandleLine />
       </div>
-      {props.interactive ? <TitleBarInteractiveRegion {...handleProps} /> : <div {...handleProps} />}
+      {props.interactive ? <InteractiveRegion {...handleProps} /> : <div {...handleProps} />}
     </>
   )
 }

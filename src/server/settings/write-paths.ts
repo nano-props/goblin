@@ -6,7 +6,6 @@ import {
   setServerWorkspaceExternalAppRecent,
   updateUserSettings,
 } from '#/server/settings/source.ts'
-import type { NativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import type { WorkspaceSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
 import type { UserSettings } from '#/shared/settings.ts'
@@ -29,9 +28,6 @@ export interface SetFetchIntervalInput {
 }
 export interface UpdateUserSettingsInput {
   prefs: Partial<UserSettings>
-}
-export interface SetGlobalShortcutRegisteredInput {
-  registered: boolean
 }
 export interface AddRecentWorkspaceInput {
   workspace: WorkspaceSessionEntry
@@ -62,15 +58,6 @@ export async function handleUpdateUserSettings(
     prefs: settings,
     ...('lang' in patch ? { i18n: resolveI18nSnapshot(settings.lang, options.acceptLanguage) } : {}),
   }
-}
-
-export function handleSetGlobalShortcutRegistered(
-  input: SetGlobalShortcutRegisteredInput,
-  state: NativeShortcutRegistrationState,
-): { ok: true; registered: boolean } {
-  const registered = (state.globalShortcutRegistered = input.registered)
-  publishSettingsInvalidation(['settings-snapshot'])
-  return { ok: true, registered }
 }
 
 export async function handleAddRecentWorkspace(

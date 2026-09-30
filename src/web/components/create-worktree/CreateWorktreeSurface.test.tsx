@@ -30,22 +30,16 @@ const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTS
 beforeEach(() => {
   appQueryClient.clear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+    runtime: { kind: 'web', bridgeVersion: 1, capabilities: [] },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
-  testWindow.goblinNative = {
-    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-    pathForFile: () => '',
-    invokeIpc: async () => null,
-    abortIpc: async () => true,
-  }
+
   vi.mocked(getRepoRemoteBranches).mockResolvedValue([])
 })
 
 afterEach(() => {
   cleanup()
   document.body.innerHTML = ''
-  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
 

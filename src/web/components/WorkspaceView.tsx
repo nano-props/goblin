@@ -42,14 +42,14 @@ interface WorkspaceProjectionRestoreController {
   retry: () => void
 }
 
-const EmptyWorkspacePane: FunctionalComponent<{ trafficLightOffset: boolean }> = (props) => (
+const EmptyWorkspacePane: FunctionalComponent<{ navigationOffset: boolean }> = (props) => (
   <section data-testid="empty-workspace-pane" class="flex min-h-0 flex-1 flex-col bg-background">
-    <WorkspaceChrome trafficLightOffset={props.trafficLightOffset} />
+    <WorkspaceChrome navigationOffset={props.navigationOffset} />
     <div class="min-h-0 flex-1" />
   </section>
 )
 
-EmptyWorkspacePane.props = ['trafficLightOffset']
+EmptyWorkspacePane.props = ['navigationOffset']
 
 interface WorkspaceViewProps {
   workspaceId: WorkspaceId
@@ -212,7 +212,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
       const gitUnavailable = currentWorkspace.capability.kind === 'filesystem'
       const gitCapabilitySettled = gitAvailable || gitUnavailable
       const zenModeCollapsed = !isCompact && currentView.zenMode && workspacePaneActive.value
-      const workspaceTrafficLightOffset = zenModeCollapsed
+      const workspaceNavigationOffset = zenModeCollapsed
       const sidebarSelectBranch = currentRouteView
         ? (branchName: string) =>
             navigation.selectRepoBranch(
@@ -226,10 +226,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
         ? () => props.onOpenWorkspaceDashboard?.(currentWorkspace.id)
         : undefined
 
-      const renderSidebarPane = (
-        navigatorContent?: VNodeChild,
-        chromeRegion: 'drag' | 'none' = zenModeCollapsed ? 'none' : 'drag',
-      ): VNodeChild => (
+      const renderSidebarPane = (navigatorContent?: VNodeChild): VNodeChild => (
         <WorkspaceLayoutPane>
           <WorkspaceLayoutSidebar
             workspaceId={currentWorkspace.id}
@@ -238,7 +235,6 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
             navigatorContent={
               navigatorContent ?? (!gitCapabilitySettled ? <GitWorkspaceNavigatorSkeleton /> : undefined)
             }
-            chromeRegion={chromeRegion}
             onOpenSettings={props.onOpenSettings}
             onSelectBranch={sidebarSelectBranch}
             onCreateWorktree={sidebarCreateWorktree}
@@ -267,10 +263,10 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
             sidebarPane={renderSidebarPane(
               isCompact ? <UnavailableWorkspaceView workspace={currentWorkspace} /> : undefined,
             )}
-            zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+            zenRevealSidebarPane={renderSidebarPane()}
             workspacePane={
               <WorkspaceLayoutPane>
-                <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+                <WorkspaceChrome navigationOffset={workspaceNavigationOffset} />
                 <UnavailableWorkspaceView workspace={currentWorkspace} />
               </WorkspaceLayoutPane>
             }
@@ -287,7 +283,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               currentBranchName={workspaceCurrentBranchName.value}
               workspacePaneRouteContext={workspacePaneRouteContext.value}
               shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
-              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+              toolbarNavigationOffset={workspaceNavigationOffset}
             />
           )
         }
@@ -298,7 +294,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               <WorkspaceDashboardPane
                 workspaceId={currentWorkspace.id}
                 compact={isCompact}
-                trafficLightOffset={workspaceTrafficLightOffset}
+                navigationOffset={workspaceNavigationOffset}
                 onBack={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
                 onOpenWorkspaceRoot={
                   openWorkspaceRootPane ? () => openWorkspaceRootPane(currentWorkspace.id) : undefined
@@ -308,7 +304,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
             )
           case 'workspace-root':
             if (currentWorkspace.capability.kind === 'probing') {
-              return <WorkspacePaneSkeleton toolbarTrafficLightOffset={workspaceTrafficLightOffset} />
+              return <WorkspacePaneSkeleton toolbarNavigationOffset={workspaceNavigationOffset} />
             }
             if (currentWorkspace.capability.kind === 'git') {
               return <RoutedWorkspaceNotFound workspaceId={currentWorkspace.id} />
@@ -322,7 +318,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                   route: currentRouteView.workspacePaneRoute,
                 }}
                 shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
-                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                toolbarNavigationOffset={workspaceNavigationOffset}
                 onBackToGitWorkspaceNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
               />
             )
@@ -337,7 +333,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                   route: currentRouteView.workspacePaneRoute,
                 }}
                 shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
-                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                toolbarNavigationOffset={workspaceNavigationOffset}
                 onBackToGitWorkspaceNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
               />
             )
@@ -346,7 +342,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               <CreateWorktreePagePane
                 repoId={currentWorkspace.id}
                 compact={isCompact}
-                trafficLightOffset={workspaceTrafficLightOffset}
+                navigationOffset={workspaceNavigationOffset}
                 onCancel={() => {
                   if (props.onCancelRepoNewWorktree) props.onCancelRepoNewWorktree(currentWorkspace.id)
                   else props.onOpenWorkspaceNavigator?.(currentWorkspace.id)
@@ -357,7 +353,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               />
             )
           case 'empty':
-            return <EmptyWorkspacePane trafficLightOffset={workspaceTrafficLightOffset} />
+            return <EmptyWorkspacePane navigationOffset={workspaceNavigationOffset} />
           case 'branch':
             return (
               <WorkspacePane
@@ -365,7 +361,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                 currentBranchName={workspaceCurrentBranchName.value}
                 workspacePaneRouteContext={workspacePaneRouteContext.value}
                 shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
-                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                toolbarNavigationOffset={workspaceNavigationOffset}
                 onBackToGitWorkspaceNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
               />
             )
@@ -393,10 +389,10 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               workspacePaneSize={currentView.workspacePaneSize}
               onWorkspacePaneSizeChange={setWorkspacePaneSize}
               sidebarPane={renderSidebarPane(isCompact ? failure : undefined)}
-              zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+              zenRevealSidebarPane={renderSidebarPane()}
               workspacePane={
                 <WorkspaceLayoutPane>
-                  <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+                  <WorkspaceChrome navigationOffset={workspaceNavigationOffset} />
                   {failure}
                 </WorkspaceLayoutPane>
               }
@@ -417,14 +413,14 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               workspacePaneSize={currentView.workspacePaneSize}
               onWorkspacePaneSizeChange={setWorkspacePaneSize}
               sidebarPane={renderSidebarPane(gitWorkspaceNavigatorSkeleton)}
-              zenRevealSidebarPane={renderSidebarPane(gitWorkspaceNavigatorSkeleton, 'none')}
+              zenRevealSidebarPane={renderSidebarPane(gitWorkspaceNavigatorSkeleton)}
               workspacePane={
                 <WorkspaceLayoutPane>
                   {workspacePaneActive.value ? (
-                    <WorkspacePaneSkeleton toolbarTrafficLightOffset={workspaceTrafficLightOffset} />
+                    <WorkspacePaneSkeleton toolbarNavigationOffset={workspaceNavigationOffset} />
                   ) : (
                     <>
-                      <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+                      <WorkspaceChrome navigationOffset={workspaceNavigationOffset} />
                       <EmptyWorkspacePaneSkeleton />
                     </>
                   )}
@@ -451,7 +447,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               workspacePaneSize={currentView.workspacePaneSize}
               onWorkspacePaneSizeChange={setWorkspacePaneSize}
               sidebarPane={renderSidebarPane()}
-              zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+              zenRevealSidebarPane={renderSidebarPane()}
               workspacePane={<WorkspaceLayoutPane>{renderWorkspacePaneContent()}</WorkspaceLayoutPane>}
               singlePaneActivePane={activeSinglePane}
             />

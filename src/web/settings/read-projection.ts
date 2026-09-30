@@ -28,9 +28,6 @@ export function useRuntimeSettingsSnapshot(): ComputedRef<RuntimeSettingsSnapsho
 export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | undefined) {
   return {
     shortcutsDisabled: data?.shortcutsDisabled ?? false,
-    globalShortcutDisabled: data?.globalShortcutDisabled ?? false,
-    globalShortcut: data?.globalShortcut ?? 'CommandOrControl+Shift+G',
-    globalShortcutRegistered: data?.globalShortcutRegistered ?? false,
   }
 }
 
@@ -51,12 +48,6 @@ export function readRuntimeExternalAppSettings(data: ExternalAppsSnapshot | unde
     },
     editorAvailable: data?.editor.available ?? false,
     editorAppAvailability: data?.editor.appAvailability ?? { vscode: false },
-  }
-}
-
-export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined) {
-  return {
-    lanEnabled: data?.lanEnabled ?? false,
   }
 }
 

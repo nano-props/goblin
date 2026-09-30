@@ -1,8 +1,8 @@
 import type { ClientBootstrapSnapshot, ClientRuntimeSnapshot } from '#/shared/bootstrap.ts'
-import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 
-/** Bootstrap for a web client with no native host capabilities or initial server. */
+/** Bootstrap for a browser client before selecting a server. */
 const EMPTY_BOOTSTRAP: ClientBootstrapSnapshot = {
   runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
   initialServer: null,
@@ -12,13 +12,7 @@ function isClientRuntimeSnapshot(value: unknown): value is ClientRuntimeSnapshot
   if (!isRecord(value) || !hasExactKeys(value, ['kind', 'bridgeVersion', 'capabilities'])) return false
   const candidate = value as Partial<ClientRuntimeSnapshot>
   if (candidate.bridgeVersion !== CLIENT_BRIDGE_VERSION || !Array.isArray(candidate.capabilities)) return false
-  const expected =
-    candidate.kind === 'electron'
-      ? ELECTRON_CLIENT_CAPABILITIES
-      : candidate.kind === 'web'
-        ? WEB_CLIENT_CAPABILITIES
-        : null
-  return !!expected && arraysEqual(candidate.capabilities, expected)
+  return candidate.kind === 'web' && arraysEqual(candidate.capabilities, WEB_CLIENT_CAPABILITIES)
 }
 
 function isClientBootstrapSnapshot(value: unknown): value is ClientBootstrapSnapshot {

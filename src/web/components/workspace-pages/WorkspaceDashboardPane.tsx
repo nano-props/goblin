@@ -37,7 +37,7 @@ import { useWorkspaceDirectoryOverview } from '#/web/workspaces/filesystem/direc
 interface WorkspaceDashboardPaneProps {
   workspaceId: WorkspaceId
   compact?: boolean
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onBack?: () => void
   onOpenWorkspaceRoot?: () => void
   onSelectBranch?: (branchName: string) => void
@@ -45,7 +45,7 @@ interface WorkspaceDashboardPaneProps {
 
 export const WorkspaceDashboardPane = defineComponent<WorkspaceDashboardPaneProps>({
   name: 'WorkspaceDashboardPane',
-  props: ['workspaceId', 'compact', 'trafficLightOffset', 'onBack', 'onOpenWorkspaceRoot', 'onSelectBranch'],
+  props: ['workspaceId', 'compact', 'navigationOffset', 'onBack', 'onOpenWorkspaceRoot', 'onSelectBranch'],
 
   setup(props) {
     const t = useT()
@@ -95,7 +95,7 @@ export const WorkspaceDashboardPane = defineComponent<WorkspaceDashboardPaneProp
           icon={LayoutDashboard}
           label={t('workspace.dashboard')}
           compact={compact}
-          trafficLightOffset={props.trafficLightOffset ?? false}
+          navigationOffset={props.navigationOffset ?? false}
           onBack={props.onBack}
         >
           <ScrollArea class="min-h-0 flex-1 bg-background">

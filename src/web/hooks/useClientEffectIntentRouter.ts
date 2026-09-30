@@ -8,7 +8,6 @@ import { subscribeServerClientIntentIngress } from '#/web/realtime/client-intent
 import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import {
-  createExternalOpenIntentDrainer,
   handleAppLevelClientIntent,
   handleTerminalBellClickIntent,
   handleWorkspaceClientIntent,
@@ -24,10 +23,6 @@ import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { clientEffectIntentRequiresWorkspaceBootstrap } from '#/web/hooks/client-effect-intent-plans.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
-import {
-  type AuthenticatedClientEffectIntent,
-  useAuthenticatedClientEffectIntentIngress,
-} from '#/web/hooks/client-effect-intent-ingress.ts'
 
 interface ClientEffectIntentRouterOptions {
   authenticatedBootstrapState: MaybeRefOrGetter<AuthenticatedAppBootstrapState>
@@ -44,14 +39,13 @@ interface ClientEffectIntentRouterOptions {
 }
 
 export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOptions) {
-  // This hook is the single client-side subscription point for native effect
+  // This hook is the single client-side subscription point for server effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
   const { openWorkspaceMembership, resetLayout, toggleZenMode } = clientEffectIntentStoreActionsFromStore(
     workspacesStore.getState(),
   )
   const t = useT()
-  const nativeIntentIngress = useAuthenticatedClientEffectIntentIngress()
   const readTerminalBellDeps = (intent: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>) => {
     const workspaceId = terminalSessionCoordinates(intent.session).workspaceId
     return {
@@ -85,16 +79,11 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
     }
   }
 
-  const externalOpenDrainer = createExternalOpenIntentDrainer({
-    openWorkspaceMembership: (path) => openWorkspaceMembership(path),
-    activateWorkspace: (workspaceId) => toValue(options.navigation).activateWorkspace(workspaceId),
-    t: (key) => t(key),
-  })
   let disposed = false
-  let pendingIntents: AuthenticatedClientEffectIntent[] = []
+  let pendingIntents: ClientEffectIntent[] = []
 
   // Every ingress uses this one routing boundary.
-  const execute = (intent: AuthenticatedClientEffectIntent) => {
+  const execute = (intent: ClientEffectIntent) => {
     if (disposed) return
     void executeClientEffectIntent(intent).catch((err) => {
       intentLog.warn(`${intent.type} failed`, { err })
@@ -105,13 +94,8 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
     })
   }
 
-  const executeClientEffectIntent = async (intent: AuthenticatedClientEffectIntent): Promise<void> => {
+  const executeClientEffectIntent = async (intent: ClientEffectIntent): Promise<void> => {
     switch (intent.type) {
-      case 'app-quitting':
-        return
-      case 'external-open-enqueued':
-        externalOpenDrainer.drain()
-        return
       case 'terminal-bell-click':
         handleTerminalBellClickIntent(intent, readTerminalBellDeps(intent))
         return
@@ -141,16 +125,12 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
     }
   }
 
-  const rejectIntent = (intent: AuthenticatedClientEffectIntent) => {
+  const rejectIntent = (intent: ClientEffectIntent) => {
     intentLog.warn(`${intent.type} rejected because authenticated bootstrap failed`)
     toast.error(t('workspace-restore.failed'))
   }
 
-  const dispatch = (intent: AuthenticatedClientEffectIntent) => {
-    if (intent.type === 'app-quitting') {
-      intentLog.warn('app-quitting rejected by the UI intent router')
-      return
-    }
+  const dispatch = (intent: ClientEffectIntent) => {
     if (!clientEffectIntentRequiresWorkspaceBootstrap(intent)) {
       execute(intent)
       return
@@ -180,12 +160,10 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
         return
       }
       for (const intent of pending) execute(intent)
-      externalOpenDrainer.drain()
     },
     { flush: 'sync', immediate: true },
   )
 
-  const offIntent = nativeIntentIngress.subscribe(dispatch)
   const offServerIntent = subscribeServerClientIntentIngress(dispatch)
   const offLocalBellClick = onClientLocalEventType('terminal-bell-click', (event) => {
     dispatch(event)
@@ -194,8 +172,6 @@ export function useClientEffectIntentRouter(options: ClientEffectIntentRouterOpt
   onScopeDispose(() => {
     disposed = true
     pendingIntents = []
-    externalOpenDrainer.dispose()
-    offIntent()
     offServerIntent()
     offLocalBellClick()
   })

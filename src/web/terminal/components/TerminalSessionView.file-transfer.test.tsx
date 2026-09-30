@@ -54,7 +54,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test('paste with an oversized blob fails without upload or terminal input', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const oversized = new File([new Uint8Array([1])], 'huge.bin', { type: 'application/octet-stream' })
@@ -82,7 +81,6 @@ describe('TerminalSessionView file transfer', () => {
     async (kind) => {
       const shellClient = await import('#/web/app/shell-client.ts')
       const { toast } = await import('vue-sonner')
-      vi.mocked(shellClient.pathForDroppedFile).mockClear()
       vi.mocked(shellClient.saveClipboardFiles).mockClear()
       vi.mocked(toast.error).mockClear()
       const rendered = await renderTerminalSession(
@@ -118,7 +116,6 @@ describe('TerminalSessionView file transfer', () => {
         })
 
         expect(event.defaultPrevented).toBe(true)
-        expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
         expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
         expect(rendered.writeInput).not.toHaveBeenCalled()
         expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-remote-unsupported')
@@ -131,7 +128,6 @@ describe('TerminalSessionView file transfer', () => {
   test.each(['paste', 'drop'] as const)('%s reports when the selected terminal cannot accept input', async (kind) => {
     const shellClient = await import('#/web/app/shell-client.ts')
     const { toast } = await import('vue-sonner')
-    vi.mocked(shellClient.pathForDroppedFile).mockClear()
     vi.mocked(shellClient.saveClipboardFiles).mockClear()
     vi.mocked(toast.warning).mockClear()
     const rendered = await renderTerminalSession({ captureInputWriter: vi.fn(() => null) })
@@ -145,7 +141,6 @@ describe('TerminalSessionView file transfer', () => {
       rendered.sessionRoot.dispatchEvent(event)
 
       expect(event.defaultPrevented).toBe(true)
-      expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
       expect(vi.mocked(toast.warning)).toHaveBeenCalledWith('terminal.write-not-sent')
     } finally {
@@ -155,7 +150,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test.each(['paste', 'drop'] as const)('%s surfaces a resolver failure without writing', async (kind) => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
@@ -182,7 +176,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test('keeps file progress visible until concurrent resolutions finish', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     const first = Promise.withResolvers<string[]>()
     const second = Promise.withResolvers<string[]>()
     vi.mocked(shellClient.saveClipboardFiles)
@@ -225,7 +218,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test('drop fast-fails an oversized blob batch with the batch limit error', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
@@ -253,7 +245,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test('drop fast-fails an excessive blob count before upload', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
@@ -277,8 +268,7 @@ describe('TerminalSessionView file transfer', () => {
 
   test('paste with paths over the terminal envelope surfaces paste-file-overflow', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue(`/abs/${'a'.repeat(1024 * 1024)}`)
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([`/abs/${'a'.repeat(1024 * 1024)}`])
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
@@ -295,7 +285,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test('paste rejects the complete path list when a returned path is unsafe', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/a.png', '/tmp/b\n.png'])
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
@@ -316,7 +305,7 @@ describe('TerminalSessionView file transfer', () => {
 
   test('paste reports when the captured terminal stops accepting input before the write', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/a.png')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/abs/a.png'])
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.warning).mockClear()
     const rendered = await renderTerminalSession({ captureInputWriter: vi.fn(() => () => false) })
@@ -423,7 +412,6 @@ describe('TerminalSessionView file transfer', () => {
 
     let resolveSave: (paths: string[]) => void = () => {}
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockImplementation(
       () =>
         new Promise<string[]>((resolve) => {
@@ -485,8 +473,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test('tabular text with a thumbnail defers to terminal text paste', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     const rendered = await renderTerminalSession()
     const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
@@ -505,8 +491,7 @@ describe('TerminalSessionView file transfer', () => {
 
   test('URI-list text with a file prefers file input', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/home/user/foo.png')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/home/user/foo.png'])
 
     const rendered = await renderTerminalSession()
     const file = new File([new Uint8Array([1])], 'foo.png')
@@ -516,7 +501,7 @@ describe('TerminalSessionView file transfer', () => {
 
       expect(event.defaultPrevented).toBe(true)
       expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/home/user/foo.png'")
-      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).toHaveBeenCalledWith([file])
     } finally {
       await rendered.cleanup()
     }
@@ -524,8 +509,6 @@ describe('TerminalSessionView file transfer', () => {
 
   test('pure-text paste (no files) does not preventDefault and does not call writeInput', async () => {
     const shellClient = await import('#/web/app/shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     const rendered = await renderTerminalSession()
 

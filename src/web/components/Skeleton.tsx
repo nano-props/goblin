@@ -75,9 +75,9 @@ export function WorkspaceLayoutSkeleton({
   )
 }
 
-export const WorkspacePaneSkeleton = defineComponent<{ toolbarTrafficLightOffset?: boolean }>({
+export const WorkspacePaneSkeleton = defineComponent<{ toolbarNavigationOffset?: boolean }>({
   name: 'WorkspacePaneSkeleton',
-  props: { toolbarTrafficLightOffset: Boolean },
+  props: { toolbarNavigationOffset: Boolean },
   setup(props) {
     const compact = useIsCompactUi()
     return () => (
@@ -87,11 +87,11 @@ export const WorkspacePaneSkeleton = defineComponent<{ toolbarTrafficLightOffset
         class="flex min-h-0 flex-1 flex-col bg-background"
       >
         <WorkspaceToolbar
-          draggable={!compact.value}
-          trafficLightOffset={!!props.toolbarTrafficLightOffset}
+          expanded={!compact.value}
+          navigationOffset={!!props.toolbarNavigationOffset}
           aria-hidden="true"
         >
-          <WorkspaceToolbarLeadingSpacer reserve={!!props.toolbarTrafficLightOffset} />
+          <WorkspaceToolbarLeadingSpacer reserve={!!props.toolbarNavigationOffset} />
           <WorkspaceToolbarContent>
             <WorkspaceToolbarPrimary>
               {compact.value ? (

@@ -62,7 +62,7 @@ export const SettingsSidebar = defineComponent<{
             compact ? 'w-16 px-2' : 'w-64 px-3',
           )}
         >
-          <div class="app-drag-region shrink-0" aria-hidden style={{ height: `${chromeHeight}px` }} />
+          <div class="shrink-0" aria-hidden style={{ height: `${chromeHeight}px` }} />
           {props.onBack ? (
             <Button
               type="button"

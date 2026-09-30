@@ -4,7 +4,7 @@ import path from 'node:path'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
-import { serveStatic } from '@hono/node-server/serve-static'
+import { serveStatic } from 'hono/serve-static'
 import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
@@ -21,7 +21,6 @@ import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { createNativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/i18n.ts'
 import { MAX_PASTE_HTTP_BODY_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
@@ -32,14 +31,10 @@ import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-comma
 import { pruneExpiredClipboardTempFiles, pruneStaleClipboardTempDirs } from '#/server/clipboard/write-paths.ts'
 
 export interface ServerAppOptions {
+  webRoot?: string
   version: string
   startedAt: number
-  /**
-   * Persistent access token shared with browser (cookie) and embedded
-   * (header / `?t=` query) clients. Read from `dataDir/server-token`
-   * by the server bootstrap (`#/server/bootstrap.ts`) — the same file
-   * the Electron main reads, so the two processes see the same value.
-   */
+  /** Persistent access token resolved by server bootstrap. */
   accessToken: string
   appRealtimeHost: ServerAppRealtimeHost
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
@@ -104,7 +99,6 @@ function isServerRoutePath(requestPath: string): boolean {
 }
 
 export function createApp(options: ServerAppOptions): Hono {
-  const settingsState = createNativeShortcutRegistrationState()
   const app = new Hono()
   app.use('*', accessLog())
   const serverHost = options.serverHost ?? '127.0.0.1'
@@ -233,7 +227,6 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route(
     '/api/settings',
     createSettingsRoutes({
-      settingsState,
       workspacePaneTabsHost: options.workspacePaneTabsHost,
       workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
       serverHost,
@@ -303,21 +296,33 @@ export function createApp(options: ServerAppOptions): Hono {
   )
   if (typeof periodic.unref === 'function') periodic.unref()
 
-  // The built web bundle is served as plain static files. The
-  // client pulls its bootstrap (i18n, settings, server URL) from
-  // `/api/settings/*` and the access token either from the Electron
-  // preload's IPC or the `/api/login` cookie — the server no longer
-  // rewrites `dist/web/index.html`. Skipping the middleware on a
-  // fresh checkout (e.g. `bun run test` without `bun run build`)
-  // keeps Hono from logging `serveStatic: root path ... is not
-  // found` on every server boot.
-  if (existsSync(WEB_DIST_DIR)) {
-    const webIndexHtmlPath = path.join(WEB_DIST_DIR, 'index.html')
+  // Serve immutable browser assets when built. Authentication and runtime
+  // hydration use HTTP; the server never injects credentials into HTML.
+  const webRoot = options.webRoot ?? WEB_DIST_DIR
+  if (existsSync(webRoot)) {
+    const webIndexHtmlPath = path.join(webRoot, 'index.html')
     app.use('*', async (c, next) => {
       await next()
       if (!isServerRoutePath(c.req.path)) applyWebStaticCacheHeaders(c)
     })
-    app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
+    app.use(
+      '/*',
+      serveStatic({
+        root: webRoot,
+        join: path.join,
+        async getContent(filePath) {
+          // Bun's embedded filesystem supports readFile, but not the Node
+          // createReadStream used by @hono/node-server's static adapter.
+          try {
+            return await readFile(filePath)
+          } catch (error) {
+            const code = error instanceof Error ? Reflect.get(error, 'code') : undefined
+            if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR') return null
+            throw error
+          }
+        },
+      }),
+    )
     // SPA fallback: deep links that don't match a real static file
     // (e.g. `/repos/abc123/changes`) get the raw `index.html` so
     // Vue Router can take over. `/api/*` and `/ws/*` requests

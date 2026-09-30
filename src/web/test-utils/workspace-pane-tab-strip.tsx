@@ -50,18 +50,12 @@ beforeEach(() => {
     value: vi.fn(),
   })
   testHostEnvironment.__GOBLIN_BOOTSTRAP__ = {
-    runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+    runtime: { kind: 'web', bridgeVersion: 1, capabilities: [] },
     initialServer: null,
-  }
-  testHostEnvironment.goblinNative = {
-    pathForFile: () => '',
-    invokeIpc: async () => null,
-    abortIpc: async () => true,
   }
 })
 
 afterEach(() => {
-  delete testHostEnvironment.goblinNative
   delete testHostEnvironment.__GOBLIN_BOOTSTRAP__
   Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
     configurable: true,

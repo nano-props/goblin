@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { WEB_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot, defaultUserSettings } from '#/shared/settings-defaults.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -15,12 +14,12 @@ function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientB
   }
 }
 
-function electronBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
+function browserBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
     runtime: {
-      kind: 'electron',
+      kind: 'web',
       bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
+      capabilities: [...WEB_CLIENT_CAPABILITIES],
     },
     initialServer: null,
     ...overrides,
@@ -50,7 +49,7 @@ describe('settings-client', () => {
     setClientBridgeForTests(null)
   })
 
-  test('reads theme state from embedded server settings when no Electron bridge exists', async () => {
+  test('reads theme state from embedded server settings over HTTP', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     mockFetch(async () => ({
       ok: true,
@@ -75,7 +74,7 @@ describe('settings-client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('fetches i18n payload from embedded server when no Electron bridge exists', async () => {
+  test('fetches i18n payload from embedded server over HTTP', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = mockFetch(async () => ({
       ok: true,
@@ -179,60 +178,15 @@ describe('settings-client', () => {
     })
   })
 
-  test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {
-    const invokeIpc = vi.fn(async () => ({
-      kind: 'projected' as const,
-      accelerator: 'CommandOrControl+Shift+K',
-      registered: true,
-    }))
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        matchMedia: vi.fn(() => ({ matches: true })),
-      },
-    })
-    const fetchMock = mockFetch()
-    const { setGlobalShortcut } = await import('#/web/settings/client.ts')
-    await expect(setGlobalShortcut('CommandOrControl+Shift+K')).resolves.toEqual({
-      kind: 'projected',
-      accelerator: 'CommandOrControl+Shift+K',
-      registered: true,
-    })
-    expect(invokeIpc).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: 'settings.setGlobalShortcut',
-        input: { accelerator: 'CommandOrControl+Shift+K' },
-      }),
-    )
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
   test('projects native prefs after updating language through the embedded server', async () => {
     const invokeIpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: browserBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -275,14 +229,10 @@ describe('settings-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: browserBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -320,15 +270,10 @@ describe('settings-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: browserBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          onIntent: () => () => {},
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -358,14 +303,10 @@ describe('settings-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: browserBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -397,14 +338,10 @@ describe('settings-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: browserBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -433,14 +370,10 @@ describe('settings-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: browserBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -472,14 +405,10 @@ describe('settings-client', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+        __GOBLIN_BOOTSTRAP__: browserBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: currentNativeBridge({
-          invokeIpc,
-          abortIpc: async () => true,
-          pathForFile: () => '',
-        }),
+
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',

@@ -11,8 +11,7 @@ import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
-import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { terminalClient } from '#/web/terminal/client-facade.ts'
 import type { VNode } from 'vue'
@@ -40,7 +39,7 @@ function defaultIpcResult(path: string, input?: unknown) {
     return { available: true, version: 'gh version 2.93.0', detectedAt: 0, hosts }
   }
   if (path === 'settings.get') {
-    return defaultSettingsSnapshot({ fetchIntervalSec: 60, globalShortcutRegistered: true })
+    return defaultSettingsSnapshot({ fetchIntervalSec: 60 })
   }
   if (path === 'externalApps.get' || path === 'externalApps.refresh') {
     return {
@@ -108,25 +107,16 @@ beforeEach(() => {
   })
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
-      kind: 'electron',
+      kind: 'web',
       bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: ELECTRON_CLIENT_CAPABILITIES,
+      capabilities: WEB_CLIENT_CAPABILITIES,
     },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
-  testWindow.goblinNative = currentNativeBridge({
-    invokeIpc,
-    terminal: {
-      notifyBell: vi.fn(async () => true),
-      sendTestNotification,
-      setBadge: vi.fn(),
-    },
-  })
 })
 
 afterEach(() => {
   setClientBridgeForTests(null)
-  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   vi.restoreAllMocks()
 })

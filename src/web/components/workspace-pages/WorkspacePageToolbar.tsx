@@ -18,13 +18,13 @@ interface WorkspacePageToolbarProps {
   icon: LucideIcon
   label: string
   compact?: boolean
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onBack?: () => void
 }
 
 export const WorkspacePageToolbar = defineComponent<WorkspacePageToolbarProps>({
   name: 'WorkspacePageToolbar',
-  props: ['icon', 'label', 'compact', 'trafficLightOffset', 'onBack'],
+  props: ['icon', 'label', 'compact', 'navigationOffset', 'onBack'],
 
   setup(props) {
     const t = useT()
@@ -43,8 +43,8 @@ export const WorkspacePageToolbar = defineComponent<WorkspacePageToolbarProps>({
 
       if (props.compact) {
         return (
-          <WorkspaceToolbar draggable={false} trafficLightOffset={props.trafficLightOffset ?? false}>
-            <WorkspaceToolbarLeadingSpacer reserve={props.trafficLightOffset ?? false} />
+          <WorkspaceToolbar expanded={false} navigationOffset={props.navigationOffset ?? false}>
+            <WorkspaceToolbarLeadingSpacer reserve={props.navigationOffset ?? false} />
             <WorkspaceToolbarContent>
               <WorkspaceToolbarPrimary>
                 <Tip label={backLabel}>
@@ -71,8 +71,8 @@ export const WorkspacePageToolbar = defineComponent<WorkspacePageToolbarProps>({
       }
 
       return (
-        <WorkspaceToolbar trafficLightOffset={props.trafficLightOffset ?? false}>
-          <WorkspaceToolbarLeadingSpacer reserve={props.trafficLightOffset ?? false} />
+        <WorkspaceToolbar navigationOffset={props.navigationOffset ?? false}>
+          <WorkspaceToolbarLeadingSpacer reserve={props.navigationOffset ?? false} />
           <WorkspaceToolbarContent>
             <WorkspaceToolbarPrimary>
               <ToolbarTabStrip

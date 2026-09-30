@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createNativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { RestoreWorkspaceTabsInput } from '#/server/workspaces/restore/tabs.ts'
 import type { WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
@@ -14,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   getSettingsSnapshot: vi.fn(),
   getUserSettings: vi.fn(),
   handleSetFetchInterval: vi.fn(),
-  handleSetGlobalShortcutRegistered: vi.fn(),
+
   handleAddRecentWorkspace: vi.fn(),
   handleClearRecentWorkspaces: vi.fn(),
   handleSetWorkspaceExternalAppRecent: vi.fn(),
@@ -45,7 +44,7 @@ vi.mock('#/server/settings/source.ts', () => ({
 
 vi.mock('#/server/settings/write-paths.ts', () => ({
   handleSetFetchInterval: mocks.handleSetFetchInterval,
-  handleSetGlobalShortcutRegistered: mocks.handleSetGlobalShortcutRegistered,
+
   handleAddRecentWorkspace: mocks.handleAddRecentWorkspace,
   handleClearRecentWorkspaces: mocks.handleClearRecentWorkspaces,
   handleSetWorkspaceExternalAppRecent: mocks.handleSetWorkspaceExternalAppRecent,
@@ -76,7 +75,6 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
 
 function settingsRouteOptions() {
   return {
-    settingsState: createNativeShortcutRegistrationState(),
     workspacePaneTabsHost: workspacePaneTabsHostStub,
     workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
     serverHost: '127.0.0.1',
@@ -363,20 +361,6 @@ describe('settings routes', () => {
     expect(mocks.handleSetFetchInterval).not.toHaveBeenCalled()
   })
 
-  test('returns 400 when global-shortcut-state body has wrong type for `registered`', async () => {
-    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(settingsRouteOptions())
-    const response = await app.request(
-      new Request('http://127.0.0.1:32100/global-shortcut-state', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ registered: 'yes' }),
-      }),
-    )
-    expect(response.status).toBe(400)
-    expect(mocks.handleSetGlobalShortcutRegistered).not.toHaveBeenCalled()
-  })
-
   test('delegates github-cli detection to the server module, scoping by hosts when provided', async () => {
     const state = {
       available: true,
@@ -444,14 +428,14 @@ describe('settings routes', () => {
     expect(mocks.handleSetFetchInterval).not.toHaveBeenCalled()
   })
 
-  test('rejects a reserved global shortcut at command admission', async () => {
+  test('rejects removed desktop settings at command admission', async () => {
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes(settingsRouteOptions())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/prefs', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prefs: { globalShortcut: 'Control+O' } }),
+        body: JSON.stringify({ prefs: { globalShortcut: 'Alt+Space' } }),
       }),
     )
 

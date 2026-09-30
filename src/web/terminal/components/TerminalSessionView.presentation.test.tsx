@@ -863,7 +863,6 @@ describe('TerminalSessionView presentation and focus', () => {
   test.each([
     ['not-sent', 'unavailable', 'not-sent', 'error'],
     ['indeterminate', 'disconnected', 'indeterminate', 'warning'],
-    ['app quitting', 'app-quitting', 'indeterminate', 'silent'],
   ] as const)('maps %s takeover transport failure at the feedback boundary', async (_label, kind, delivery, tone) => {
     const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
@@ -872,7 +871,7 @@ describe('TerminalSessionView presentation and focus', () => {
       new ClientRealtimeRequestError('takeover failed', {
         kind,
         delivery,
-        outageId: kind === 'app-quitting' ? null : 1,
+        outageId: 1,
       }),
     )
     const view = await renderTerminalSession(

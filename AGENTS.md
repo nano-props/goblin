@@ -2,7 +2,7 @@
 
 ## TypeScript and dependencies
 
-- The project runs TypeScript in Node.js strip-only mode. Do not use enums,
+- The server runs on Bun; development checks also load TypeScript in Node.js strip-only mode. Do not use enums,
   runtime namespaces, parameter properties, or import aliases.
 - Pin new package versions exactly in `package.json`; do not add range prefixes.
 - Before adding a package or writing custom code, inspect and reuse suitable
@@ -164,13 +164,11 @@
 ## Architecture boundaries
 
 - Keep `bun run check:boundaries` green:
-  - `src/main/**` does not import `src/web/**` or `src/server/**`.
-  - `src/web/**` does not import `src/main/**`.
-  - `src/server/**` and `src/shared/**` do not import `electron`.
-  - `src/system/**` does not import `src/server/**`, `src/web/**`, or `src/main/**`.
-- Prefer server-first application behavior. Add IPC only for an Electron-only
-  capability that cannot reasonably use the server/browser path, and document
-  that reason at the call site.
+  - Browser code must not import server implementations or Node.js built-ins.
+  - Application code must not depend on Electron or native desktop bridges.
+  - `src/system/**` does not import `src/server/**` or `src/web/**`.
+- Application behavior belongs in the server; browser clients use the HTTP and
+  WebSocket contracts. IPC is reserved for server-owned worker processes.
 
 ## Git operations and safety
 
@@ -193,8 +191,8 @@
 - GET is limited to WebSocket upgrades, external health checks, and genuinely
   browser-addressable URLs.
 - Never put arrays, unbounded strings, or serialized objects in URLs.
-- New procedures use `*_PROCEDURE_SCHEMAS`, server-side `parseHttpBody`, and an
-  embedded-server IPC route entry when IPC exposure is required.
+- New procedures use `*_PROCEDURE_SCHEMAS`, server-side `parseHttpBody`, and bounded
+  input schemas.
 - If a GET payload changes, migrate that endpoint to the standard POST
   procedure shape in the same change. Existing GET endpoints are not precedent
   for new ones.

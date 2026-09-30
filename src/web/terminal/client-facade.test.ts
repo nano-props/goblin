@@ -727,22 +727,6 @@ describe('terminal web host client', () => {
     dispose()
   })
 
-  test('stops reconnecting terminal sockets after app quitting starts', async () => {
-    useFakeTimers()
-    const { markAppQuitting } = await import('#/web/app/lifecycle.ts')
-    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    if (!socket) throw new Error('missing initial terminal socket')
-
-    markAppQuitting()
-    await vi.advanceTimersByTimeAsync(300)
-
-    expect(socket.readyState).toBe(wsMock.CLOSED)
-    expect(wsMock.instances).toHaveLength(1)
-    dispose()
-  })
-
   test('emits terminal bell click events from browser notifications in web host mode', async () => {
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/bridge/local-events.ts')

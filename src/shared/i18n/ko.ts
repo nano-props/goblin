@@ -5,67 +5,9 @@
 import type { DictKey } from '#/shared/i18n/en.ts'
 
 export const ko: Record<DictKey, string> = {
-  // ---- Menu --------------------------------------------------------------
-  'menu.file': '파일',
-  'menu.edit': '편집',
-  'menu.view': '보기',
-  'menu.window': '윈도우',
-  'menu.help': '도움말',
-
-  'menu.app.about': '{name} 정보',
-  'menu.app.services': '서비스',
-  'menu.app.hide': '{name} 가리기',
-  'menu.app.hide-others': '다른 항목 가리기',
-  'menu.app.show-all': '모두 보기',
-  'menu.app.quit': '{name} 종료',
-  'menu.app.settings': '설정…',
-
-  'menu.window.minimize': '최소화',
-  'menu.window.zoom': '확대/축소',
-  'menu.window.front': '모두 앞으로 가져오기',
-
-  'menu.file.open-local-workspace': '작업 공간 열기…',
-  'menu.file.open-local-workspace-path': '경로로 작업 공간 열기…',
-  'menu.file.open-remote-workspace': '원격 작업 공간 열기…',
-  'menu.file.clone-repo': '리포지토리 클론…',
-  'menu.file.create-worktree': '새 워크트리…',
-  'menu.file.open-recent': '최근 항목 열기',
-  'menu.file.no-recent': '최근 작업 공간 없음',
-  'menu.file.clear-recent': '메뉴 지우기',
-  'menu.file.open-in-browser': '브라우저에서 열기',
-  'menu.file.open-data-folder': '데이터 폴더 열기',
-  'menu.file.open-data-folder.mac': 'Finder에서 데이터 폴더 열기',
-  'menu.file.open-data-folder.win': 'Explorer에서 데이터 폴더 열기',
-  'menu.file.close-window': '창 닫기',
-  'menu.file.close-workspace-tab': '워크스페이스 탭 닫기',
-  'menu.file.close-workspace': '워크스페이스 닫기',
-  'menu.file.settings': '설정…',
-  'menu.file.quit': '종료',
-  'menu.client-intent-delivery-failed': '앱 창이 변경되었거나 로드하지 못해 작업을 보낼 수 없습니다. 다시 시도하세요.',
-
-  'menu.edit.undo': '실행 취소',
-  'menu.edit.redo': '다시 실행',
-  'menu.edit.cut': '잘라내기',
-  'menu.edit.copy': '복사',
-  'menu.edit.paste': '붙여넣기',
-  'menu.edit.paste-match-style': '스타일에 맞춰 붙여넣기',
   'menu.edit.delete': '삭제',
-  'menu.edit.select-all': '전체 선택',
 
-  'menu.view.status': '상태',
-  'menu.view.history': '기록',
-  'menu.view.changes': '변경 사항',
-  'menu.view.terminal': '터미널',
   'menu.view.refresh': '워크스페이스 새로 고침',
-  'menu.view.reload-page': '페이지 새로 고침',
-  'menu.view.toggle-full-screen': '전체 화면 전환',
-  'menu.view.toggle-dev-tools': '개발자 도구',
-
-  'menu.window.next-workspace': '다음 워크스페이스',
-  'menu.window.prev-workspace': '이전 워크스페이스',
-  'menu.window.reset-window': '창 재설정',
-
-  'menu.help.shortcuts': '키보드 단축키',
 
   // ---- 앱 상단 바 ------------------------------------------------------------
   'app-chrome.open': '열기',
@@ -736,9 +678,7 @@ export const ko: Record<DictKey, string> = {
   'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': '새로 고침',
   'settings.nav.shortcuts': '단축키',
-  'settings.lan.enabled': 'LAN 접근 허용',
-  'settings.lan.enabled-hint': '로컬 네트워크의 다른 기기가 Goblin에 접근할 수 있도록 허용합니다.',
-  'settings.lan.restart-hint': '이 설정은 Goblin을 다시 시작한 후에 적용됩니다.',
+
   'settings.web.title': '원격 액세스',
   'settings.nav.web': '원격 액세스',
   'settings.web.server': '서버',
@@ -755,17 +695,13 @@ export const ko: Record<DictKey, string> = {
   'settings.web.token-copied': '토큰이 클립보드에 복사되었습니다.',
   'settings.web.token-copy-failed': '클립보드에 복사하지 못했습니다.',
   'settings.web.token-read-failed': '토큰 상태를 읽지 못했습니다. 설정을 다시 열어 재시도하세요.',
-  'settings.web.token-rotate': '토큰 회전',
-  'settings.web.token-rotated': '새 토큰을 저장했습니다. 다음에 Goblin을 시작하면 적용됩니다.',
-  'settings.web.token-rotate-failed': '토큰 회전에 실패했습니다.',
-  'settings.web.token-rotation-hint':
-    '아래 QR 코드에는 현재 유효한 토큰이 포함되어 있습니다. 스캔하면 대상 기기의 게이트에 자동으로 채워집니다.',
+
   'settings.web.token-pending-restart-hint':
     '표시된 토큰과 QR 코드는 다음 Goblin 시작 시 유효해집니다. 그때까지는 현재 토큰이 계속 유효합니다.',
   'settings.web.lan': '네트워크',
   'settings.web.lan-urls': 'LAN 주소',
   'settings.web.lan-urls-hint': '같은 로컬 네트워크의 다른 기기에서 이 주소로 Goblin에 접근할 수 있습니다.',
-  'settings.lan.local-only': '현재 이 기기에서만 접근할 수 있습니다.',
+
   'settings.web.qr': 'QR 코드',
   'settings.web.qr-scan': 'QR 코드',
   'settings.about': '정보',
@@ -817,17 +753,7 @@ export const ko: Record<DictKey, string> = {
     '  IdentityFile ~/.ssh/id_ed25519\n',
   'settings.shortcuts': '키보드 단축키',
   'settings.shortcuts-disable-app': '앱 단축키 비활성화',
-  'settings.shortcuts-disable-global': '전역 단축키 비활성화',
-  'settings.global-shortcut': '전역 단축키',
-  'settings.global-shortcut-hint': '새 조합을 누르세요. Esc 취소.',
-  'settings.global-shortcut-disabled-hint': '저장됨, 현재 꺼짐.',
-  'settings.global-shortcut-record': '전역 단축키 변경',
-  'settings.global-shortcut-recording': '키 입력…',
-  'settings.global-shortcut-reset': '초기화',
-  'settings.global-shortcut-conflict': '등록 실패. 사용 중일 수 있습니다.',
-  'settings.global-shortcut-projection-failed':
-    '설정은 저장되었지만 앱 단축키를 업데이트하지 못했습니다. 적용하려면 앱을 다시 여세요.',
-  'settings.global-shortcut-invalid': 'Command, Control 또는 Option과 키를 함께 사용하세요.',
+
   'settings.open-github': 'GitHub에서 프로젝트 열기',
   'about.app': 'Goblin',
   'about.version': '버전',

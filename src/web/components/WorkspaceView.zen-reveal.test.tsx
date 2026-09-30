@@ -14,7 +14,6 @@ import {
   render,
   workspaceLayout,
   zenModeSidebarHitArea,
-  zenModeSidebarDragPlate,
   zenModeSidebarLayer,
   zenModeSidebarReveal,
   zenModeSidebarResizeHandle,
@@ -46,12 +45,10 @@ describe('WorkspaceView Zen reveal', () => {
 
     expect(zenModeSidebarHitArea(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenModeSidebarHitArea(container)?.hasAttribute('data-interactive')).toBe(false)
-    expect(zenModeSidebarHitArea(container)?.dataset.titleBarChromeRegion).toBeUndefined()
+
     expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-auto')
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-    expect(
-      workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]'),
-    ).not.toBeNull()
+    expect(workspaceNavigationControls(container)?.closest('[data-interactive]')).not.toBeNull()
     expect(zenModeSidebarTrigger(container)?.tagName).toBe('BUTTON')
   })
 
@@ -62,20 +59,18 @@ describe('WorkspaceView Zen reveal', () => {
     const revealLayer = zenModeSidebarLayer(container)
     const toggleOverlay = zenModeToggleOverlay(container)
     expect(zenModeToggleOverlay(container)?.hasAttribute('data-interactive')).toBe(false)
-    expect(zenModeToggleOverlay(container)?.dataset.titleBarChromeRegion).toBeUndefined()
+
     expect(zenModeToggleOverlay(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenModeToggleOverlay(container)?.className).toContain('goblin-zen-reveal-trigger-layer')
     expect(zenModeToggleOverlay(container)?.className).toContain('z-40')
     expect(zenModeToggleOverlay(container)?.className).not.toContain('title-bar-chrome')
-    expect(zenModeToggleOverlay(container)?.className).not.toContain('app-drag-region')
+
     expect(revealLayer).not.toBeNull()
     expect(toggleOverlay).not.toBeNull()
     expect(revealLayer!.compareDocumentPosition(toggleOverlay!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
-    expect(
-      workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]'),
-    ).not.toBeNull()
+    expect(workspaceNavigationControls(container)?.closest('[data-interactive]')).not.toBeNull()
     expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenModeSidebarTriggerSurface(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
@@ -91,19 +86,11 @@ describe('WorkspaceView Zen reveal', () => {
     expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
     expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBeNull()
     expect(zenModeSidebarReveal(container)?.hasAttribute('inert')).toBe(false)
-    const dragPlate = zenModeSidebarDragPlate(container)
-    expect(dragPlate?.dataset.titleBarChromeRegion).toBe('drag')
-    expect(dragPlate?.hasAttribute('data-interactive')).toBe(false)
-    expect(dragPlate?.hasAttribute('data-zen-reveal-surface')).toBe(true)
-    expect(dragPlate?.className).toContain('pointer-events-auto')
-    expect(
-      zenModeSidebarReveal(container)!.compareDocumentPosition(dragPlate!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     const floatingSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
       '[data-testid="workspace-shell-sidebar-top"]',
     )
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
-    expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+
     expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
@@ -378,7 +365,7 @@ describe('WorkspaceView Zen reveal', () => {
     const retainedSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
       '[data-testid="workspace-shell-sidebar-top"]',
     )
-    expect(retainedSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+
     expect(retainedSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
     await flushTestUpdates(() => {

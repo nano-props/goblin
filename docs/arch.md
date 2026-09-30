@@ -5,15 +5,18 @@ Feature-specific invariants belong to their feature specifications.
 
 ## Process model
 
-- Keep one primary `BrowserWindow` by default. It is the native host's
-  principal and activation target. Add another window only for a distinct
-  product surface.
-- Keep Electron-native host code focused on capabilities that require Electron.
-  Application behavior belongs in the server or runtime-neutral shared layer.
-- Use `native host` for the Electron process and `embedded server` for the
-  server it starts.
-- Let the native host project native state instead of maintaining parallel
-  application authority.
+- Bun runs the HTTP/WebSocket server and owns application authority.
+- A dedicated subprocess of the same executable owns Bun PTY resources. The server
+  supervises its lifecycle; browsers never own OS processes.
+- Browser tabs run the client UI and connect to the server through HTTP and
+  WebSocket contracts. Client-local presentation is persisted in browser storage.
+- Bun compiles one executable containing the runtime, server, browser assets,
+  worker, CLI, and SSH scripts. The server supports Linux and macOS.
+- Terminal output is decoded as a streaming UTF-8 sequence. A terminal exits
+  only after both process exit and PTY EOF, preserving final output.
+- The terminal `g` launcher lives in a private temporary directory for one
+  server lifetime and invokes the same executable. Credentials travel through
+  the terminal environment, never the launcher file.
 - Keep application overlays behind one client-owned composition boundary.
 
 ## Authority and commands
@@ -34,8 +37,7 @@ Feature-specific invariants belong to their feature specifications.
   through their independently revisioned query or invalidation boundaries.
 - Client presentation is a best-effort projection. Presentation failure cannot
   roll back or reclassify an already committed server fact.
-- Route menu and UI actions through client/server intent flows. Direct
-  native-host actions are reserved for native-only work.
+- Route UI and CLI actions through client/server intent flows.
 - The server owns settings and application data. Client settings actions keep
   query projections coherent; raw transport is not a component mutation API.
 

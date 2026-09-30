@@ -1,35 +1,19 @@
 #!/usr/bin/env bun
-import { $ } from 'bun'
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
-const outputDir = path.join(repoRoot, 'dist/server')
-const mainEntry = path.join(repoRoot, 'src/server/entrypoints/main.ts')
-const ptyWorkerEntry = path.join(repoRoot, 'src/server/entrypoints/pty-worker.ts')
-const gCommandEntry = path.join(repoRoot, 'src/server/entrypoints/g-command.ts')
-const bootstrapScript = path.join(repoRoot, 'src/system/ssh/remote-worktree-bootstrap.sh')
-const downloadScript = path.join(repoRoot, 'src/system/ssh/remote-file-download.sh')
-const gitOperationStateScript = path.join(repoRoot, 'src/system/ssh/remote-git-operation-state.sh')
-const gitRemotesScript = path.join(repoRoot, 'src/system/ssh/remote-git-remotes.sh')
-
-rmSync(outputDir, { recursive: true, force: true })
-mkdirSync(outputDir, { recursive: true })
-
-await $`bun build ${mainEntry} ${ptyWorkerEntry} ${gCommandEntry} --outdir ${outputDir} --target node --external node-pty`
-copyFileSync(bootstrapScript, path.join(outputDir, 'remote-worktree-bootstrap.sh'))
-copyFileSync(downloadScript, path.join(outputDir, 'remote-file-download.sh'))
-copyFileSync(gitOperationStateScript, path.join(outputDir, 'remote-git-operation-state.sh'))
-copyFileSync(gitRemotesScript, path.join(outputDir, 'remote-git-remotes.sh'))
-
-for (const artifact of [
-  path.join(outputDir, 'main.js'),
-  path.join(outputDir, 'pty-worker.js'),
-  path.join(outputDir, 'g-command.js'),
-  path.join(outputDir, 'remote-worktree-bootstrap.sh'),
-  path.join(outputDir, 'remote-file-download.sh'),
-  path.join(outputDir, 'remote-git-operation-state.sh'),
-  path.join(outputDir, 'remote-git-remotes.sh'),
-]) {
-  if (!existsSync(artifact)) throw new Error(`Server build artifact missing: ${artifact}`)
-}
+process.chdir(repoRoot)
+if (process.platform !== 'linux' && process.platform !== 'darwin')
+  throw new Error('Build on Linux or macOS; Bun PTY requires POSIX')
+if (!existsSync('dist/web/index.html') || !existsSync('dist/web/boot.js'))
+  throw new Error('Build the browser assets first: bun run build:web')
+mkdirSync('dist', { recursive: true })
+const result = await Bun.build({
+  entrypoints: ['src/server/entrypoints/standalone.ts'],
+  target: 'bun',
+  minify: true,
+  compile: { outfile: 'dist/goblin', assets: ['dist/web'], autoloadDotenv: false, autoloadBunfig: false },
+})
+if (!result.success) throw new AggregateError(result.logs, 'Goblin executable build failed')
+console.log('Built dist/goblin (Bun runtime, browser assets, server, PTY worker, g command, SSH scripts)')

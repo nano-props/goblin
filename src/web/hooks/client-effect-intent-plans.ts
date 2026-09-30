@@ -80,8 +80,6 @@ export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-r
 
 export function clientEffectIntentRequiresWorkspaceBootstrap(event: ClientEffectIntent): boolean {
   switch (event.type) {
-    case 'app-quitting':
-    case 'server-command-reset-requested':
     case 'open-settings-requested':
     case 'theme-pref-set-requested':
     case 'lang-pref-set-requested':
@@ -103,7 +101,6 @@ export function clientEffectIntentRequiresWorkspaceBootstrap(event: ClientEffect
     case 'clear-recent-workspaces-requested':
     case 'open-recent-workspace-requested':
     case 'terminal-bell-click':
-    case 'external-open-enqueued':
       return true
   }
 }
@@ -263,13 +260,4 @@ export function createWorkspaceIntentPlan(
         return { kind: 'noop' }
       return { kind: 'toggle-zen-mode' }
   }
-}
-
-export function createExternalOpenDrainKickPlan(context: {
-  disposed: boolean
-  draining: boolean
-}): ExternalOpenDrainKickPlan {
-  if (context.disposed) return { kind: 'ignore' }
-  if (context.draining) return { kind: 'schedule-rerun' }
-  return { kind: 'start-drain' }
 }

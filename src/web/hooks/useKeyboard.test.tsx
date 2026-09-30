@@ -46,7 +46,6 @@ import type {
   TerminalFocusRequest,
 } from '#/web/terminal/components/types.ts'
 import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
@@ -67,7 +66,7 @@ vi.mock('#/web/keyboard/branch-action-shortcuts.ts', () => ({
   runBranchActionShortcut: branchShortcutMocks.runBranchActionShortcut,
 }))
 
-const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
+const testWindow = window as unknown as { goblinNative?: unknown }
 const originalNavigatorPlatform = window.navigator.platform
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/keyboard-repo')
 const REPO_PATH = '/tmp/keyboard-repo'
@@ -102,7 +101,6 @@ afterEach(() => {
   resetTerminalAutoFocusForTest()
   resetAppNavigationForTest()
   setTerminalSessionCommandBridge(null)
-  delete testWindow.goblinNative
   Object.defineProperty(window.navigator, 'platform', {
     configurable: true,
     value: originalNavigatorPlatform,
@@ -786,41 +784,6 @@ describe('useKeyboard', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  test('does not run menu-backed primary shortcuts from the client in electron', async () => {
-    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    installNativeBridgeStub()
-    seedTabbedWorktreeRepoForTest('terminal')
-    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => ({
-      kind: 'committed' as const,
-      projection: 'applied' as const,
-    }))
-    const openCreateWorktree = vi.fn()
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
-      createTerminal,
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor,
-    })
-    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
-
-    await flushTestUpdates(async () => {
-      window.dispatchEvent(keyboardEventForTest('keydown', { key: 't', code: 'KeyT', ctrlKey: true }))
-      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'n', code: 'KeyN', ctrlKey: true }))
-      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
-      await Promise.resolve()
-    })
-
-    expect(createTerminal).not.toHaveBeenCalled()
-    expect(openCreateWorktree).not.toHaveBeenCalled()
-    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
-    expect(toast.error).not.toHaveBeenCalled()
-  })
-
   test('does not dispatch workspace-pane shortcuts from the dashboard route', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
@@ -1109,19 +1072,7 @@ function workspaceRuntimeIdForTest(): string {
   return repo.workspaceRuntimeId
 }
 
-function installNativeBridgeStub() {
-  testWindow.goblinNative = currentNativeBridge({
-    invokeIpc: vi.fn(async () => null),
-    abortIpc: vi.fn(async () => false),
-    onIntent: vi.fn(() => () => {}),
-    pathForFile: vi.fn(() => ''),
-    terminal: {
-      notifyBell: async () => true,
-      sendTestNotification: async () => true,
-      setBadge: () => {},
-    },
-  })
-}
+function installNativeBridgeStub() {}
 
 function terminalFilesystemTargetSnapshot(): TerminalFilesystemTargetSnapshot {
   return {

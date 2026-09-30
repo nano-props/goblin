@@ -1,55 +1,63 @@
 # Goblin
 
-One workspace for Git branches and worktrees.
+One workspace for Git branches and worktrees, served to your browser.
 
 ## Requirements
 
-- Bun 1.4+
-- Node.js 24.15+ (LTS) or 26+
+- Linux or macOS for the server (Windows is not supported)
+- Bun 1.4.2+ for source development and builds
+- Node.js 24.15+ (LTS) or 26+ for development checks and Vitest
+- Git; SSH for remote workspaces
 
 ## Core features
 
-- Headless terminals. Server-backed.
-- Compact on small screens.
-- Local and SSH repos.
-- Built for branch flow.
+- Server-backed terminals and persistent workspace tabs
+- Local and SSH workspaces
+- Git branches and worktrees
+- Responsive browser UI
 
-## Build & install
-
-```sh
-./install.ts                # mac / linux
-bun install.ts              # windows
-bun run install:app         # any platform
-```
-
-Installs a host-architecture `.app` to `~/Applications` (mac) or
-`%LOCALAPPDATA%\Programs\Goblin[-arm64]` (win). See `-h` for flags.
-
-## Run server mode
-
-Install dependencies first, then start server mode:
+## Start
 
 ```sh
-bun install # first run only
-./serve.sh
+bun install
+bun run start
 ```
 
-Builds the web UI, then starts server mode. Default: `http://127.0.0.1:32100`.
-
-Use `--host` or `--port` to override the listen address:
+This builds the web UI and server, then starts the executable at `http://127.0.0.1:32100`.
+On macOS and Linux, `./serve.sh` runs the same build and accepts server options:
 
 ```sh
 ./serve.sh --host 127.0.0.1 --port 32100
 ```
 
-On first start the server writes a 25-char token to `<dataDir>/server-token`
-and prints it. Paste it once at the browser login gate.
+Build and run the standalone executable:
 
-To rotate a generated token, stop the server, reset it, then restart:
+```sh
+bun run build
+./dist/goblin --host 127.0.0.1 --port 32100
+```
+
+The distributable is the single file `dist/goblin`, built for the current OS and
+CPU architecture. Copy it to another directory or compatible machine and run it
+directly: no Bun, Node.js, `node_modules`, or separate web assets are needed.
+The binary embeds the Bun runtime, browser assets, server, PTY worker, SSH
+scripts, and `g` command. Git, a local shell, and SSH (for remote workspaces)
+remain system prerequisites. Application data is stored outside the binary.
+The build also leaves `dist/web` for source development; it is not needed for
+distribution.
+
+On first start the server writes a 25-character token to `<dataDir>/server-token`
+and prints it. Open the browser URL and paste the token at the login gate.
+Use `--data-dir /path/to/data` to choose a data directory, or `--token` to supply
+a token explicitly. Bind to `--host 0.0.0.0` for trusted LAN access; the server
+prints LAN URLs and QR codes. Use an HTTPS reverse proxy outside a trusted network.
+
+To rotate a generated token, stop the server, delete `<dataDir>/server-token`,
+then restart. In a source checkout, the reset helper removes that file:
 
 ```sh
 bun run reset-token
-bun run reset-token -- --data-dir /path/to/data # custom data dir
+bun run reset-token -- --data-dir /path/to/data
 ```
 
 Tokens supplied with `--token` are not file-backed and are unaffected.
@@ -57,6 +65,23 @@ Tokens supplied with `--token` are not file-backed and are unaffected.
 ## Develop
 
 ```sh
-bun install
 bun run dev
 ```
+
+Open `http://127.0.0.1:5173` and use the server's printed token. Vite provides
+frontend hot updates and proxies `/api` and `/ws` to the Bun server. Bun watch
+mode restarts the backend when its imported source changes; restarting ends its
+live terminals. `GOBLIN_WEB_DEV_HOST` / `GOBLIN_WEB_DEV_PORT` configure Vite;
+`GOBLIN_SERVER_HOST` / `GOBLIN_SERVER_PORT` configure the backend.
+
+`bun run start:server` starts the backend directly from source. Run
+`bun run build:web` first when serving the UI without Vite.
+
+## Verify
+
+```sh
+bun run typecheck
+bun run test
+```
+
+See [the documentation index](docs/README.md) for architecture and feature contracts.

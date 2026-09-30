@@ -186,19 +186,16 @@ export class TerminalSessionProjection {
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly acceptedRetirementListeners = new Set<AcceptedTerminalRetirementListener>()
   private readonly terminalSessionIdsByTerminalFilesystemTarget = new Map<string, string[]>()
-  private readonly bellState = createTerminalBellState(
-    (terminalSessionId) => {
-      if (terminalSessionId) {
-        const descriptor = this.sessions.get(terminalSessionId)?.descriptor
-        const terminalFilesystemTargetKey = descriptor ? terminalDescriptorFilesystemTargetKey(descriptor) : null
-        if (terminalFilesystemTargetKey) this.notifyFilesystemTarget(terminalFilesystemTargetKey)
-        return
-      }
-      this.notifyAllFilesystemTargets()
-      this.notifyAllWorkspaceBellCounts()
-    },
-    (count) => terminalClient.setBadge(count),
-  )
+  private readonly bellState = createTerminalBellState((terminalSessionId) => {
+    if (terminalSessionId) {
+      const descriptor = this.sessions.get(terminalSessionId)?.descriptor
+      const terminalFilesystemTargetKey = descriptor ? terminalDescriptorFilesystemTargetKey(descriptor) : null
+      if (terminalFilesystemTargetKey) this.notifyFilesystemTarget(terminalFilesystemTargetKey)
+      return
+    }
+    this.notifyAllFilesystemTargets()
+    this.notifyAllWorkspaceBellCounts()
+  })
   private readonly outputActivityState = createTerminalOutputActivityState((terminalFilesystemTargetKey) =>
     this.notifyFilesystemTarget(terminalFilesystemTargetKey),
   )

@@ -72,17 +72,13 @@ export interface ClientWorkspaceState {
   filetreeViewStateByFilesystemTargetByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
-export type NativeClientWorkspaceReadResult = { kind: 'loaded'; state: unknown }
-
 export interface FiletreeSessionViewState {
   selectedKeys: string[]
   expandedKeys: string[]
   topVisibleRowIndex: number
 }
 
-export interface RuntimeSettingsSnapshot extends UserSettings {
-  globalShortcutRegistered: boolean
-}
+export interface RuntimeSettingsSnapshot extends UserSettings {}
 
 export type RepoLogResponse = LogEntry[] | { ok: false; message: string }
 
@@ -163,9 +159,6 @@ export interface WorkspaceSettingsState {
 
 export interface SettingsSnapshot
   extends RuntimeSettingsSnapshot, RuntimeRecentWorkspacesState, WorkspaceSettingsState {}
-
-export type SetGlobalShortcutResult =
-  { kind: 'projected'; accelerator: string; registered: boolean } | { kind: 'committed-projection-failed' }
 
 export interface GitHubCliState {
   available: boolean
@@ -335,96 +328,4 @@ export interface RepoWorktreeStatusSnapshot {
   workspaceRuntimeId: string
   status: WorktreeStatus[]
   loadedAt: number
-}
-
-/** Request envelope for the native Electron bridge IPC layer. */
-export interface IpcRequest {
-  path: string
-  input?: unknown
-  requestId?: string
-}
-
-/** Response envelope for the native Electron bridge IPC layer. */
-export interface IpcResponseError {
-  message: string
-  code?: string
-  name?: string
-}
-
-export type IpcResponse = { ok: true; data: unknown } | { ok: false; error: IpcResponseError }
-
-export interface NativeHostSettingsIpcHandlers {
-  settings: {
-    setGlobalShortcut: (input: { accelerator: string }) => Promise<SetGlobalShortcutResult>
-  }
-}
-
-export interface NativeHostIpcHandlers extends NativeHostSettingsIpcHandlers {
-  clientWorkspace: {
-    read: (_input: undefined) => Promise<NativeClientWorkspaceReadResult>
-    write: (input: ClientWorkspaceState) => Promise<void>
-  }
-}
-
-export type NativeHostIpcPath = {
-  [NS in keyof NativeHostIpcHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeHostIpcHandlers[NS], string>}`
-}[keyof NativeHostIpcHandlers]
-
-type IpcInputSchema<TInput> = v.BaseSchema<unknown, TInput, v.BaseIssue<unknown>>
-
-function parseIpcInput<TInput>(schema: IpcInputSchema<TInput>, input: unknown): TInput {
-  const parsed = v.safeParse(schema, input)
-  if (!parsed.success) throw new CodedError({ code: 'BAD_REQUEST', message: 'Invalid IPC input' })
-  return parsed.output
-}
-
-function createValidatedProcedure<TInput, TOutput>(
-  schema: IpcInputSchema<TInput>,
-  handler: (input: TInput) => Promise<TOutput> | TOutput,
-): (input: unknown) => Promise<TOutput> {
-  return async (input: unknown) => await handler(parseIpcInput<TInput>(schema, input))
-}
-
-// These projections are intentionally derived from the handler authority: a
-// new native procedure must add a schema and a caller implementation before
-// createAppRouter can satisfy AppRouter.
-type AppRouterCaller = {
-  [Namespace in keyof NativeHostIpcHandlers]: {
-    [Procedure in keyof NativeHostIpcHandlers[Namespace]]: NativeHostIpcHandlers[Namespace][Procedure] extends (
-      ...args: never[]
-    ) => infer TOutput
-      ? (input: unknown) => Promise<Awaited<TOutput>>
-      : never
-  }
-}
-
-export interface AppRouter {
-  createCaller: () => AppRouterCaller
-}
-
-type NativeHostIpcProcedureSchemas = {
-  [Namespace in keyof NativeHostIpcHandlers]: {
-    [Procedure in keyof NativeHostIpcHandlers[Namespace]]: NativeHostIpcHandlers[Namespace][Procedure] extends (
-      input: infer TInput,
-    ) => unknown
-      ? IpcInputSchema<TInput>
-      : never
-  }
-}
-
-export function createAppRouter(handlers: NativeHostIpcHandlers, schemas: NativeHostIpcProcedureSchemas): AppRouter {
-  return {
-    createCaller: () => ({
-      clientWorkspace: {
-        read: createValidatedProcedure(schemas.clientWorkspace.read, handlers.clientWorkspace.read),
-        write: createValidatedProcedure(schemas.clientWorkspace.write, handlers.clientWorkspace.write),
-      },
-      settings: {
-        setGlobalShortcut: createValidatedProcedure(
-          schemas.settings.setGlobalShortcut,
-          handlers.settings.setGlobalShortcut,
-        ),
-      },
-    }),
-  }
 }

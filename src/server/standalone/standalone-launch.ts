@@ -1,29 +1,24 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { bootstrapServer, type BootstrappedServer } from '#/server/bootstrap.ts'
-import { resolveGoblinCommandEntry } from '#/server/terminal/g-command.ts'
-import { resolvePtyWorkerEntry } from '#/server/terminal/pty-worker-entry.ts'
+import { createGoblinCommandLauncher } from '#/server/terminal/g-command.ts'
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { serverDataDir } from '#/shared/data-dir.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
-import { prepareNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 export interface StandaloneServerLayout {
-  repoRoot: string
-  runtimeEntryDir: string
+  command: readonly string[]
+  webRoot: string
+  version: string
 }
 
 export async function launchStandaloneServer(
   layout: StandaloneServerLayout,
   args: string[] = process.argv.slice(2),
-  fileExists: typeof existsSync = existsSync,
 ): Promise<BootstrappedServer> {
-  process.chdir(layout.repoRoot)
-  prepareNodePtyDarwinRuntime({
-    packageRoot: path.join(layout.repoRoot, 'node_modules/node-pty'),
-  })
-
+  if (process.platform !== 'linux' && process.platform !== 'darwin')
+    throw new Error('Goblin requires Linux or macOS (Bun PTY)')
   const { values } = parseArgs({
     args,
     options: {
@@ -34,68 +29,60 @@ export async function launchStandaloneServer(
     },
     strict: true,
   })
-
   if (values.host?.trim()) process.env.GOBLIN_SERVER_HOST = values.host.trim()
   if (values.port?.trim()) process.env.GOBLIN_SERVER_PORT = values.port.trim()
-  if (values['data-dir']?.trim()) process.env.GOBLIN_SERVER_DATA_DIR = values['data-dir'].trim()
-
-  // Resolve the printable token before bootstrap, then project that exact
-  // value into the server process so its in-memory auth boundary cannot drift
-  // from the standalone login instructions.
+  if (values['data-dir']?.trim()) process.env.GOBLIN_SERVER_DATA_DIR = path.resolve(values['data-dir'].trim())
   const accessToken = values.token?.trim() || (await readOrCreateAccessToken(serverDataDir()))
   process.env.GOBLIN_SERVER_ACCESS_TOKEN = accessToken
-
-  if (!process.env.npm_package_version?.trim()) {
-    const pkg: unknown = JSON.parse(readFileSync(path.join(layout.repoRoot, 'package.json'), 'utf8'))
-    const version = pkg && typeof pkg === 'object' ? Reflect.get(pkg, 'version') : undefined
-    process.env.npm_package_version = (typeof version === 'string' ? version.trim() : '') || '0.1.0'
+  const launcher = createGoblinCommandLauncher(layout.command)
+  process.once('exit', launcher.dispose)
+  const disposeLauncher = () => {
+    process.removeListener('exit', launcher.dispose)
+    launcher.dispose()
   }
-
-  const webIndex = path.join(layout.repoRoot, 'dist/web/index.html')
-  const webBoot = path.join(layout.repoRoot, 'dist/web/boot.js')
-  const webReady = fileExists(webIndex) && fileExists(webBoot)
-  const server = await bootstrapServer({
-    ptyWorkerEntry: resolvePtyWorkerEntry(layout.runtimeEntryDir),
-    gCommandEntry: resolveGoblinCommandEntry(layout.runtimeEntryDir),
-  })
-
-  // Accepted tradeoff: built-in LAN access uses HTTP and a token-bearing URL.
-  // Use it only on a trusted network; terminate HTTPS externally otherwise.
-  console.log(`[embedded-server] listening on http://${server.hostname}:${server.port}`)
-  console.log(`[embedded-server] data dir: ${serverDataDir()}`)
-  console.log(`[embedded-server] access token: ${accessToken}`)
-  console.log(
-    `[embedded-server] open the app at http://${server.hostname}:${server.port}/ and paste the token into the gate.`,
-  )
-
-  const lanUrls: string[] =
-    server.hostname === '0.0.0.0'
-      ? getLanUrls(server.port)
-      : isLanAddress(server.hostname)
-        ? [`http://${server.hostname}:${server.port}`]
-        : []
-
-  if (lanUrls.length > 0) {
+  try {
+    const server = await bootstrapServer({
+      workerCommand: [...layout.command, '--pty-worker'],
+      gCommandBinDir: launcher.binDir,
+      webRoot: layout.webRoot,
+      version: layout.version,
+    })
+    console.log(`[server] listening on http://${server.hostname}:${server.port}`)
+    console.log(`[server] data dir: ${serverDataDir()}`)
+    console.log(`[server] access token: ${accessToken}`)
+    console.log(`[server] open the browser URL and paste the token into the login gate.`)
+    const lanUrls =
+      server.hostname === '0.0.0.0'
+        ? getLanUrls(server.port)
+        : isLanAddress(server.hostname)
+          ? [`http://${server.hostname}:${server.port}`]
+          : []
     for (const url of lanUrls) {
-      // The page consumes this token immediately through POST /api/login and
-      // removes it from the address bar. This matches the existing standalone
-      // LAN login contract.
       const urlWithToken = `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(accessToken)}`
-      console.log(`[embedded-server] LAN URL: ${urlWithToken}`)
+      console.log(`[server] LAN URL: ${urlWithToken}`)
       try {
-        // LAN-only presentation dependency. The standalone build keeps qrcode
-        // external so localhost-only servers do not parse or retain it.
+        // QR rendering is only needed when advertising LAN access.
         const { default: qrcode } = await import('qrcode')
-        const qr = await qrcode.toString(urlWithToken, { type: 'terminal', small: true })
-        console.log(qr)
+        console.log(await qrcode.toString(urlWithToken, { type: 'terminal', small: true }))
       } catch {
-        console.warn(`[embedded-server] failed to generate QR code for ${urlWithToken}`)
+        console.warn('[server] failed to generate LAN QR code')
       }
     }
+    if (!existsSync(path.join(layout.webRoot, 'index.html')) || !existsSync(path.join(layout.webRoot, 'boot.js')))
+      console.warn('[server] web assets missing; run `bun run build:web` for the web UI')
+    return {
+      hostname: server.hostname,
+      port: server.port,
+      async stop() {
+        try {
+          await server.stop()
+        } finally {
+          disposeLauncher()
+        }
+      },
+    }
+  } catch (error) {
+    disposeLauncher()
+    throw error
   }
-
-  if (!webReady) {
-    console.warn('[embedded-server] web assets missing; run `bun run build:web` for the web UI')
-  }
-  return server
 }

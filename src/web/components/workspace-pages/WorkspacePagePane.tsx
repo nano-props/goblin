@@ -8,7 +8,7 @@ interface WorkspacePagePaneProps {
   icon: LucideIcon
   label: string
   compact?: boolean
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onBack?: () => void
 }
 
@@ -18,14 +18,14 @@ export const WorkspacePagePane: FunctionalComponent<WorkspacePagePaneProps> = (p
       icon={props.icon}
       label={props.label}
       compact={props.compact ?? false}
-      trafficLightOffset={props.trafficLightOffset ?? false}
+      navigationOffset={props.navigationOffset ?? false}
       onBack={props.onBack}
     />
     {slots.default?.()}
   </section>
 )
 
-WorkspacePagePane.props = ['icon', 'label', 'compact', 'trafficLightOffset', 'onBack']
+WorkspacePagePane.props = ['icon', 'label', 'compact', 'navigationOffset', 'onBack']
 
 export const WorkspacePageLoadingBody: FunctionalComponent = () => (
   <ScrollPane>

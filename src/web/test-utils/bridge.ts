@@ -6,7 +6,7 @@
 
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import type { RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import type {
   TerminalAttachResult,
@@ -81,10 +81,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     }
   >()
   const sessionStorageValues = new Map<string, string>()
-  const hostOpenExternalUrl = handlers['app.openExternalUrl']
-  const hostOpenDirectoryDialog = handlers['workspace.openDialog']
-  const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
-  const hostOpenSettingsWindow = handlers['app.openSettingsWindow']
   const browserWindow = globalThis.window
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -94,51 +90,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       dispatchEvent: browserWindow.dispatchEvent.bind(browserWindow),
       __GOBLIN_BOOTSTRAP__: {
         runtime: {
-          kind: 'electron',
+          kind: 'web',
           bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
+          capabilities: [],
         },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-      },
-      goblinNative: {
-        invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
-          const handler = handlers[path]
-          if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
-          return handler(input)
-        },
-        abortIpc: () => Promise.resolve(false),
-        notifyAppQuitDrained: () => Promise.resolve(true),
-        onAppQuitting: () => () => {},
-        onIntent: () => () => {},
-        pathForFile: () => '',
-        host: {
-          openSettingsWindow: (input: unknown) =>
-            hostOpenSettingsWindow ? Promise.resolve(hostOpenSettingsWindow(input)) : Promise.resolve(false),
-          openExternalUrl: (input: unknown) =>
-            hostOpenExternalUrl
-              ? Promise.resolve(hostOpenExternalUrl(input))
-              : Promise.resolve({ ok: false, message: 'error.invalid-url' }),
-          openDirectoryDialog: (input: { title?: string }) => {
-            const handler =
-              input?.title === 'Choose Clone Destination' && handlers['repo.cloneParentDialog']
-                ? handlers['repo.cloneParentDialog']
-                : hostOpenDirectoryDialog
-            return handler ? Promise.resolve(handler(input)) : Promise.resolve(null)
-          },
-          consumeExternalOpenPaths: () =>
-            hostConsumeExternalOpenPaths
-              ? Promise.resolve(hostConsumeExternalOpenPaths(undefined))
-              : Promise.resolve([]),
-        },
-        terminal: {
-          notifyBell: () => Promise.resolve(true),
-          sendTestNotification: () => Promise.resolve(true),
-          setBadge: () => {},
-        },
-        getAccessTokenProjection: () =>
-          Promise.resolve({ accessToken: 'test-access-token', activation: 'current' as const }),
-        rotateAccessToken: () =>
-          Promise.resolve({ accessToken: 'test-access-token', activation: 'after-restart' as const }),
       },
       location: {
         href: 'http://127.0.0.1:32100/',

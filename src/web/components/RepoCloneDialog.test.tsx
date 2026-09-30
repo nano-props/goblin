@@ -11,12 +11,11 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { WEB_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -55,16 +54,13 @@ beforeEach(() => {
   fetchMock.mockClear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
-      kind: 'electron',
+      kind: 'web',
       bridgeVersion: CLIENT_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
+      capabilities: [...WEB_CLIENT_CAPABILITIES],
     },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: currentNativeBridge(),
-  })
+
   hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
@@ -73,7 +69,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   setClientBridgeForTests(null)
 })

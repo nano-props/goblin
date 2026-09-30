@@ -8,7 +8,6 @@ import { describe, expect, test } from 'vitest'
 import {
   clientEffectIntentRequiresWorkspaceBootstrap,
   createAppLevelIntentPlan,
-  createExternalOpenDrainKickPlan,
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
@@ -690,12 +689,6 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('external open drain kick plan schedules rerun when a drain is already active', () => {
-    expect(createExternalOpenDrainKickPlan({ disposed: false, draining: true })).toEqual({
-      kind: 'schedule-rerun',
-    })
-  })
-
   test.each([
     { type: 'open-settings-requested' as const, page: 'general' as const },
     { type: 'theme-pref-set-requested' as const, pref: 'dark' as const },
@@ -703,7 +696,6 @@ describe('client effect intent plans', () => {
     { type: 'open-workspace-path-requested' as const },
     { type: 'clone-repo-requested' as const },
     { type: 'open-remote-workspace-requested' as const },
-    { type: 'server-command-reset-requested' as const },
   ])('does not bind $type to workspace bootstrap', (intent) => {
     expect(clientEffectIntentRequiresWorkspaceBootstrap(intent)).toBe(false)
   })
@@ -713,7 +705,6 @@ describe('client effect intent plans', () => {
     { type: 'layout-reset-requested' as const },
     { type: 'clear-recent-workspaces-requested' as const },
     { type: 'open-workspace-requested' as const },
-    { type: 'external-open-enqueued' as const },
   ])('keeps $type behind workspace bootstrap', (intent) => {
     expect(clientEffectIntentRequiresWorkspaceBootstrap(intent)).toBe(true)
   })

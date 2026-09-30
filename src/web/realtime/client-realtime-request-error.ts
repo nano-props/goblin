@@ -1,12 +1,5 @@
 export type ClientRealtimeRequestFailureKind =
-  | 'unavailable'
-  | 'open-timeout'
-  | 'open-failed'
-  | 'send-failed'
-  | 'disconnected'
-  | 'timeout'
-  | 'invalid-response'
-  | 'app-quitting'
+  'unavailable' | 'open-timeout' | 'open-failed' | 'send-failed' | 'disconnected' | 'timeout' | 'invalid-response'
 
 export class ClientRealtimeRequestError extends Error {
   readonly kind: ClientRealtimeRequestFailureKind

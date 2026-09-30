@@ -1,66 +1,49 @@
-import { mkdtempDisposableSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { buildGoblinTerminalCommandEnvironment, resolveGoblinCommandEntry } from '#/server/terminal/g-command.ts'
-
-function makeTmpDir() {
-  return mkdtempDisposableSync(path.join(os.tmpdir(), 'goblin-g-command-'))
-}
+import { buildGoblinTerminalCommandEnvironment, createGoblinCommandLauncher } from '#/server/terminal/g-command.ts'
 
 describe('g terminal command', () => {
-  test('builds the terminal environment from static launcher resources', () => {
-    using temporaryDirectory = makeTmpDir()
-    const binDir = temporaryDirectory.path
-    writeFileSync(path.join(binDir, process.platform === 'win32' ? 'g.cmd' : 'g'), '')
-    const entryPath = path.join(binDir, 'g-command.js')
-    writeFileSync(entryPath, '')
-
-    const env = buildGoblinTerminalCommandEnvironment({
-      binDir,
-      entryPath,
-      terminalSessionId: 'term-111111111111111111111',
-      serverUrl: 'http://127.0.0.1:32100',
-      accessToken: 'secret',
-      currentPath: '/usr/bin',
-      nodePath: '/node',
-    })
-
-    expect(env).toMatchObject({
-      PATH: `${binDir}${path.delimiter}/usr/bin`,
-      GOBLIN_TERMINAL: '1',
-      GOBLIN_TERMINAL_SESSION_ID: 'term-111111111111111111111',
-      GOBLIN_SERVER_URL: 'http://127.0.0.1:32100',
-      GOBLIN_SERVER_ACCESS_TOKEN: 'secret',
-      GOBLIN_NODE: '/node',
-      GOBLIN_CLI_ENTRY: entryPath,
-    })
+  test('quotes the executable prefix and forwards arguments literally', () => {
+    const launcher = createGoblinCommandLauncher(['/usr/bin/printf', '%s\n', "a ' quoted $value"])
+    try {
+      expect(execFileSync(path.join(launcher.binDir, 'g'), ['two words', '$(false)'], { encoding: 'utf8' })).toBe(
+        "a ' quoted $value\ng\ntwo words\n$(false)\n",
+      )
+    } finally {
+      launcher.dispose()
+    }
+    expect(existsSync(launcher.binDir)).toBe(false)
   })
-
-  test('refuses to build an environment when the packaged entrypoint is missing', () => {
-    using temporaryDirectory = makeTmpDir()
-    const binDir = temporaryDirectory.path
-    writeFileSync(path.join(binDir, process.platform === 'win32' ? 'g.cmd' : 'g'), '')
-
-    const env = buildGoblinTerminalCommandEnvironment({
-      binDir,
-      entryPath: path.join(binDir, 'missing.js'),
-      terminalSessionId: 'term-111111111111111111111',
-      serverUrl: 'http://127.0.0.1:32100',
-      accessToken: 'secret',
-    })
-
-    expect(env).toBeNull()
-  })
-
-  test('resolves built command entry before source fallback', () => {
-    using temporaryDirectory = makeTmpDir()
-    const dir = temporaryDirectory.path
-    const built = path.join(dir, 'g-command.js')
-    const source = path.join(dir, 'g-command.ts')
-    writeFileSync(built, '')
-    writeFileSync(source, '')
-
-    expect(resolveGoblinCommandEntry(dir)).toBe(built)
+  test('injects credentials only into the PTY environment', () => {
+    const launcher = createGoblinCommandLauncher(['/app/goblin'])
+    try {
+      const env = buildGoblinTerminalCommandEnvironment({
+        binDir: launcher.binDir,
+        terminalSessionId: 'term-example',
+        serverUrl: 'http://127.0.0.1:32100',
+        accessToken: 'example-secret',
+        currentPath: '/usr/bin',
+      })
+      expect(env).toEqual({
+        PATH: launcher.binDir + path.delimiter + '/usr/bin',
+        GOBLIN_TERMINAL: '1',
+        GOBLIN_TERMINAL_SESSION_ID: 'term-example',
+        GOBLIN_SERVER_URL: 'http://127.0.0.1:32100',
+        GOBLIN_SERVER_ACCESS_TOKEN: 'example-secret',
+      })
+      expect(readFileSync(path.join(launcher.binDir, 'g'), 'utf8')).not.toContain('example-secret')
+    } finally {
+      launcher.dispose()
+    }
+    expect(
+      buildGoblinTerminalCommandEnvironment({
+        binDir: launcher.binDir,
+        terminalSessionId: 'term-example',
+        serverUrl: 'http://127.0.0.1:32100',
+        accessToken: 'example-secret',
+      }),
+    ).toBeNull()
   })
 })

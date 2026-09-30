@@ -14,8 +14,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceMembershipActions } from '#/web/stores/workspaces/types.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
-import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -45,17 +44,14 @@ beforeEach(() => {
     configurable: true,
     value: {
       runtime: {
-        kind: 'electron',
+        kind: 'web',
         bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: ELECTRON_CLIENT_CAPABILITIES,
+        capabilities: WEB_CLIENT_CAPABILITIES,
       },
       initialServer: null,
     },
   })
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: currentNativeBridge(),
-  })
+
   hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
@@ -64,7 +60,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   setClientBridgeForTests(null)
 })

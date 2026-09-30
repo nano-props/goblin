@@ -1,5 +1,4 @@
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import { subscribeServerCommandGenerationAdvance } from '#/web/lib/server-command-generation.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { setBackgroundSyncRepos } from '#/web/repos/client.ts'
 
@@ -31,10 +30,6 @@ function declareDesiredTargets(): void {
 
 // Registration state follows the page-scoped clientId and outlives the
 // conditional Vue scope so an interrupted empty declaration can be rehydrated.
-subscribeServerCommandGenerationAdvance(() => {
-  if (desiredTargets.length === 0 && !serverMayHaveRegisteredTargets) return
-  declareDesiredTargets()
-})
 
 export const backgroundSyncRegistration: BackgroundSyncRegistration = {
   setTargets(targets) {

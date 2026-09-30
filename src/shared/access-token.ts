@@ -3,14 +3,10 @@
 /** HTTP cookie name set by `POST /api/login`. */
 export const ACCESS_TOKEN_COOKIE = 'goblin_access_token'
 
-/** HTTP header set on every authenticated request from the embedded
- *  client (and from the Electron main's IPC client when calling
- *  the server's HTTP API). */
+/** HTTP header for authenticated programmatic clients and explicit token handoffs. */
 export const ACCESS_TOKEN_HEADER = 'x-goblin-access-token'
 
-/** WebSocket query parameter accepted alongside the cookie on the
- *  upgrade request. Browsers can't set WS headers, and the
- *  embedded `file://` origin can't carry cross-origin cookies. */
+/** WebSocket query token for clients with explicit credentials; cookies are also accepted. */
 export const ACCESS_TOKEN_QUERY = 't'
 
 /** URL query parameter for QR-code auto-login: a URL of the form
@@ -26,8 +22,3 @@ export const ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
 
 /** File name under the server data directory that holds the persistent access token. */
 export const ACCESS_TOKEN_FILE_NAME = 'server-token'
-
-export type AccessTokenProjection = {
-  accessToken: string
-  activation: 'current' | 'after-restart'
-}

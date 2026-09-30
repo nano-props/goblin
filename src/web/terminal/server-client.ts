@@ -20,7 +20,6 @@ export type ClientServerTerminalConfig = AppRealtimeServerConfig
 export function createServerTerminalClient(options: {
   realtime: ClientAppRealtime
   notificationProvider: TerminalNotificationProvider
-  setBadge?: (count: number) => void
 }): ClientTerminal {
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const bellSubscribers = new Set<(event: TerminalBellRealtimeEvent) => void>()
@@ -57,9 +56,6 @@ export function createServerTerminalClient(options: {
     },
     sendTestNotification(input: TerminalTestNotificationInput) {
       return options.notificationProvider.sendTestNotification(input)
-    },
-    setBadge(count) {
-      options.setBadge?.(count)
     },
     onOutput(cb) {
       outputSubscribers.add(cb)

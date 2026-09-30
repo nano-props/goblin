@@ -124,7 +124,7 @@ describe('WorkspaceLayoutSkeleton', () => {
 
     const toolbar = container.querySelector('.goblin-workspace-toolbar')
     const tabs = container.querySelectorAll('[data-testid="workspace-pane-skeleton-tab"]')
-    expect(toolbar?.className).toContain('goblin-workspace-toolbar--non-draggable')
+    expect(toolbar?.className).toContain('goblin-workspace-toolbar--compact')
     expect(tabs).toHaveLength(1)
     expect(tabs[0]?.className).toContain('min-w-0')
     expect(tabs[0]?.className).toContain('flex-1')

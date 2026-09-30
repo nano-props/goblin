@@ -1,8 +1,7 @@
 # Startup Architecture
 
 Startup separates public shell hydration, authentication, workspace restore,
-and post-restore application behavior. Electron pages and browser tabs follow
-the same functional stages.
+and post-restore application behavior in browser tabs.
 
 ## Stages
 
@@ -41,30 +40,13 @@ Consumers use a canonical readiness projection instead of recombining internal
 flags. Optional authenticated enrichment may fail without blocking readiness;
 membership and persistence failures may not.
 
-### Native document delivery
+### Browser document lifecycle
 
-Electron client-surface identity and renderer delivery readiness are separate
-facts. The native host registers a window early enough to authenticate renderer
-IPC, but sends a discrete client effect only after the exact application
-document generation's preload has installed its lifetime intent listener and
-acknowledged readiness to the native host. An action that creates the primary
-window may wait within a bounded lifetime for that exact new document's preload
-acknowledgement after the shared window creation has completed; the deadline
-does not cancel or replace Electron's singleton window-loading lifecycle. An
-existing document that is not ready fails fast. Reload, navigation replacement,
-renderer exit, window close, load failure, or readiness timeout rejects delivery
-instead of forwarding the effect to a later document. The preload handoff then
-bridges that listener to the single client intent consumer
-within the same document generation.
-
-Native quit delivery is an application lifecycle signal, not an authenticated
-UI command. Its consumer exists for the full web entrypoint lifetime, including
-public bootstrap, authentication gates, route changes, and render fallbacks;
-ordinary client effects remain owned by the authenticated UI router. Client
-workspace presentation is already persisted continuously to browser storage or
-the Electron user-data file. Quit delivery is only a bounded, best-effort chance
-to flush its final debounce window; authoritative server state and native exit
-do not depend on a loading or unavailable renderer.
+The server is started independently of the browser. Closing a tab detaches its
+client; it does not stop the server or retire server-owned terminal sessions.
+Client workspace presentation is persisted continuously in localStorage after
+restore succeeds. Page lifecycle events offer only a best-effort final flush;
+authoritative server state never depends on an unloading document.
 
 ## Routing
 

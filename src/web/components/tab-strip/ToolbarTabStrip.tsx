@@ -1,7 +1,6 @@
 import { defineComponent } from 'vue'
 import type { HTMLAttributes, PropType, Ref, VNodeChild } from 'vue'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { TitleBarDragRegion, TitleBarScrollableInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface ToolbarTabStripProps {
@@ -30,19 +29,19 @@ export const ToolbarTabStrip = defineComponent<ToolbarTabStripProps>({
 
       return (
         <div class="flex h-full min-w-0 flex-1 items-center">
-          <TitleBarScrollableInteractiveRegion asChild>
-            <ScrollArea
-              orientation="horizontal"
-              scrollbarMode="compact"
-              class="h-full min-w-0 max-w-full flex-none w-fit"
-              viewportClass="[&>div]:h-full"
-              viewportRef={props.viewportRef}
-              viewportOnScroll={props.viewportOnScroll}
-            >
-              {props.scrollContent}
-            </ScrollArea>
-          </TitleBarScrollableInteractiveRegion>
-          <TitleBarDragRegion reserveWindowControls={false} class="min-w-0 flex-1 self-stretch" aria-hidden="true" />
+          <ScrollArea
+            data-interactive
+            orientation="horizontal"
+            scrollbarMode="compact"
+            class="h-full min-w-0 max-w-full flex-none w-fit"
+            viewportClass="[&>div]:h-full"
+            viewportRef={props.viewportRef}
+            viewportOnScroll={props.viewportOnScroll}
+          >
+            {props.scrollContent}
+          </ScrollArea>
+
+          <div class="min-w-0 flex-1 self-stretch" aria-hidden="true" />
         </div>
       )
     }

@@ -1,4 +1,3 @@
-import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
 import type { ClientWorkspaceState, ServerWorkspaceState, SettingsSnapshot } from '#/shared/api-types.ts'
 import type { LangPref, UserSettings, ThemePref } from '#/shared/settings.ts'
@@ -10,8 +9,6 @@ export const DEFAULT_LANG_PREF: LangPref = 'auto'
 export const DEFAULT_THEME_PREF: ThemePref = 'auto'
 export const DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED = false
 export const DEFAULT_SHORTCUTS_DISABLED = false
-export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
-export const DEFAULT_LAN_ENABLED = false
 
 export function defaultServerWorkspaceState(): ServerWorkspaceState {
   return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
@@ -37,9 +34,6 @@ export function defaultUserSettings(overrides: Partial<UserSettings> = {}): User
     fetchIntervalSec: overrides.fetchIntervalSec ?? DEFAULT_FETCH_INTERVAL_SEC,
     terminalNotificationsEnabled: overrides.terminalNotificationsEnabled ?? DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED,
     shortcutsDisabled: overrides.shortcutsDisabled ?? DEFAULT_SHORTCUTS_DISABLED,
-    globalShortcutDisabled: overrides.globalShortcutDisabled ?? DEFAULT_GLOBAL_SHORTCUT_DISABLED,
-    globalShortcut: overrides.globalShortcut ?? DEFAULT_GLOBAL_SHORTCUT,
-    lanEnabled: overrides.lanEnabled ?? DEFAULT_LAN_ENABLED,
   }
 }
 
@@ -47,7 +41,6 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
   const prefs = defaultUserSettings(overrides)
   return {
     ...prefs,
-    globalShortcutRegistered: overrides.globalShortcutRegistered ?? false,
     recentWorkspaces: overrides.recentWorkspaces ?? [],
     workspaceSettings: overrides.workspaceSettings ?? [],
   }

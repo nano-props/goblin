@@ -12,9 +12,6 @@ export function resolveLocalShell(
 ): ResolvedLocalShell {
   const explicit = input.command?.trim()
   if (explicit) return { command: explicit, args: input.args ?? [] }
-  if (process.platform === 'win32') {
-    return { command: env.COMSPEC?.trim() || 'cmd.exe', args: [] }
-  }
   const fromEnv = env.SHELL?.trim()
   if (fromEnv) return { command: fromEnv, args: input.args ?? ['-l'] }
   const fromUserInfo = readUserLoginShell()
@@ -28,7 +25,6 @@ export function resolveLocalShellWithStartupShellCommand(
 ): ResolvedLocalShell {
   const commandLine = normalizeStartupShellCommand(startupShellCommand)
   if (!commandLine) return resolveLocalShell({}, env)
-  if (process.platform === 'win32') return { command: env.COMSPEC?.trim() || 'cmd.exe', args: ['/K', commandLine] }
   const shell = resolveLocalShell({}, env).command
   // The PTY is spawned only after the mounted client xterm has fitted its host,
   // so width-sensitive startup output begins at canonical geometry.

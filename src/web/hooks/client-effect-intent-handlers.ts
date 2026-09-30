@@ -6,14 +6,12 @@ import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts
 import { themeStore } from '#/web/stores/theme.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
 import { clearRecentWorkspaceHistory } from '#/web/settings/actions.ts'
-import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import {
   reportCloseWorkspaceFailure,
   reportOpenWorkspacePostOpenError,
   reportOpenWorkspacePostOpenEffects,
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
-import { consumeExternalOpenPaths } from '#/web/app/shell-client.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {
@@ -24,7 +22,6 @@ import {
 } from '#/web/commands/workspace-commands.ts'
 import {
   createAppLevelIntentPlan,
-  createExternalOpenDrainKickPlan,
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
   type ClientAppIntent,
@@ -71,12 +68,6 @@ interface WorkspaceClientIntentDeps {
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
   toggleZenMode: () => void
-  t: (key: string) => string
-}
-
-interface ExternalOpenIntentDrainerDeps {
-  openWorkspaceMembership: (path: string) => Promise<OpenWorkspaceResult>
-  activateWorkspace: (workspaceId: WorkspaceId) => void
   t: (key: string) => string
 }
 
@@ -137,12 +128,7 @@ export async function handleAppLevelClientIntent(event: ClientAppIntent, deps: A
       return
     }
     case 'open-workspace':
-      await openWorkspaceFromDialog({
-        openWorkspaceMembership: deps.openWorkspaceMembership,
-        activateWorkspace: deps.navigation.activateWorkspace,
-        openWorkspacePathDialog: deps.openWorkspacePathDialog,
-        t: deps.t,
-      })
+      deps.openWorkspacePathDialog()
       return
     case 'open-workspace-path':
       deps.openWorkspacePathDialog()
@@ -256,64 +242,5 @@ export async function handleWorkspaceClientIntent(
     case 'toggle-zen-mode':
       deps.toggleZenMode()
       return true
-  }
-}
-
-export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerDeps): {
-  drain: () => void
-  dispose: () => void
-} {
-  let disposed = false
-  let draining = false
-  let rerun = false
-
-  const drain = () => {
-    const kickPlan = createExternalOpenDrainKickPlan({ disposed, draining })
-    switch (kickPlan.kind) {
-      case 'ignore':
-        return
-      case 'schedule-rerun':
-        rerun = true
-        return
-      case 'start-drain':
-        break
-    }
-    draining = true
-    void (async () => {
-      try {
-        while (!disposed) {
-          rerun = false
-          const paths = await consumeExternalOpenPaths()
-          if (paths.length === 0) break
-          await openWorkspacePaths(paths, {
-            openWorkspaceMembership: deps.openWorkspaceMembership,
-            activateWorkspace: deps.activateWorkspace,
-            onOpenFailed: (path, result) => {
-              if (!reportOpenWorkspaceUncertainty(result, deps.t, { descriptionPrefix: path })) {
-                toast.error(deps.t('drop.open-failed'), {
-                  description: `${path}\n${deps.t(result.message)}`,
-                })
-              }
-            },
-            onPostOpenError: (path, error) => {
-              reportOpenWorkspacePostOpenError(error, deps.t, { descriptionPrefix: path })
-            },
-          })
-          if (!rerun) break
-        }
-      } catch (err) {
-        externalOpenLog.warn('failed to drain queued paths', { err })
-      } finally {
-        draining = false
-        if (rerun && !disposed) drain()
-      }
-    })()
-  }
-
-  return {
-    drain,
-    dispose() {
-      disposed = true
-    },
   }
 }

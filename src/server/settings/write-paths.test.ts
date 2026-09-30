@@ -44,9 +44,6 @@ describe('settings command handlers', () => {
       fetchIntervalSec: 120,
       terminalNotificationsEnabled: false,
       shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      lanEnabled: false,
     } as const
     const i18nSnapshot = resolveI18nSnapshot('ja', 'ja-JP,ja;q=0.9,en;q=0.8')
     mocks.updateUserSettings.mockResolvedValue(updatedSettings)

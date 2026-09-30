@@ -1,12 +1,8 @@
 // Global keyboard shortcuts. Mounted once in App.tsx — all bindings
 // live here so adding/removing one is a single-file change.
 //
-// Shortcuts wired through the Electron application menu are forwarded
-// as typed IPC events. Numbered workspace tab shortcuts are handled
-// here in the capture phase so terminal focus cannot swallow them;
-// Cmd/Ctrl+T (new terminal tab), Cmd/Ctrl+N (create worktree) and
-// Cmd/Ctrl+W (close workspace tab) use this DOM path only in
-// the web runtime.
+// Keyboard shortcuts use browser DOM events. Numbered workspace tab shortcuts
+// run in the capture phase so terminal focus cannot swallow them.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
 // is suppressed — including `?`, otherwise pressing it with Settings
@@ -33,7 +29,6 @@ import {
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { getClientBridge } from '#/web/bridge/client.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'
 import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
@@ -110,14 +105,6 @@ function digitShortcutIndex(event: KeyboardEvent): number | null {
   return Number(event.code.slice('Digit'.length))
 }
 
-function hasNativeMenuAccelerators(): boolean {
-  try {
-    return getClientBridge().kind() === 'electron'
-  } catch {
-    return false
-  }
-}
-
 function nextIndex(current: number, length: number, direction: MoveDirection): number {
   if (direction === 1) return Math.min(length - 1, current < 0 ? 0 : current + 1)
   return Math.max(0, current < 0 ? 0 : current - 1)
@@ -187,17 +174,15 @@ export function useKeyboard(options: Options) {
     if (primaryModifierPressed(e) && !e.altKey) {
       const workspaceId = toValue(options.currentWorkspaceId)
       const paneTarget = toValue(options.currentWorkspacePaneCommandTarget)
-      const menuBackedShortcut = hasNativeMenuAccelerators()
       const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
       const rendererOwnedShortcut =
-        tabIndex !== null ||
-        (!menuBackedShortcut && !e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
+        tabIndex !== null || (!e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
       if (rendererOwnedShortcut) {
         e.preventDefault()
         e.stopPropagation()
         if (workspaceShortcutsSuppressed) return
       }
-      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
+      if (!e.shiftKey && e.code === 'KeyT') {
         if (!paneTarget) return
         const workspace = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
         if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
@@ -211,7 +196,7 @@ export function useKeyboard(options: Options) {
         })
         return
       }
-      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
+      if (!e.shiftKey && e.code === 'KeyN') {
         const repo = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
         if (
           !repo ||
@@ -231,7 +216,7 @@ export function useKeyboard(options: Options) {
         }
         return
       }
-      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
+      if (!e.shiftKey && e.code === 'KeyW') {
         if (!paneTarget) return
         void runCloseCurrentWorkspacePaneTabCommand({
           workspaceId,

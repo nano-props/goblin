@@ -1,11 +1,8 @@
-import { readFileSync } from 'node:fs'
+import script from '#/system/ssh/remote-file-download.sh' with { type: 'text' }
 import { shellQuote } from '#/system/remote-shell.ts'
 
-let cachedScript: string | undefined
-
 export function loadRemoteFileDownloadScript(): string {
-  cachedScript ??= readFileSync(new URL('./remote-file-download.sh', import.meta.url), 'utf8')
-  return cachedScript
+  return script
 }
 
 export function remoteFileDownloadStreamScript(rootPath: string, filePath: string, marker: string): string {

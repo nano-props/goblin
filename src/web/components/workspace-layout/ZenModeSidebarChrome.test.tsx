@@ -76,7 +76,7 @@ describe('ZenModeSidebarChrome', () => {
     expect(overlay.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
     expect(controls.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenSurface.hasAttribute('data-zen-reveal-surface')).toBe(true)
-    expect(controls.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
+    expect(controls.closest('[data-interactive]')).not.toBeNull()
     await flushTestUpdates(() => {
       screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseenter'))
     })
@@ -99,7 +99,7 @@ describe('ZenModeSidebarChrome', () => {
     expect(hitArea?.className).toContain('pointer-events-auto')
     expect(hitArea?.style.top).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
     expect(hitArea?.hasAttribute('data-interactive')).toBe(false)
-    expect(hitArea?.dataset.titleBarChromeRegion).toBeUndefined()
+
     expect(hitArea?.hasAttribute('data-zen-reveal-surface')).toBe(false)
 
     await flushTestUpdates(() => {
@@ -278,32 +278,6 @@ describe('ZenModeSidebarChrome', () => {
     expect(reveal?.dataset.state).toBe('open')
   })
 
-  test('uses a top-level drag plate for the revealed sidebar titlebar', async () => {
-    renderInJsdom(
-      <ZenModeSidebarChrome
-        workspaceId={WORKSPACE_ID}
-        zenModeToggleEnabled
-        revealEnabled
-        sidebarSize={36}
-        onSidebarSizeChange={() => {}}
-        sidebarPane={mockSidebarPane()}
-      />,
-    )
-
-    expect(screen.queryByTestId('zen-mode-sidebar-drag-plate')).toBeNull()
-
-    await flushTestUpdates(() => {
-      screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseenter'))
-    })
-
-    const dragPlate = screen.getByTestId('zen-mode-sidebar-drag-plate')
-    expect(dragPlate.dataset.titleBarChromeRegion).toBe('drag')
-    expect(dragPlate.hasAttribute('data-interactive')).toBe(false)
-    expect(dragPlate.hasAttribute('data-zen-reveal-surface')).toBe(true)
-    expect(dragPlate.className).toContain('pointer-events-auto')
-    expect(dragPlate.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
-  })
-
   test('keeps the resize visual full-height while the hit target stays below the draggable reveal titlebar', async () => {
     renderInJsdom(
       <ZenModeSidebarChrome
@@ -324,10 +298,10 @@ describe('ZenModeSidebarChrome', () => {
     const resizeHandle = screen.getByTestId('zen-mode-sidebar-resize-handle')
     expect(resizeVisual.className).toContain('pointer-events-none')
     expect(resizeVisual.className).toContain('inset-y-0')
-    expect(resizeVisual.dataset.titleBarChromeRegion).toBeUndefined()
+
     expect(resizeVisual.hasAttribute('data-interactive')).toBe(false)
     expect(resizeVisual.querySelector('span')).not.toBeNull()
-    expect(resizeHandle.dataset.titleBarChromeRegion).toBe('interactive')
+
     expect(resizeHandle.style.top).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
     expect(resizeHandle.style.height).toBe(`calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`)
 

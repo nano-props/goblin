@@ -28,7 +28,7 @@ interface WorkspacePaneToolbarProps {
   items: WorkspacePaneTabItem[]
   activeTabIdentity: string | null
   createAction: WorkspacePaneTabCreateAction | null
-  trafficLightOffset?: boolean
+  navigationOffset?: boolean
   onBackToNavigator?: () => void
   trailingActions?: VNodeChild
   onSelect: (item: WorkspacePaneTabItem) => void
@@ -79,7 +79,7 @@ export const WorkspacePaneToolbar = defineComponent<WorkspacePaneToolbarProps>({
     'items',
     'activeTabIdentity',
     'createAction',
-    'trafficLightOffset',
+    'navigationOffset',
     'onBackToNavigator',
     'trailingActions',
     'onSelect',
@@ -93,8 +93,8 @@ export const WorkspacePaneToolbar = defineComponent<WorkspacePaneToolbarProps>({
     const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
     return () => (
-      <WorkspaceToolbar draggable={!compact.value} trafficLightOffset={props.trafficLightOffset ?? false}>
-        <WorkspaceToolbarLeadingSpacer reserve={props.trafficLightOffset ?? false} />
+      <WorkspaceToolbar expanded={!compact.value} navigationOffset={props.navigationOffset ?? false}>
+        <WorkspaceToolbarLeadingSpacer reserve={props.navigationOffset ?? false} />
         <WorkspaceToolbarContent>
           <WorkspaceToolbarPrimary>
             <WorkspacePaneCompactBackButton onBackToNavigator={props.onBackToNavigator} />

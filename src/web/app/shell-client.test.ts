@@ -17,33 +17,14 @@ function installWindow(openReturn: unknown = {}) {
 }
 
 function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
-  const nativeHost = overrides.host?.() ?? null
   return {
-    kind: () => 'web',
-    hasCapability: (capability) => {
-      if (capability === 'global-shortcut') return typeof overrides.invokeIpc === 'function'
-      if (capability === 'open-settings-window') return nativeHost?.openSettingsWindow !== undefined
-      if (capability === 'open-external-url') return nativeHost?.openExternalUrl !== undefined
-      if (capability === 'open-directory-dialog') return nativeHost?.openDirectoryDialog !== undefined
-      if (capability === 'consume-external-open-paths') return nativeHost?.consumeExternalOpenPaths !== undefined
-      return false
-    },
     getBootstrap: () => ({
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     }),
-    invokeIpc: vi.fn(),
-    abortIpc: vi.fn(async () => false),
-    onEffectIntent: () => () => {},
-    pathForFile: () => '',
+
     saveClipboardFiles: () => Promise.resolve([]),
-    getAccessTokenProjection: async () => {
-      throw new Error('unused token projection')
-    },
-    rotateAccessToken: async () => {
-      throw new Error('unused token rotation')
-    },
-    host: () => null,
+
     appRealtime: () => ({
       kickReconnect: () => {},
       onRecovered: () => () => {},
@@ -68,26 +49,6 @@ describe('app shell client', () => {
     installWindow()
   })
 
-  test('opens app settings through the client bridge host', async () => {
-    const bridgeModule = await import('#/web/bridge/client.ts')
-    const openSettingsWindow = vi.fn(async () => true)
-    bridgeModule.setClientBridgeForTests(
-      testBridge({
-        kind: () => 'electron',
-        host: () => ({
-          openSettingsWindow,
-          openExternalUrl: vi.fn(),
-          openDirectoryDialog: vi.fn(),
-          consumeExternalOpenPaths: vi.fn(),
-        }),
-      }),
-    )
-
-    const { openAppSettings } = await import('#/web/app/shell-client.ts')
-    await expect(openAppSettings('about')).resolves.toBe(true)
-    expect(openSettingsWindow).toHaveBeenCalledWith({ page: 'about' })
-  })
-
   test('opens external URLs in the browser when no native host is available', async () => {
     const { openExternalUrl } = await import('#/web/app/shell-client.ts')
     await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
@@ -103,99 +64,6 @@ describe('app shell client', () => {
     const { openExternalUrl } = await import('#/web/app/shell-client.ts')
     await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
-  })
-
-  test('opens the project GitHub URL through the native host with https-only policy', async () => {
-    const bridgeModule = await import('#/web/bridge/client.ts')
-    const hostOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
-    bridgeModule.setClientBridgeForTests(
-      testBridge({
-        kind: () => 'electron',
-        host: () => ({
-          openSettingsWindow: vi.fn(),
-          openExternalUrl: hostOpenExternalUrl,
-          openDirectoryDialog: vi.fn(),
-          consumeExternalOpenPaths: vi.fn(),
-        }),
-      }),
-    )
-
-    const { openProjectGitHub } = await import('#/web/app/shell-client.ts')
-    await expect(openProjectGitHub()).resolves.toEqual({ ok: true, message: 'https://github.com/nano-props/goblin' })
-    expect(hostOpenExternalUrl).toHaveBeenCalledWith({
-      url: 'https://github.com/nano-props/goblin',
-      allowHttp: false,
-    })
-    expect(window.open).not.toHaveBeenCalled()
-  })
-
-  test('chooses workspace paths through the client bridge host', async () => {
-    const bridgeModule = await import('#/web/bridge/client.ts')
-    const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
-      input?.title === 'Open Workspace' ? '/tmp/repo' : '/tmp',
-    )
-    bridgeModule.setClientBridgeForTests(
-      testBridge({
-        host: () => ({
-          openSettingsWindow: vi.fn(),
-          openExternalUrl: vi.fn(),
-          openDirectoryDialog,
-          consumeExternalOpenPaths: vi.fn(),
-        }),
-      }),
-    )
-
-    const { chooseCloneParentPath, chooseLocalWorkspacePath, hasNativeDirectoryPicker } =
-      await import('#/web/app/shell-client.ts')
-    expect(hasNativeDirectoryPicker()).toBe(true)
-    await expect(chooseLocalWorkspacePath()).resolves.toBe('/tmp/repo')
-    await expect(chooseCloneParentPath()).resolves.toBe('/tmp')
-  })
-
-  test('stops waiting for a native directory selection when its caller is cancelled', async () => {
-    const selection = Promise.withResolvers<string | null>()
-    const bridgeModule = await import('#/web/bridge/client.ts')
-    bridgeModule.setClientBridgeForTests(
-      testBridge({
-        host: () => ({
-          openSettingsWindow: vi.fn(),
-          openExternalUrl: vi.fn(),
-          openDirectoryDialog: vi.fn(() => selection.promise),
-          consumeExternalOpenPaths: vi.fn(),
-        }),
-      }),
-    )
-    const { chooseCloneParentPath } = await import('#/web/app/shell-client.ts')
-    const abortController = new AbortController()
-
-    const choosing = chooseCloneParentPath({ signal: abortController.signal })
-    abortController.abort()
-
-    await expect(choosing).rejects.toMatchObject({ name: 'AbortError' })
-    selection.resolve('/tmp/ignored-selection')
-  })
-
-  test('does not open a native directory picker for an already cancelled caller', async () => {
-    const openDirectoryDialog = vi.fn(async () => '/tmp/unowned-selection')
-    const bridgeModule = await import('#/web/bridge/client.ts')
-    bridgeModule.setClientBridgeForTests(
-      testBridge({
-        host: () => ({
-          openSettingsWindow: vi.fn(),
-          openExternalUrl: vi.fn(),
-          openDirectoryDialog,
-          consumeExternalOpenPaths: vi.fn(),
-        }),
-      }),
-    )
-    const { chooseLocalWorkspacePath } = await import('#/web/app/shell-client.ts')
-    const abortController = new AbortController()
-    abortController.abort()
-
-    await expect(chooseLocalWorkspacePath({ signal: abortController.signal })).rejects.toMatchObject({
-      name: 'AbortError',
-    })
-    expect(openDirectoryDialog).not.toHaveBeenCalled()
   })
 
   test('saveClipboardFiles forwards paths from the bridge', async () => {

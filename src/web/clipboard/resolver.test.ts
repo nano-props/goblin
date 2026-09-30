@@ -29,39 +29,6 @@ describe('resolvePastedFiles', () => {
     expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
   })
 
-  test('uses path-attempt results without calling the backend when every file has a path', async () => {
-    mocks.pathForDroppedFile.mockImplementation((f) => `/abs/${f.name}`)
-    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
-    const a = new File([new Uint8Array([1])], 'a.png')
-    const b = new File([new Uint8Array([2])], 'b.png')
-    await expect(resolvePastedFiles([a, b])).resolves.toEqual({
-      paths: ['/abs/a.png', '/abs/b.png'],
-    })
-    expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
-  })
-
-  test('does not apply upload limits to a large file with a native path', async () => {
-    mocks.pathForDroppedFile.mockReturnValue('/abs/archive.bin')
-    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
-    const file = new File([new Uint8Array([1])], 'archive.bin')
-    Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
-    await expect(resolvePastedFiles([file])).resolves.toEqual({
-      paths: ['/abs/archive.bin'],
-    })
-    expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
-  })
-
-  test('falls back to blob save when path-attempt result contains terminal control characters', async () => {
-    mocks.pathForDroppedFile.mockReturnValue('/abs/bad\nname.png')
-    mocks.saveClipboardFiles.mockResolvedValue(['/tmp/bad.png'])
-    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
-    const file = new File([new Uint8Array([1])], 'bad.png')
-    await expect(resolvePastedFiles([file])).resolves.toEqual({
-      paths: ['/tmp/bad.png'],
-    })
-    expect(mocks.saveClipboardFiles).toHaveBeenCalledWith([file])
-  })
-
   test('falls through to blob save for files with no resolvable path', async () => {
     mocks.pathForDroppedFile.mockReturnValue('')
     mocks.saveClipboardFiles.mockResolvedValue(['/tmp/x.bin'])
@@ -119,19 +86,6 @@ describe('resolvePastedFiles', () => {
       paths: ['/tmp/first.bin', '/tmp/second.bin'],
     })
     expect(mocks.saveClipboardFiles).toHaveBeenCalledWith([first, second])
-  })
-
-  test('preserves input order across backend and path-attempt results', async () => {
-    mocks.pathForDroppedFile.mockImplementation((f) => (f.name === 'b' ? '/abs/b' : ''))
-    mocks.saveClipboardFiles.mockResolvedValue(['/tmp/a', '/tmp/c'])
-    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
-    const a = new File([new Uint8Array([1])], 'a')
-    const b = new File([new Uint8Array([1])], 'b')
-    const c = new File([new Uint8Array([1])], 'c')
-    await expect(resolvePastedFiles([a, b, c])).resolves.toEqual({
-      paths: ['/tmp/a', '/abs/b', '/tmp/c'],
-    })
-    expect(mocks.saveClipboardFiles).toHaveBeenCalledWith([a, c])
   })
 
   test('rejects when the backend returns fewer paths than requested', async () => {

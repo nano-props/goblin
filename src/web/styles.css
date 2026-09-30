@@ -64,58 +64,6 @@ html {
   --goblin-workspace-navigation-controls-reserved-width: 7rem;
 }
 
-html[data-host='electron']:not([data-chrome='overlay']) {
-  --goblin-title-bar-chrome-left: 92px;
-}
-
-html[data-host='electron'][data-chrome='overlay'] {
-  --goblin-title-bar-chrome-left: max(16px, env(titlebar-area-x, 16px));
-  --goblin-title-bar-chrome-right: max(
-    16px,
-    calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 150px)))
-  );
-}
-
-/* Window-chrome drag region — leaves room for macOS traffic lights on the left.
- * Use this on empty chrome surfaces and structural chrome overlays. Controls
- * opt out through the interactive/no-drag chrome regions; marking a layout host
- * as interactive removes that whole rectangle from native dragging. */
-.title-bar-chrome {
-  -webkit-app-region: drag;
-  padding-left: var(--goblin-title-bar-chrome-left);
-  padding-right: var(--goblin-title-bar-chrome-right);
-}
-
-button,
-[data-title-bar-chrome-region='interactive'],
-[data-interactive],
-[data-title-bar-chrome-region='no-drag'] {
-  -webkit-app-region: no-drag;
-}
-
-.app-drag-region {
-  -webkit-app-region: drag;
-}
-
-/* Native app-region does not reliably clip descendant no-drag rectangles to
- * scroll viewports. Keep scrollable title-bar controls interactive by carving
- * out only the visible scroll root, then neutralize descendant controls so
- * offscreen tabs cannot suppress dragging in neighboring title-bar panes. */
-.title-bar-scroll-region {
-  -webkit-app-region: no-drag;
-}
-
-.title-bar-scroll-region button,
-.title-bar-scroll-region [data-interactive],
-.title-bar-scroll-region [data-title-bar-chrome-region='interactive'],
-.title-bar-scroll-region [data-title-bar-chrome-region='no-drag'] {
-  -webkit-app-region: initial;
-}
-
-/* Zen-mode overlay is only a layout/hit-test surface for the navigation
- * controls. Blank-space dragging is owned by the workspace toolbar or the
- * revealed sidebar's dedicated drag plate; the child trigger opts out through
- * an interactive chrome region. */
 .goblin-zen-reveal-trigger-layer {
   width: calc(var(--goblin-title-bar-chrome-left) + var(--goblin-workspace-navigation-controls-width));
   padding-left: var(--goblin-title-bar-chrome-left);
@@ -233,7 +181,7 @@ button,
 
 .goblin-workspace-toolbar {
   --goblin-workspace-toolbar-edge-inset: 0.375rem;
-  --goblin-workspace-toolbar-edge-inset-non-draggable: 0.5rem;
+  --goblin-workspace-toolbar-edge-inset-compact: 0.5rem;
   --goblin-workspace-toolbar-section-gap: 0.375rem;
   --goblin-workspace-toolbar-control-gap: 0.25rem;
   padding-left: var(--goblin-workspace-toolbar-edge-inset);
@@ -245,9 +193,9 @@ button,
       var(--goblin-workspace-pane-transition-easing, cubic-bezier(0.2, 0, 0, 1));
 }
 
-.goblin-workspace-toolbar--non-draggable {
-  padding-left: var(--goblin-workspace-toolbar-edge-inset-non-draggable);
-  padding-right: var(--goblin-workspace-toolbar-edge-inset-non-draggable);
+.goblin-workspace-toolbar--compact {
+  padding-left: var(--goblin-workspace-toolbar-edge-inset-compact);
+  padding-right: var(--goblin-workspace-toolbar-edge-inset-compact);
 }
 
 .goblin-workspace-toolbar__content {
@@ -288,12 +236,8 @@ button,
   width: var(--goblin-workspace-navigation-controls-reserved-width);
 }
 
-/* Traffic-light offset for the workspace toolbar. Applied when zen-mode
-   collapses the sidebar and the workspace pane becomes the first visible
-   pane under the macOS traffic-light buttons. Only left padding is
-   adjusted; right padding stays at the toolbar's standard padding so
-   trailing actions (e.g. open-external button group) don't shift. */
-.goblin-workspace-toolbar--traffic-offset {
+/* Leave space for the sidebar navigation controls when the sidebar is collapsed. */
+.goblin-workspace-toolbar--navigation-offset {
   padding-left: var(--goblin-title-bar-chrome-left);
 }
 

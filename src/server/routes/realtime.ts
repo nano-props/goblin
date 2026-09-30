@@ -37,7 +37,7 @@ const realtimeRoutesLogger = serverNodeLog.child({ module: 'realtime-routes' })
 // in a JSON envelope, and fans it out to subscribed clients. The server
 // forwards only that narrow protocol. Interpretation
 // happens in the client's existing `useClientEffectIntentRouter`,
-// which already handles the same intents coming from Electron IPC.
+// which owns browser client intent dispatch.
 export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeRouteOptions) {
   const warnedSubscriberLimits = new Set<RealtimeSubscriberChannel>()
 
@@ -51,7 +51,7 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
   // the access token, and SameSite=Lax blocks normal cross-site cookie use;
   // the residual same-site risk is accepted for loopback/trusted-LAN use.
   // The shared middleware accepts cookie, header, or `?t=` query, so
-  // browser clients (cookie), embedded Electron clients (`?t=`),
+  // browser clients (cookie), explicit token handoffs (`?t=`),
   // and LAN CLI clients (any of the three) all work. The middleware
   // stashes an `userId` derived from the access token on the
   // Hono context; the WS upgrade reads it and threads it into the
@@ -110,7 +110,7 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
   // Client-side subscribers opt in to receive client effect intents
   // forwarded by the server. The client opens this socket once at boot
   // and feeds incoming payloads into its existing intent router — the
-  // same path Electron IPC intents travel through. No server-side
+  // shared client intent path. No server-side
   // message handling beyond register/unregister; the server never
   // receives anything from this socket beyond the upgrade.
   app.get(

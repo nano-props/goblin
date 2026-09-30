@@ -9,7 +9,7 @@ import {
   flushFontRefit,
   flushTerminalStart,
   flushUntil,
-  hostOpenExternalUrl,
+  openBrowserUrl,
   hydrateManagedSession,
   mockFonts,
   optionArrow,
@@ -862,8 +862,8 @@ describe('TerminalSession attachment and presentation', () => {
 
     expect(event.defaultPrevented).toBe(true)
     expect(term.options.linkHandler!.allowNonHttpProtocols).toBe(false)
-    expect(hostOpenExternalUrl).toHaveBeenNthCalledWith(1, { url: 'https://example.com/path', allowHttp: true })
-    expect(hostOpenExternalUrl).toHaveBeenNthCalledWith(2, { url: 'https://example.com/osc8', allowHttp: true })
+    expect(openBrowserUrl).toHaveBeenNthCalledWith(1, 'https://example.com/path', '_blank', 'noopener,noreferrer')
+    expect(openBrowserUrl).toHaveBeenNthCalledWith(2, 'https://example.com/osc8', '_blank', 'noopener,noreferrer')
   })
 
   test('does not send unsafe web links to the app ipc', async () => {
@@ -873,7 +873,7 @@ describe('TerminalSession attachment and presentation', () => {
     xtermMocks.webLinkAddons[0]!.open('https://example.com/\u0000bad')
     await Promise.resolve()
 
-    expect(hostOpenExternalUrl).not.toHaveBeenCalled()
+    expect(openBrowserUrl).not.toHaveBeenCalled()
   })
 
   test('keeps the terminal usable when every optional addon fails', async () => {

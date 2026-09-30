@@ -91,7 +91,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('a failed first attach keeps the prepared session addressable for retry', async () => {
-    const { spawn } = await import('node-pty')
+    const { spawnTerminalPtyRuntime: spawn } = await import('#/server/terminal/terminal-pty-runtime.ts')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty spawn failed')
     })
@@ -160,7 +160,7 @@ describe('server terminal runtime operations', () => {
   test('a failed restart keeps the session visible as error state', async () => {
     const { host, shutdown, socket, terminalRuntimeSessionId } = await startControlledTerminalRuntime()
 
-    const { spawn } = await import('node-pty')
+    const { spawnTerminalPtyRuntime: spawn } = await import('#/server/terminal/terminal-pty-runtime.ts')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty restart failed')
     })
@@ -238,7 +238,7 @@ describe('server terminal runtime operations', () => {
     // Stored controller intent still points at `client_a`, and `client_a`
     // is the effective controller; a subsequent restart from that client
     // must pass the authority check (here it fails later at spawn).
-    const { spawn } = await import('node-pty')
+    const { spawnTerminalPtyRuntime: spawn } = await import('#/server/terminal/terminal-pty-runtime.ts')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty restart failed')
     })

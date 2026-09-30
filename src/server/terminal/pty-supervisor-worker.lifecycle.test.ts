@@ -229,7 +229,7 @@ describe('WorkerBackedPtySupervisor events and worker lifecycle', () => {
     const workerB = new FakeWorker()
     const workers = [workerA, workerB]
     const supervisor = new WorkerBackedPtySupervisor({
-      workerEntry: '/tmp/pty-worker.js',
+      workerCommand: ['bun', '/tmp/pty-worker.js'],
       spawnWorker: () => workers.shift() as never,
     })
 

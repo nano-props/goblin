@@ -3,12 +3,7 @@
 // the resolved browser theme locally. When `pref === 'auto'`, the
 // client also listens for `(prefers-color-scheme: dark)` changes so
 // OS appearance flips propagate without a server round-trip —
-// Chromium's matchMedia tracks `nativeTheme` in Electron, so this
-// covers both the desktop and plain-browser runtimes. Electron main
-// still projects the server-owned preference into native host state,
-// but it is not the business source of truth.
-// Theme hydration can read the transport snapshot directly; theme writes go
-// through `#/web/settings/actions.ts`.
+// Browser matchMedia supplies the operating-system color preference.
 
 import { createStore } from 'zustand/vanilla'
 import type { StoreApi } from 'zustand/vanilla'
@@ -57,7 +52,7 @@ function colorThemeFromHtmlAttr(): ColorTheme {
 
 function resolveOsTheme(): ResolvedTheme | null {
   // matchMedia is the only signal the client has for the OS
-  // appearance — in Electron it tracks `nativeTheme` because the
+  // appearance through the browser media query.
   // client shares Chromium's media-query implementation with the
   // host process; in a plain browser it tracks the OS via the
   // browser's own plumbing. Either way the listener below covers
@@ -93,7 +88,7 @@ function installMediaQueryListener(set: ThemeSet, get: ThemeGet): void {
   const mql = window.matchMedia(PREFERS_DARK_MEDIA_QUERY)
   if (!mql || typeof mql.addEventListener !== 'function') return
   // `addListener` / `removeListener` were deprecated in favor of
-  // `addEventListener` on MediaQueryList a decade ago. Electron's
+  // `addEventListener` on MediaQueryList a decade ago. The supported browsers'
   // bundled Chromium and every browser this app ships to support
   // the modern API, so the legacy fallback isn't worth carrying.
   const handleOsThemeChange = () => syncOsThemeIntoStore(set, get)

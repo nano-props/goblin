@@ -1,50 +1,23 @@
-export type ClientRuntimeKind = 'electron' | 'web'
-export type ClientNativeCapability =
-  | 'global-shortcut'
-  | 'open-settings-window'
-  | 'open-external-url'
-  | 'open-directory-dialog'
-  | 'consume-external-open-paths'
-  | 'terminal-notifications'
-  | 'terminal-badge'
-
 export const CLIENT_BRIDGE_VERSION = 1
-export const ELECTRON_CLIENT_CAPABILITIES = [
-  'global-shortcut',
-  'open-settings-window',
-  'open-external-url',
-  'open-directory-dialog',
-  'consume-external-open-paths',
-  'terminal-notifications',
-  'terminal-badge',
-] as const satisfies readonly ClientNativeCapability[]
-export const WEB_CLIENT_CAPABILITIES = [] as const satisfies readonly ClientNativeCapability[]
+export const WEB_CLIENT_CAPABILITIES = [] as const
 
 export interface InitialServerSnapshot {
   url: string
-  /**
-   * Optional pre-rotation access token. The cookie path doesn't
-   * need this — the embedded Electron main plants an http-only
-   * cookie on the client's `webContents.session` before the
-   * URL loads, and the web path exchanges the user-pasted token
-   * for a cookie via `POST /api/login`. The field is kept on
-   * the shape for `readQueryBootstrap` (QR-code login) which
-   * can drop a token into the bootstrap before the first paint.
-   */
+  /** Optional token from a QR/login handoff; ordinary sessions use an HttpOnly auth cookie. */
   accessToken?: string
 }
 
 export interface ClientRuntimeSnapshot {
-  kind: ClientRuntimeKind
+  kind: 'web'
   bridgeVersion: number
-  capabilities: readonly ClientNativeCapability[]
+  capabilities: readonly never[]
 }
 
 /**
  * Snapshot the client reads at module init. The server no longer
  * inlines these into HTML — the bootstrap is now a tiny payload
  * carrying only the runtime kind, the bridge protocol version, the
- * native capability set, and the optional QR-code server handoff.
+ * empty browser capability list, and the optional QR-code server handoff.
  * Everything else (i18n, settings, host info) lives behind dedicated
  * server procedures. The client hydrates i18n before mounting
  * the normal Vue tree, then the app bootstrap composables hydrate the

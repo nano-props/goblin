@@ -16,7 +16,6 @@
 //   ~25 lines once they pick the path + parser and forward to this
 // factory.
 
-import { isAppQuitting, subscribeAppQuitting } from '#/web/app/lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import { resolveClientServerConfig } from '#/web/lib/server-config.ts'
@@ -54,7 +53,7 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
       return new WebSocket(connection.url)
     },
     shouldOpen() {
-      return typeof WebSocket !== 'undefined' && subscriptions.size > 0 && !isAppQuitting()
+      return typeof WebSocket !== 'undefined' && subscriptions.size > 0
     },
     shouldKeepOpen() {
       return subscriptions.size > 0
@@ -94,7 +93,7 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
   }
 
   function scheduleReconnect(): void {
-    if (reconnectTimer !== null || subscriptions.size === 0 || isAppQuitting()) return
+    if (reconnectTimer !== null || subscriptions.size === 0) return
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
       ensureSocket()
@@ -111,13 +110,6 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
     clearReconnectTimer()
     socketLifecycle.requestIdleClose()
   }
-
-  function closeSocketForQuit(): void {
-    clearReconnectTimer()
-    socketLifecycle.closeAndForget()
-  }
-
-  subscribeAppQuitting(closeSocketForQuit)
 
   return {
     subscribe(listener, onOpen) {
