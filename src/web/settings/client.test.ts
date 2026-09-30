@@ -1,3 +1,4 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot, defaultUserSettings } from '#/shared/settings-defaults.ts'
@@ -13,18 +14,15 @@ function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientB
 }
 
 function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      __GOBLIN_BOOTSTRAP__: bootstrap,
-      location: {
-        href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
-        origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
-        protocol: 'http:',
-        search: '',
-      },
-      matchMedia: vi.fn(() => ({ matches: true })),
+  stubBrowserGlobal('window', {
+    __GOBLIN_BOOTSTRAP__: bootstrap,
+    location: {
+      href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
+      origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
+      protocol: 'http:',
+      search: '',
     },
+    matchMedia: vi.fn(() => ({ matches: true })),
   })
 }
 
@@ -165,20 +163,17 @@ describe('settings-client', () => {
   })
 
   test('returns the authoritative i18n snapshot after updating language', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: webBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: webBootstrap({
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+      }),
 
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        matchMedia: vi.fn(() => ({ matches: true })),
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        search: '',
       },
+      matchMedia: vi.fn(() => ({ matches: true })),
     })
     const fetchMock = mockFetch().mockResolvedValueOnce({
       ok: true,
@@ -209,20 +204,17 @@ describe('settings-client', () => {
   })
 
   test('returns server recent workspaces after adding a workspace', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: webBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: webBootstrap({
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+      }),
 
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        matchMedia: vi.fn(() => ({ matches: true })),
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        search: '',
       },
+      matchMedia: vi.fn(() => ({ matches: true })),
     })
     const fetchMock = mockFetch(async () => ({
       ok: true,
@@ -248,20 +240,17 @@ describe('settings-client', () => {
   })
 
   test('clears recent workspaces through the server', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: webBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: webBootstrap({
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+      }),
 
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        matchMedia: vi.fn(() => ({ matches: true })),
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        search: '',
       },
+      matchMedia: vi.fn(() => ({ matches: true })),
     })
     const fetchMock = mockFetch(async () => ({
       ok: true,
@@ -279,20 +268,17 @@ describe('settings-client', () => {
   })
 
   test('preserves the authoritative recent workspaces when the server rejects the candidate', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: webBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: webBootstrap({
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+      }),
 
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        matchMedia: vi.fn(() => ({ matches: true })),
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        search: '',
       },
+      matchMedia: vi.fn(() => ({ matches: true })),
     })
     mockFetch(async () => ({
       ok: true,

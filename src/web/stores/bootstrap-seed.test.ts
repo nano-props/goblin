@@ -1,3 +1,4 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
@@ -5,13 +6,10 @@ import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 function installBridge() {
   // Settings and i18n are hydrated from the server, not the bootstrap.
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      __GOBLIN_BOOTSTRAP__: {
-        initialServer: null,
-      } satisfies ClientBootstrapSnapshot,
-    },
+  stubBrowserGlobal('window', {
+    __GOBLIN_BOOTSTRAP__: {
+      initialServer: null,
+    } satisfies ClientBootstrapSnapshot,
   })
 }
 

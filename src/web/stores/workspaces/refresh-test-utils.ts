@@ -13,14 +13,13 @@ import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factor
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
 export const serverHandlers: Record<string, ServerTestHandler> = {}
 export const refreshStoreAccess = { get: workspacesStore.getState, set: workspacesStore.setState }
 
-type TestRepo = NonNullable<ReturnType<typeof workspacesStore.getState>['workspaces'][string]>
-
-export function updateRepoForTest(mutator: (repo: TestRepo) => void): void {
+export function updateRepoForTest(mutator: (repo: WorkspaceState) => void): void {
   workspacesStore.setState((state) => {
     const repo = state.workspaces[REPO_ID]
     if (!repo) return state

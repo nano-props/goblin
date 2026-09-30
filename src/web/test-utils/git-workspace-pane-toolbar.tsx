@@ -307,20 +307,7 @@ export function renderToolbar(options: {
    * without an HTTP round trip. Defaults to an empty array.
    */
   seedWorkspaceSettings?: WorkspaceSettingsEntry[]
-}): {
-  container: HTMLElement
-  terminalTab: HTMLButtonElement
-  rerender: ReturnType<typeof renderInJsdom>['rerender']
-  rerenderWorktreePath: (worktreePath: string) => void
-  queryClient: QueryClient
-  mocks: {
-    createTerminal: ReturnType<typeof vi.fn>
-    selectTerminal: ReturnType<typeof vi.fn>
-    scrollToBottom: ReturnType<typeof vi.fn>
-    closeTerminalByDescriptor: ReturnType<typeof vi.fn>
-    showRepoBranchWorkspacePaneTab: ReturnType<typeof vi.fn>
-  }
-} {
+}) {
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
   const branch = createBranchSnapshot(branchName)
   const repo = seedRepoWithReadModelForTest({
@@ -639,7 +626,7 @@ export function terminalEntry(id: string): WorkspacePaneTabEntry {
 export function installRecentAppFetch(
   initialSnapshot: object,
   options: { failPost?: boolean; beforePostResponse?: Promise<void> } = {},
-): ReturnType<typeof vi.fn> {
+) {
   let currentSnapshot = initialSnapshot
   return mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url

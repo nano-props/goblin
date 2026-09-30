@@ -6,10 +6,10 @@ import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('CopyButton', () => {
-  let writeText: ReturnType<typeof vi.fn>
+  const writeText = vi.fn(async (_value: string) => {})
 
   beforeEach(() => {
-    writeText = vi.fn()
+    writeText.mockReset().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },

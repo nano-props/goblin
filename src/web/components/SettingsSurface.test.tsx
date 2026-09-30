@@ -177,8 +177,8 @@ describe('SettingsSurface', () => {
   })
 
   test('reflects notification preference from the settings query', async () => {
-    fetchMock.mockImplementation(async (input: string | URL, init?: RequestInit) => {
-      const url = new URL(typeof input === 'string' ? input : input.toString())
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input)
       const rawBody = typeof init?.body === 'string' && init.body.length > 0 ? init.body : ''
       const body = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {}
       let result: unknown = null
@@ -232,8 +232,8 @@ describe('SettingsSurface', () => {
   })
 
   test('shows unavailable GitHub CLI status when gh is missing', async () => {
-    fetchMock.mockImplementation(async (input: string | URL, init?: RequestInit) => {
-      const url = new URL(typeof input === 'string' ? input : input.toString())
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input)
       let result: unknown = null
       if (url.pathname === '/api/settings/github-cli/refresh') {
         result = { available: false, version: null, detectedAt: 0, hosts: {} }

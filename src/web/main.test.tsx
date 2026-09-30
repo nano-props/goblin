@@ -5,10 +5,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitFor } from '@testing-library/vue'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 
-let hydrateI18n: ReturnType<typeof vi.fn>
-let hydrateHostInfo: ReturnType<typeof vi.fn>
-let appMount: ReturnType<typeof vi.fn>
-let appUnmount: ReturnType<typeof vi.fn>
+// Developer tooling is outside the entrypoint's bootstrap and recovery contract.
+vi.mock('@tanstack/vue-query-devtools', () => ({ VueQueryDevtools: () => null }))
+
+const hydrateI18n = vi.fn(async (_options?: { subscribe?: boolean; signal?: AbortSignal }) => {})
+const hydrateHostInfo = vi.fn(async (_options?: { signal?: AbortSignal }) => {})
+const appMount = vi.fn<() => void>()
+const appUnmount = vi.fn<() => void>()
 let showBootstrapLoading: (() => void) | null
 let hideBootstrapLoading: (() => void) | null
 let routerRenderError: Error | null
@@ -19,10 +22,10 @@ beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
   document.body.innerHTML = '<div id="root"></div>'
-  hydrateI18n = vi.fn().mockResolvedValue(undefined)
-  hydrateHostInfo = vi.fn().mockResolvedValue(undefined)
-  appMount = vi.fn()
-  appUnmount = vi.fn()
+  hydrateI18n.mockReset().mockResolvedValue(undefined)
+  hydrateHostInfo.mockReset().mockResolvedValue(undefined)
+  appMount.mockReset()
+  appUnmount.mockReset()
   showBootstrapLoading = null
   hideBootstrapLoading = null
   routerRenderError = null
@@ -213,7 +216,9 @@ describe('client entrypoint', () => {
 
   test('aborts hydration and shows retry after the boot timeout', async () => {
     useFakeTimers()
-    hydrateI18n.mockImplementation(({ signal }: { signal: AbortSignal }) => {
+    hydrateI18n.mockImplementation((options) => {
+      const signal = options?.signal
+      if (!signal) throw new Error('bootstrap hydration requires an abort signal')
       return new Promise<void>((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(signal.reason), { once: true })
       })
@@ -222,11 +227,11 @@ describe('client entrypoint', () => {
     await loadMain()
 
     expect(document.body.textContent).toContain('Loading')
-    expect(hydrateI18n.mock.calls[0]?.[0].signal.aborted).toBe(false)
+    expect(hydrateI18n.mock.calls[0]?.[0]?.signal?.aborted).toBe(false)
 
     await vi.advanceTimersByTimeAsync(15_000)
 
-    expect(hydrateI18n.mock.calls[0]?.[0].signal.aborted).toBe(true)
+    expect(hydrateI18n.mock.calls[0]?.[0]?.signal?.aborted).toBe(true)
     expect(document.body.textContent).toContain('Unable to load application resources.')
     expect(document.body.textContent).not.toContain('app mounted')
   })

@@ -1,17 +1,15 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBridge } from '#/web/bridge/types.ts'
 
 function installWindow(openReturn: unknown = {}) {
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      location: {
-        href: 'http://127.0.0.1:32100/',
-        origin: 'http://127.0.0.1:32100',
-        search: '',
-      },
-      open: vi.fn(() => openReturn),
+  stubBrowserGlobal('window', {
+    location: {
+      href: 'http://127.0.0.1:32100/',
+      origin: 'http://127.0.0.1:32100',
+      search: '',
     },
+    open: vi.fn(() => openReturn),
   })
 }
 

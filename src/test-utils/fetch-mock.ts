@@ -26,8 +26,6 @@
 // can be simplified to `const fetchMock = mockFetch()`.
 import { vi } from 'vitest'
 
-type FetchMock = ReturnType<typeof vi.fn>
-
 /**
  * Install a `vi.fn()` as the global `fetch` and return it. Tests configure
  * responses via the standard vi.fn API (`fetchMock.mockResolvedValueOnce(...)`).
@@ -36,8 +34,8 @@ type FetchMock = ReturnType<typeof vi.fn>
  * `unknown` for the common test shorthand of returning a plain `{ ok, json }`
  * object.
  */
-export function mockFetch(impl?: (...args: Parameters<typeof fetch>) => Response | unknown): FetchMock {
-  const fetchMock = vi.fn(impl as (...args: unknown[]) => unknown)
-  vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
+export function mockFetch(impl?: (...args: Parameters<typeof fetch>) => unknown) {
+  const fetchMock = vi.fn(impl)
+  vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }

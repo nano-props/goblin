@@ -1,3 +1,4 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
@@ -21,18 +22,15 @@ function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientB
 }
 
 function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      __GOBLIN_BOOTSTRAP__: bootstrap,
-      location: {
-        href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
-        origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
-        protocol: 'http:',
-        search: '',
-      },
-      matchMedia: vi.fn(() => ({ matches: true })),
+  stubBrowserGlobal('window', {
+    __GOBLIN_BOOTSTRAP__: bootstrap,
+    location: {
+      href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
+      origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
+      protocol: 'http:',
+      search: '',
     },
+    matchMedia: vi.fn(() => ({ matches: true })),
   })
 }
 
@@ -484,20 +482,17 @@ describe('repo-client', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-finder' }) }),
     )
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: webBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        }),
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: webBootstrap({
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+      }),
 
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        matchMedia: vi.fn(() => ({ matches: true })),
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        search: '',
       },
+      matchMedia: vi.fn(() => ({ matches: true })),
     })
     const { openWorkspaceEditor, openWorkspaceInFinder, openWorkspaceTerminal } =
       await import('#/web/external-apps/workspace-client.ts')

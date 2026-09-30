@@ -20,7 +20,8 @@ import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import type { RepoBranchAction } from '#/web/stores/workspaces/branch-action-types.ts'
-import type { BranchViewMode } from '#/shared/api-types.ts'
+import type { BranchViewMode, RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import type { GitRemoteInfo } from '#/shared/git-types.ts'
@@ -45,7 +46,7 @@ function testRemote(name: string): GitRemoteInfo {
   }
 }
 
-function updateSnapshotForTest(mutator: (snapshot: NonNullable<ReturnType<typeof getRepoSnapshotQueryData>>) => void) {
+function updateSnapshotForTest(mutator: (snapshot: RepoSnapshot) => void) {
   const repo = workspacesStore.getState().workspaces[REPO_ID]
   if (!repo) throw new Error('missing test repository')
   const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
@@ -85,9 +86,7 @@ function repoCurrentBranch(): string | null {
   return repo ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current ?? null) : null
 }
 
-function repoGitPresentationForTest(
-  repo: NonNullable<ReturnType<typeof workspacesStore.getState>['workspaces'][string]>,
-) {
+function repoGitPresentationForTest(repo: WorkspaceState) {
   const git = requireGitWorkspaceForTest(repo).capability.git
   return {
     ...repoPresentationFromQueryForTest(repo),

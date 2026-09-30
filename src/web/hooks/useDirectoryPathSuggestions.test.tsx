@@ -13,15 +13,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
+import { seedHostInfoForTest } from '#/web/test-utils/host-info.ts'
 
 vi.mock('#/web/workspaces/remote-client.ts', () => ({
   getRemotePathSuggestions: vi.fn(),
 }))
 vi.mock('#/web/workspaces/client.ts', () => ({
   getLocalDirectoryPathSuggestions: vi.fn(),
-}))
-vi.mock('#/web/stores/host-info.ts', () => ({
-  getPlatform: () => 'linux',
 }))
 
 import { getRemotePathSuggestions } from '#/web/workspaces/remote-client.ts'
@@ -31,6 +29,7 @@ const mockedFetch = vi.mocked(getRemotePathSuggestions)
 const mockedLocalFetch = vi.mocked(getLocalDirectoryPathSuggestions)
 
 beforeEach(() => {
+  seedHostInfoForTest({ homeDir: '/home/test', platform: 'linux', hostname: 'test-host', pid: 1 })
   // Default no-op so the debounced fetch in the hook settles without
   // hitting the network. Per-test mocks override this.
   mockedFetch.mockResolvedValue([])

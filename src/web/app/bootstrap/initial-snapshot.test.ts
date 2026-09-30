@@ -1,3 +1,4 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
@@ -11,8 +12,8 @@ function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientB
 
 describe('client bootstrap', () => {
   beforeEach(() => {
-    Reflect.deleteProperty(globalThis, 'window')
-    Reflect.deleteProperty(globalThis, 'document')
+    stubBrowserGlobal('window', undefined)
+    stubBrowserGlobal('document', undefined)
     setClientBridgeForTests(null)
     vi.resetModules()
   })
@@ -21,15 +22,12 @@ describe('client bootstrap', () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        // The bootstrap is now the single source of truth for the
-        // initial server handoff. Host info (homeDir, platform) and i18n live
-        // on dedicated `/api/*` endpoints fetched by
-        // the client bootstrap hooks, not in the bootstrap.
-        __GOBLIN_BOOTSTRAP__: bootstrap,
-      },
+    stubBrowserGlobal('window', {
+      // The bootstrap is now the single source of truth for the
+      // initial server handoff. Host info (homeDir, platform) and i18n live
+      // on dedicated `/api/*` endpoints fetched by
+      // the client bootstrap hooks, not in the bootstrap.
+      __GOBLIN_BOOTSTRAP__: bootstrap,
     })
 
     const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
@@ -49,14 +47,11 @@ describe('client bootstrap', () => {
       initialServer: null,
     })
 
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {
-          initialServer: null,
-        },
-        location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: {
+        initialServer: null,
       },
+      location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
     })
 
     expect(getInitialBootstrap()).toEqual({
@@ -117,12 +112,9 @@ describe('client bootstrap', () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: bootstrap,
-        location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
-      },
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: bootstrap,
+      location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
     })
 
     const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
@@ -133,11 +125,8 @@ describe('client bootstrap', () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
-      },
+    stubBrowserGlobal('window', {
+      location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
     })
     Object.defineProperty(globalThis, 'document', {
       configurable: true,
@@ -151,12 +140,9 @@ describe('client bootstrap', () => {
   })
 
   test('rejects a present but invalid injected bootstrap', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {},
-        location: { href: 'http://localhost/', origin: 'http://localhost', search: '' },
-      },
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: {},
+      location: { href: 'http://localhost/', origin: 'http://localhost', search: '' },
     })
 
     const { readInjectedWebBootstrap } = await import('#/web/bridge/bootstrap.ts')
@@ -183,12 +169,9 @@ describe('client bootstrap', () => {
       },
     ],
   ])('rejects %s in an injected bootstrap', async (_label, bootstrap) => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: bootstrap,
-        location: { href: 'http://localhost/', origin: 'http://localhost', protocol: 'http:', search: '' },
-      },
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: bootstrap,
+      location: { href: 'http://localhost/', origin: 'http://localhost', protocol: 'http:', search: '' },
     })
 
     const { readInjectedWebBootstrap } = await import('#/web/bridge/bootstrap.ts')
@@ -196,10 +179,7 @@ describe('client bootstrap', () => {
   })
 
   test('rejects an empty bootstrap script instead of treating it as absent', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: { location: { href: 'http://localhost/', origin: 'http://localhost', search: '' } },
-    })
+    stubBrowserGlobal('window', { location: { href: 'http://localhost/', origin: 'http://localhost', search: '' } })
     Object.defineProperty(globalThis, 'document', {
       configurable: true,
       value: { getElementById: () => ({ textContent: '' }) },
@@ -210,14 +190,11 @@ describe('client bootstrap', () => {
   })
 
   test('rejects an invalid server URL when an access token requests query bootstrap', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        location: {
-          href: 'http://localhost/',
-          origin: 'http://localhost',
-          search: '?accessToken=secret&goblinServerUrl=http://[invalid',
-        },
+    stubBrowserGlobal('window', {
+      location: {
+        href: 'http://localhost/',
+        origin: 'http://localhost',
+        search: '?accessToken=secret&goblinServerUrl=http://[invalid',
       },
     })
 
@@ -231,14 +208,11 @@ describe('client bootstrap', () => {
     // the token as a header. The old `?goblinServerSecret=...`
     // query was the original per-launch-secret leak; the new name
     // matches the field on `InitialServerSnapshot`.
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        location: {
-          href: 'http://127.0.0.1:32100/?accessToken=test-secret',
-          origin: 'http://127.0.0.1:32100',
-          search: '?accessToken=test-secret',
-        },
+    stubBrowserGlobal('window', {
+      location: {
+        href: 'http://127.0.0.1:32100/?accessToken=test-secret',
+        origin: 'http://127.0.0.1:32100',
+        search: '?accessToken=test-secret',
       },
     })
 

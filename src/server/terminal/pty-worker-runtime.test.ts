@@ -3,13 +3,14 @@
 // and the data/exit/process-name-changed emission paths.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { PtyWorkerRuntime } from '#/server/terminal/pty-worker-runtime.ts'
 import type { PtyWorkerMessage, PtyWorkerRequest } from '#/server/terminal/pty-worker-protocol.ts'
 
 interface MockPty {
-  write: ReturnType<typeof vi.fn>
-  resize: ReturnType<typeof vi.fn>
-  kill: ReturnType<typeof vi.fn>
+  write: Mock<(data: string) => void>
+  resize: Mock<(cols: number, rows: number) => void>
+  kill: Mock<() => void>
   emitData: (data: string) => void
   emitExit: () => void
   get process(): string

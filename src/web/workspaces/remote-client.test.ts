@@ -1,3 +1,4 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -8,17 +9,14 @@ describe('remote client web helpers', () => {
     vi.restoreAllMocks()
     vi.resetModules()
     setClientBridgeForTests(null)
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        },
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: {
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+      },
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        search: '',
       },
     })
   })

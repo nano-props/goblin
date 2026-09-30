@@ -119,6 +119,11 @@ named import rather than a separate side-effect import of the same module.
 
 `renderInJsdom(component, options?)` wraps Vue Testing Library's `render` and
 owns automatic cleanup because Vitest globals are disabled.
+Component and composable harnesses establish the entrypoint's successfully
+hydrated host-information precondition before each test. Tests that need a
+different host snapshot can use `seedHostInfoForTest` from
+`src/web/test-utils/host-info.ts`; hydration and transport tests establish
+their own state without importing the render harness for this purpose.
 
 Import each canonical helper module directly: `render.tsx`, `timers.ts`, or
 `microtasks.ts`. Do not add an index re-export layer.
@@ -235,23 +240,29 @@ capabilities needed by the behavior suites.
 
 ## 9. Vitest setup (`vitest.setup.ts`)
 
-The setup file owns these global shims because they cannot be expressed
-as per-test mocks:
+The setup file owns shared platform shims. It must not import application
+stores or initialize application state. It is included in the test TypeScript
+project so its implementations receive the same type checks as tests.
 
-1. Filter Node v25's `--localstorage-file was provided without a valid
-path` warning (process startup, before any test code runs).
-2. Install an in-memory `Storage` shim on `globalThis.localStorage` and
+1. Install an in-memory `Storage` shim on `globalThis.localStorage` and
    `globalThis.sessionStorage` so the Zustand persist middleware always
    finds a valid storage regardless of test environment ordering.
-3. Stub `window.focus` as a no-op in jsdom (real notifications call it;
+2. Stub `window.focus` as a no-op in jsdom (real notifications call it;
    jsdom's virtual console otherwise logs "not implemented").
-4. Stub `HTMLCanvasElement.prototype.getContext` to return `null` in
+3. Stub `HTMLCanvasElement.prototype.getContext` to return `null` in
    jsdom (xterm's `ImageAddon` would otherwise log "Not implemented").
-5. Install a no-op `ResizeObserver` on `window` in jsdom (Reka UI's
+4. Install a no-op `ResizeObserver` on `window` in jsdom (Reka UI's
    Tooltip and HoverCard mount one per `TooltipContent`; jsdom does not
    implement it).
-6. Restore jsdom's real `Window` before every test so narrow host facades
-   cannot leak browser lifecycle methods across tests.
+
+Tests and transport harnesses replace `window` or `document` with
+`stubBrowserGlobal` from `src/web/test-utils/browser-globals.ts`, which restores
+their original descriptors after each test without removing other harnesses'
+fetch or animation mocks. Other `vi.stubGlobal` replacements must be restored
+by their owning test or harness; `restoreMocks` alone does not restore globals.
+Setup does not compensate for untracked replacements of platform bindings.
+Developer tooling outside a test's behavior contract is mocked locally at its
+module boundary rather than adding global platform shims for that tooling.
 
 Tests do not redefine these. If a test needs to bypass a shim (e.g. spy
 on `canvas.getContext`), install the spy inside the test body so it runs

@@ -7,13 +7,15 @@ import type { QueryClient } from '@tanstack/vue-query'
 import { defineComponent, isVNode, nextTick, shallowRef } from 'vue'
 import type { Component, ComponentOptions, ShallowRef, VNode } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach } from 'vitest'
 import {
   consumeAppHistoryPresentationAction,
   createAppHistoryPresentationHistory,
 } from '#/web/app/navigation/history-presentation.ts'
 import { appI18n } from '#/web/stores/i18n-vue.ts'
+import { seedHostInfoForTest } from '#/web/test-utils/host-info.ts'
 
+beforeEach(() => seedHostInfoForTest())
 afterEach(cleanup)
 
 type JsxComponent = Exclude<Component, ComponentOptions>

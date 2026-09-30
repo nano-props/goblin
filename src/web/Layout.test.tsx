@@ -17,17 +17,16 @@ import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstr
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { AccessTokenStatusState } from '#/web/hooks/useAccessTokenStatus.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 const authenticatedBootstrapMock = vi.hoisted(() => ({
   retry: vi.fn(),
 }))
-const authMock = vi.hoisted(() => ({
-  status: null as unknown as {
-    state: 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable'
-    refresh: ReturnType<typeof vi.fn>
-  },
-}))
+const authMock = vi.hoisted(() => {
+  const status: AccessTokenStatusState = { state: 'checking', refresh: vi.fn() }
+  return { status }
+})
 const workspaceOpenDialogMock = vi.hoisted(() => ({ renderError: null as Error | null }))
 const authenticatedBootstrapState = ref<AuthenticatedAppBootstrapState>({ status: 'ready' })
 const clientIntentIngress = vi.hoisted(() => ({
@@ -175,8 +174,8 @@ const SettingsRetainedOutletTerminalConsumer = defineComponent({
 })
 
 beforeEach(() => {
-  authMock.status = reactive({
-    state: 'authenticated' as 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable',
+  authMock.status = reactive<AccessTokenStatusState>({
+    state: 'authenticated',
     refresh: vi.fn(),
   })
   workspaceOpenDialogMock.renderError = null

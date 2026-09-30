@@ -1,3 +1,4 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 // Web client bridge helpers for tests that simulate the server.
 //
 // This module owns transport wiring only: HTTP and WebSocket dispatch, terminal
@@ -80,25 +81,22 @@ export function installGoblinTestBridge(handlers: Record<string, ServerTestHandl
   >()
   const sessionStorageValues = new Map<string, string>()
   const browserWindow = globalThis.window
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      addEventListener: browserWindow.addEventListener.bind(browserWindow),
-      removeEventListener: browserWindow.removeEventListener.bind(browserWindow),
-      dispatchEvent: browserWindow.dispatchEvent.bind(browserWindow),
-      __GOBLIN_BOOTSTRAP__: {
-        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-      },
-      location: {
-        href: 'http://127.0.0.1:32100/',
-        origin: 'http://127.0.0.1:32100',
-        protocol: 'http:',
-        search: '',
-      },
-      sessionStorage: {
-        getItem: (key: string) => sessionStorageValues.get(key) ?? null,
-        setItem: (key: string, value: string) => sessionStorageValues.set(key, value),
-      },
+  stubBrowserGlobal('window', {
+    addEventListener: browserWindow.addEventListener.bind(browserWindow),
+    removeEventListener: browserWindow.removeEventListener.bind(browserWindow),
+    dispatchEvent: browserWindow.dispatchEvent.bind(browserWindow),
+    __GOBLIN_BOOTSTRAP__: {
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+    },
+    location: {
+      href: 'http://127.0.0.1:32100/',
+      origin: 'http://127.0.0.1:32100',
+      protocol: 'http:',
+      search: '',
+    },
+    sessionStorage: {
+      getItem: (key: string) => sessionStorageValues.get(key) ?? null,
+      setItem: (key: string, value: string) => sessionStorageValues.set(key, value),
     },
   })
   function callTerminalHandler(name: 'terminal.attach', payload: unknown): TerminalClientTestOutputs['terminal.attach']

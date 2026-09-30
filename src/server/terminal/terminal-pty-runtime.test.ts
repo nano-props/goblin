@@ -1,5 +1,6 @@
 import { userInfo } from 'node:os'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
 import { spawnTerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 import type { SpawnTerminalPtyRuntimeInput } from '#/server/terminal/terminal-pty-runtime.ts'
@@ -18,11 +19,11 @@ let callbacks: { data(terminal: unknown, bytes: Uint8Array): void; exit(): void 
 let resolveExit: (code: number) => void
 let terminal: {
   closed: boolean
-  write: ReturnType<typeof vi.fn>
-  resize: ReturnType<typeof vi.fn>
-  close: ReturnType<typeof vi.fn>
+  write: Mock<(data: string) => number>
+  resize: Mock<(cols: number, rows: number) => void>
+  close: Mock<() => void>
 }
-let kill: ReturnType<typeof vi.fn>
+const kill = vi.fn<() => void>()
 
 beforeEach(() => {
   vi.stubGlobal('Bun', { spawn })
@@ -31,7 +32,7 @@ beforeEach(() => {
     terminal.closed = true
     callbacks.exit()
   })
-  kill = vi.fn()
+  kill.mockReset()
   spawn.mockImplementation((_command, options) => {
     callbacks = options.terminal
     return {

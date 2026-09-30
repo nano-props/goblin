@@ -9,7 +9,7 @@ import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
-import type { ClientWorkspaceState } from '#/shared/api-types.ts'
+import type { ClientWorkspaceState, WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
 
 const WORKSPACE_A_ID = workspaceIdForTest('goblin+file:///workspaces/a')
 const WORKSPACE_B_ID = workspaceIdForTest('goblin+file:///workspaces/b')
@@ -19,7 +19,7 @@ const DEDUPE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspaces/dedupe
 interface RestoreStoreState {
   workspaces: Record<string, ReturnType<typeof stubRepo>>
   restoredClientWorkspaceBaseline?: ClientWorkspaceState | null
-  promoteRestoredWorkspace: ReturnType<typeof vi.fn>
+  promoteRestoredWorkspace: (result: WorkspaceTabsRestoreResult) => boolean
 }
 
 const mocks = vi.hoisted(() => {
@@ -27,11 +27,11 @@ const mocks = vi.hoisted(() => {
   let storeState = {
     workspaces: {},
     restoredClientWorkspaceBaseline: null,
-    promoteRestoredWorkspace: vi.fn(),
+    promoteRestoredWorkspace: vi.fn<(result: WorkspaceTabsRestoreResult) => boolean>(),
   } as RestoreStoreState
   return {
     restoreWorkspaceTabsOnView: vi.fn(),
-    promoteRestoredWorkspace: vi.fn(),
+    promoteRestoredWorkspace: vi.fn<(result: WorkspaceTabsRestoreResult) => boolean>(),
     get storeState() {
       return storeState
     },

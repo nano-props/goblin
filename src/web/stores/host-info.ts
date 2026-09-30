@@ -14,7 +14,7 @@ import { HostInfoSnapshotSchema } from '#/shared/web-bootstrap-response-schema.t
  */
 export type ClientPlatform = NodeJS.Platform | 'web'
 
-interface HostInfoSnapshot {
+export interface HostInfoSnapshot {
   /** Absolute path of the user's home directory. `''` if the server couldn't determine it. */
   homeDir: string
   /** Node.js platform identifier returned by the server. */

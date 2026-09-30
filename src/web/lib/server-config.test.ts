@@ -1,25 +1,23 @@
+import { stubBrowserGlobal } from '#/web/test-utils/browser-globals.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 describe('client server config', () => {
   beforeEach(() => {
     vi.resetModules()
-    Reflect.deleteProperty(globalThis, 'window')
-    Reflect.deleteProperty(globalThis, 'document')
+    stubBrowserGlobal('window', undefined)
+    stubBrowserGlobal('document', undefined)
   })
 
   test('falls back to same-origin server when bootstrap has no handoff', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {
-          initialServer: null,
-        },
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          protocol: 'http:',
-          search: '',
-        },
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: {
+        initialServer: null,
+      },
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        protocol: 'http:',
+        search: '',
       },
     })
 
@@ -32,18 +30,15 @@ describe('client server config', () => {
   })
 
   test('prefers bootstrap server handoff when present', async () => {
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {
-          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-        },
-        location: {
-          href: 'http://127.0.0.1:5173/',
-          origin: 'http://127.0.0.1:5173',
-          protocol: 'http:',
-          search: '',
-        },
+    stubBrowserGlobal('window', {
+      __GOBLIN_BOOTSTRAP__: {
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+      },
+      location: {
+        href: 'http://127.0.0.1:5173/',
+        origin: 'http://127.0.0.1:5173',
+        protocol: 'http:',
+        search: '',
       },
     })
 

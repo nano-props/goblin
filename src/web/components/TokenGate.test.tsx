@@ -10,17 +10,16 @@ import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstr
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CodedError } from '#/shared/coded-error.ts'
+import type { AccessTokenStatusState } from '#/web/hooks/useAccessTokenStatus.ts'
 
 const toastMocks = vi.hoisted(() => ({ warning: vi.fn() }))
 
 vi.mock('vue-sonner', () => ({ toast: toastMocks }))
 
-const authMock = vi.hoisted(() => ({
-  status: null as unknown as {
-    state: 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable'
-    refresh: ReturnType<typeof vi.fn>
-  },
-}))
+const authMock = vi.hoisted(() => {
+  const status: AccessTokenStatusState = { state: 'checking', refresh: vi.fn() }
+  return { status }
+})
 
 vi.mock('#/web/auth/AuthProvider.tsx', () => ({
   useAuth: () => authMock.status,
@@ -31,8 +30,8 @@ vi.mock('#/web/lib/server-fetch.ts', () => ({
 }))
 
 beforeEach(() => {
-  authMock.status = reactive({
-    state: 'unauthenticated' as 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable',
+  authMock.status = reactive<AccessTokenStatusState>({
+    state: 'unauthenticated',
     refresh: vi.fn(),
   })
   vi.mocked(postServerCommandJson).mockReset()
