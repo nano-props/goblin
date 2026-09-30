@@ -3,6 +3,30 @@
 Startup separates public shell hydration, authentication, workspace restore,
 and post-restore application behavior in browser tabs.
 
+## Server launch
+
+The canonical process entry is `src/server/main.ts`. `bun run start:server`
+runs it from source; `bun run build:web` provides the browser assets when Vite
+is not running. `bun run start` and `./serve.sh` build and launch the standalone
+binary. `serve.sh` forwards its arguments to `goblin serve`.
+
+The compiled binary embeds the runtime, browser assets, PTY worker, SSH scripts,
+and `g` command. It requires the matching OS and CPU architecture, Git, a local
+shell, and SSH for remote workspaces. Application data lives outside the binary.
+
+`serve` and `open` accept `--host` / `--port`, defaulting to `GOBLIN_SERVER_HOST` /
+`GOBLIN_SERVER_PORT` or `127.0.0.1:32100`. Use the same address settings for both.
+The server accepts `--data-dir` and `--token`. Without an explicit token it stores
+one in `<dataDir>/server-token` and prints it for browser login. To rotate that
+token, stop the server, delete the file, and restart. The source checkout also
+provides `bun run reset-token -- --data-dir /path/to/data`; explicit tokens are
+unaffected. Binding to `0.0.0.0` enables LAN access and prints LAN URLs and QR
+codes. Use an HTTPS reverse proxy outside a trusted network.
+
+`bun run dev` starts Vite and the source server. `GOBLIN_WEB_DEV_HOST` /
+`GOBLIN_WEB_DEV_PORT` configure Vite; server address variables configure the
+backend. Vite proxies `/api` and `/ws`. Backend reloads end live terminals.
+
 ## Stages
 
 1. **Public bootstrap** hydrates unauthenticated-safe presentation state. It
@@ -46,7 +70,12 @@ membership and persistence failures may not.
 without a command displays help. `goblin open [directory]` only opens a
 browser-addressable `/open?path=<encoded-directory>` URL; it does not authenticate
 or call the server. The bounded `path` is an absolute directory on the server,
-with relative CLI arguments resolved against the CLI working directory.
+with relative CLI arguments resolved against the CLI working directory. Omitting
+the directory uses the working directory; the URL accepts one path of up to 4096
+characters. Linux uses `xdg-open` and macOS uses `open`. The command returns once
+the system launcher starts, without waiting for the browser to exit. Browser
+opening is best-effort: launcher startup failures report an error, and the URL
+is always printed for manual opening.
 
 The `/open` page mounts only after browser authentication and workspace restore.
 It automatically opens the requested directory through the existing workspace
