@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { execa } from 'execa'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import * as v from 'valibot'
 import { formatServerUrl } from '#/shared/server-url.ts'
 import { WorkspaceOpenPathSchema } from '#/shared/workspace-open-url.ts'
@@ -22,7 +23,13 @@ export async function openGoblin(args: string[]): Promise<void> {
   const url = new URL('/open', formatServerUrl(host, port))
   url.searchParams.set('path', directory)
   try {
-    await execa(process.platform === 'darwin' ? 'open' : 'xdg-open', [url.href])
+    const launcher = spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url.href], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    // The launcher may stay alive for the browser's lifetime. Only wait for startup.
+    await once(launcher, 'spawn')
+    launcher.unref()
   } catch {
     throw new Error(`Could not launch the browser. Open ${url.href} manually.`)
   }

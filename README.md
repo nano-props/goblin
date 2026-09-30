@@ -77,7 +77,8 @@ Both `serve` and `open` accept `--host` / `--port` and use `GOBLIN_SERVER_HOST` 
 Directories are on the server machine; relative inputs are resolved against the
 CLI's working directory. The URL accepts one absolute path of up to 4096
 characters. Linux browser opening requires `xdg-open`; macOS uses `open`.
-If browser launching fails, the command prints the URL for manual opening.
+The command returns once the system launcher starts; browser opening is best-effort.
+It always prints the URL for manual opening and reports launcher startup errors.
 
 On first start the server writes a 25-character token to `<dataDir>/server-token`
 and prints it. Open the browser URL and paste the token at the login gate.
