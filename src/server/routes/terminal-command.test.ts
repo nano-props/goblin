@@ -6,7 +6,11 @@ import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { ServerTerminalCommandHost } from '#/server/terminal/terminal-command-host.ts'
 import { GOBLIN_SERVER_COMMAND_RESULT_SCHEMA } from '#/shared/g-command.ts'
-import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/realtime/client-intent-broker.ts'
+import {
+  disconnectAllNotificationSockets,
+  registerNotificationSocket,
+  setNotificationClientIntentSubscription,
+} from '#/server/realtime/notification-broker.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { runGoblinCommand } from '#/server/g-command/cli.ts'
@@ -65,7 +69,7 @@ function createTestTransport(host: ServerTerminalCommandHost) {
 
 describe('terminal command routes', () => {
   beforeEach(() => {
-    disconnectAllClientIntentSockets()
+    disconnectAllNotificationSockets()
   })
 
   test('rejects terminal inspection without the access token', async () => {
@@ -103,7 +107,8 @@ describe('terminal command routes', () => {
     ['log', 'history'],
   ] as const)('dispatches %s through the consolidated endpoint', async (command, tab) => {
     const subscriber = { send: vi.fn(), close: vi.fn() }
-    registerClientIntentSocket(subscriber)
+    registerNotificationSocket(subscriber, 'user_test')
+    setNotificationClientIntentSubscription(subscriber, true)
     const app = createTestApp(terminalCommandHost())
     const response = await app.request('/api/terminal-command', {
       method: 'POST',
@@ -119,6 +124,19 @@ describe('terminal command routes', () => {
         intent: { type: 'show-workspace-pane-tab-requested', tab },
       }),
     )
+  })
+
+  test('returns NO_CLIENT when only data notification listeners are connected', async () => {
+    const subscriber = { send: vi.fn(), close: vi.fn() }
+    registerNotificationSocket(subscriber, 'user_test')
+    const response = await createTestApp().request('/api/terminal-command', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goblin-access-token': 'secret' },
+      body: JSON.stringify({ command: 'delta', payload: { args: [] } }),
+    })
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ code: 'NO_CLIENT' })
+    expect(subscriber.send).not.toHaveBeenCalled()
   })
 
   test('validates view arguments at the consolidated server boundary', async () => {

@@ -1,60 +1,25 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  disconnectAllInvalidationSockets,
-  InvalidationSocketLimitError,
-  MAX_INVALIDATION_SOCKETS,
   publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
   publishUserRepoReadInvalidation,
   publishUserWorkspaceRuntimeInvalidation,
-  registerInvalidationSocket,
-  unregisterInvalidationSocket,
 } from '#/server/realtime/invalidation-broker.ts'
+import { disconnectAllNotificationSockets, registerNotificationSocket } from '#/server/realtime/notification-broker.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('invalidation broker', () => {
   const workspaceId = workspaceIdForTest('goblin+file:///workspace')
 
   beforeEach(() => {
-    disconnectAllInvalidationSockets()
-  })
-
-  test('disconnects every registered invalidation socket during shutdown', () => {
-    const first = { send: vi.fn(), close: vi.fn() }
-    const second = { send: vi.fn(), close: vi.fn() }
-    registerInvalidationSocket(first)
-    registerInvalidationSocket(second)
-
-    disconnectAllInvalidationSockets()
-    publishRepoReadInvalidation({ repoId: workspaceId, domain: 'metadata' })
-
-    expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
-    expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
-    expect(first.send).not.toHaveBeenCalled()
-    expect(second.send).not.toHaveBeenCalled()
-  })
-
-  test('rejects the (N+1)th subscriber to prevent socket floods', () => {
-    for (let i = 0; i < MAX_INVALIDATION_SOCKETS; i += 1) {
-      registerInvalidationSocket({ send: vi.fn(), close: vi.fn() })
-    }
-    const overflow = { send: vi.fn(), close: vi.fn() }
-    expect(() => registerInvalidationSocket(overflow)).toThrow(InvalidationSocketLimitError)
-  })
-
-  test('frees a slot when a subscriber disconnects', () => {
-    const sockets = Array.from({ length: MAX_INVALIDATION_SOCKETS }, () => ({ send: vi.fn(), close: vi.fn() }))
-    for (const s of sockets) registerInvalidationSocket(s)
-    unregisterInvalidationSocket(sockets[0]!)
-    // The freed slot is available again.
-    expect(() => registerInvalidationSocket({ send: vi.fn(), close: vi.fn() })).not.toThrow()
+    disconnectAllNotificationSockets()
   })
 
   test('fans user-scoped invalidations only to sockets for that identity', () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
-    registerInvalidationSocket(first, 'user_a')
-    registerInvalidationSocket(second, 'user_b')
+    registerNotificationSocket(first, 'user_a')
+    registerNotificationSocket(second, 'user_b')
 
     publishUserRepoReadInvalidation('user_a', { repoId: workspaceId, domain: 'operations' })
 
@@ -69,7 +34,7 @@ describe('invalidation broker', () => {
       }),
       close: vi.fn(),
     }
-    registerInvalidationSocket(socket)
+    registerNotificationSocket(socket, 'user_a')
 
     publishRepoReadInvalidation({ repoId: workspaceId, domain: 'metadata' })
     publishRepoReadInvalidation({ repoId: workspaceId, domain: 'metadata' })
@@ -79,7 +44,7 @@ describe('invalidation broker', () => {
 
   test('publishes workspace runtime invalidations with canonical workspace identity', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
-    registerInvalidationSocket(socket, 'user_a')
+    registerNotificationSocket(socket, 'user_a')
     const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
 
     publishUserWorkspaceRuntimeInvalidation('user_a', { workspaceId })
@@ -90,8 +55,8 @@ describe('invalidation broker', () => {
   test('publishes filesystem invalidations only to the owning user', () => {
     const owner = { send: vi.fn(), close: vi.fn() }
     const other = { send: vi.fn(), close: vi.fn() }
-    registerInvalidationSocket(owner, 'user_a')
-    registerInvalidationSocket(other, 'user_b')
+    registerNotificationSocket(owner, 'user_a')
+    registerNotificationSocket(other, 'user_b')
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
     const target = { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: 'workspace-runtime-test' }
 

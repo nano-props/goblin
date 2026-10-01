@@ -2,6 +2,7 @@ import { computed, defineComponent, watch } from 'vue'
 import type { ComputedRef, PropType, VNode } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
+import { useSettingsQueryInvalidationSync } from '#/web/settings/queries.ts'
 import { useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { TerminalSessionProvider } from '#/web/terminal/components/TerminalSessionProvider.tsx'
@@ -79,6 +80,7 @@ const AuthenticatedAppShell = defineComponent({
   setup() {
     const bootstrapLoading = useBootstrapLoadingPresentation()
     useWorkspaceFilesystemInvalidationSync()
+    useSettingsQueryInvalidationSync()
     const route = useRoute()
     const queryClient = useQueryClient()
     const overlays = useAppOverlays()

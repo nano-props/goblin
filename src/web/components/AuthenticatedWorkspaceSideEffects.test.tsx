@@ -18,7 +18,6 @@ const sideEffectMocks = vi.hoisted(() => ({
   useBackgroundFetch: vi.fn(),
   useKeyboard: vi.fn(),
   useWorkspaceRuntimeInvalidationRefresh: vi.fn(),
-  useSettingsQueryInvalidationSync: vi.fn(),
   useWorkspaceNavigationHistory: vi.fn(),
   useTerminalRetirementWorkspacePanePresentation: vi.fn(),
 }))
@@ -29,9 +28,6 @@ vi.mock('#/web/hooks/useBackgroundFetch.ts', () => ({
 vi.mock('#/web/hooks/useKeyboard.ts', () => ({ useKeyboard: sideEffectMocks.useKeyboard }))
 vi.mock('#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts', () => ({
   useWorkspaceRuntimeInvalidationRefresh: sideEffectMocks.useWorkspaceRuntimeInvalidationRefresh,
-}))
-vi.mock('#/web/settings/queries.ts', () => ({
-  useSettingsQueryInvalidationSync: sideEffectMocks.useSettingsQueryInvalidationSync,
 }))
 vi.mock('#/web/app/navigation/workspace-history.ts', () => ({
   useWorkspaceNavigationHistory: sideEffectMocks.useWorkspaceNavigationHistory,

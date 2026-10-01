@@ -1,5 +1,6 @@
 import { QueryClient, QueryObserver } from '@tanstack/query-core'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { registerNotificationSocket, unregisterNotificationSocket } from '#/server/realtime/notification-broker.ts'
 import type * as InvalidationBroker from '#/server/realtime/invalidation-broker.ts'
 import { REPO_ID, mocks } from '#/server/test-utils/repo-module.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
@@ -41,7 +42,7 @@ describe('background sync projection convergence', () => {
       },
       close: vi.fn(),
     }
-    broker.registerInvalidationSocket(socket)
+    registerNotificationSocket(socket, USER_ID)
     mocks.publishRepoReadInvalidation.mockImplementation((event) => broker.publishRepoReadInvalidation(event))
     mocks.fetchAll.mockImplementation(async () => {
       projection = 'after-fetch'
@@ -74,7 +75,7 @@ describe('background sync projection convergence', () => {
         expect(observer.getCurrentResult().data).toBe('after-fetch')
       })
     } finally {
-      broker.unregisterInvalidationSocket(socket)
+      unregisterNotificationSocket(socket)
       unsubscribe()
       queryClient.clear()
     }

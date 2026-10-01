@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => {
   const closeHttpServer = vi.fn()
   const serverOn = vi.fn()
   const runtimeShutdown = vi.fn()
-  const disconnectAllInvalidationSockets = vi.fn()
+  const disconnectAllNotificationSockets = vi.fn()
   const websocketClose = vi.fn()
   const websocketConstructor = vi.fn()
   const websocketClients = new Set<{ close(): void }>()
@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => {
     closeHttpServer,
     serverOn,
     runtimeShutdown,
-    disconnectAllInvalidationSockets,
+    disconnectAllNotificationSockets,
     websocketClose,
     websocketConstructor,
     websocketClients,
@@ -51,8 +51,8 @@ vi.mock('#/server/runtime.ts', () => ({
   createServerRuntime: mocks.createServerRuntime,
 }))
 
-vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
-  disconnectAllInvalidationSockets: mocks.disconnectAllInvalidationSockets,
+vi.mock('#/server/realtime/notification-broker.ts', () => ({
+  disconnectAllNotificationSockets: mocks.disconnectAllNotificationSockets,
 }))
 
 describe('bootstrap server shutdown', () => {
@@ -91,7 +91,7 @@ describe('bootstrap server shutdown', () => {
     await stopPromise
 
     expect(mocks.runtimeShutdown).toHaveBeenCalledTimes(1)
-    expect(mocks.disconnectAllInvalidationSockets).toHaveBeenCalledTimes(1)
+    expect(mocks.disconnectAllNotificationSockets).toHaveBeenCalledTimes(1)
     expect(client.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(client.terminate).toHaveBeenCalledTimes(1)
     expect(socket.destroy).toHaveBeenCalledTimes(1)

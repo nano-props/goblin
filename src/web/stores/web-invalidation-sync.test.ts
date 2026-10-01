@@ -60,8 +60,8 @@ describe('web invalidation sync', () => {
   })
 
   afterEach(async () => {
-    const { resetServerInvalidationIngressForTests } = await import('#/web/realtime/invalidation-ingress.ts')
-    resetServerInvalidationIngressForTests()
+    const { resetServerNotificationIngressForTests } = await import('#/web/realtime/notification-ingress.ts')
+    resetServerNotificationIngressForTests()
     vi.unstubAllGlobals()
   })
 
@@ -106,7 +106,7 @@ describe('web invalidation sync', () => {
     const { themeStore } = await import('#/web/stores/theme.ts')
     await themeStore.getState().hydrate()
 
-    expect(latestSocket().url).toBe('ws://127.0.0.1:32100/ws/invalidation')
+    expect(latestSocket().url).toBe('ws://127.0.0.1:32100/ws/notifications')
     emitServerMessage({ type: 'settings-invalidated', scopes: ['theme'] })
 
     await vi.waitFor(() => {

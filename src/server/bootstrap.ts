@@ -3,8 +3,7 @@ import { serve, type ServerType } from '@hono/node-server'
 import { WebSocketServer } from 'ws'
 import { APP_REALTIME_WS_MESSAGE_LIMIT_BYTES } from '#/shared/app-realtime-validators.ts'
 import { serverNodeLog } from '#/node/logger.ts'
-import { disconnectAllInvalidationSockets } from '#/server/realtime/invalidation-broker.ts'
-import { disconnectAllClientIntentSockets } from '#/server/realtime/client-intent-broker.ts'
+import { disconnectAllNotificationSockets } from '#/server/realtime/notification-broker.ts'
 import { createServerRuntime } from '#/server/runtime.ts'
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
@@ -91,10 +90,7 @@ export async function bootstrapServer(options: BootstrapServerOptions): Promise<
         runtime.shutdown()
       } catch {}
       try {
-        disconnectAllInvalidationSockets()
-      } catch {}
-      try {
-        disconnectAllClientIntentSockets()
+        disconnectAllNotificationSockets()
       } catch {}
       closeWebSocketClients(websocket)
       let forceClosed = false

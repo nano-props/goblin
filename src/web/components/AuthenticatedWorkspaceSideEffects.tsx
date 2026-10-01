@@ -4,7 +4,6 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
-import { useSettingsQueryInvalidationSync } from '#/web/settings/queries.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/app/navigation/workspace-history.ts'
 import { useWorkspaceNavigationHistory } from '#/web/app/navigation/workspace-history.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
@@ -67,7 +66,6 @@ export const AuthenticatedWorkspaceSideEffects = defineComponent<AuthenticatedWo
     })
     useWorkspaceNavigationHistory({ routeContext: () => props.routeContext })
     useWorkspaceRuntimeInvalidationRefresh()
-    useSettingsQueryInvalidationSync()
 
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const backgroundFetchTarget = computed(() => {

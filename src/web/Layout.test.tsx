@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { QueryClient } from '@tanstack/vue-query'
+import { QueryClient, useQuery } from '@tanstack/vue-query'
+import type { ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import { defineComponent, reactive, ref } from 'vue'
 import { userEvent } from '@testing-library/user-event'
 import { waitFor } from '@testing-library/vue'
@@ -34,6 +36,7 @@ const clientIntentIngress = vi.hoisted(() => ({
   subscriptionStarts: 0,
 }))
 const clientWorkspacePersistence = vi.hoisted(() => vi.fn())
+const invalidationIngress = vi.hoisted(() => ({ listeners: new Set<(event: ServerInvalidationEvent) => void>() }))
 const runtimeProjectionRecoveryMock = vi.hoisted(() => ({
   reconcileOpenWorkspaceRuntimeMemberships: vi.fn(async () => ({
     kind: 'settled' as const,
@@ -66,7 +69,12 @@ vi.mock('#/web/stores/workspaces/workspace-runtime-membership-recovery.ts', () =
   reconcileOpenWorkspaceRuntimeMemberships: runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships,
 }))
 
-vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
+vi.mock('#/web/realtime/notification-ingress.ts', () => ({
+  resetServerNotificationIngressForTests: () => {},
+  subscribeServerInvalidationIngress: (listener: (event: ServerInvalidationEvent) => void) => {
+    invalidationIngress.listeners.add(listener)
+    return () => invalidationIngress.listeners.delete(listener)
+  },
   subscribeServerClientIntentIngress: () => () => {},
 }))
 
@@ -184,12 +192,40 @@ beforeEach(() => {
   clientIntentIngress.listeners.clear()
   clientIntentIngress.subscriptionStarts = 0
   clientWorkspacePersistence.mockClear()
+  invalidationIngress.listeners.clear()
   runtimeProjectionRecoveryMock.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
   workspacesStore.setState({ workspaceMembershipReady: false })
   layoutQueryClient.clear()
 })
 
 describe('Layout shell providers', () => {
+  test('refreshes active settings reads on invalidation while staying in settings and releases subscriptions', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    const read = vi.fn(async () => 'initial')
+    const settingsPage = defineComponent({
+      setup() {
+        const query = useQuery({ queryKey: settingsSnapshotQueryKey(), queryFn: read, staleTime: Infinity })
+        return () => <span>{query.data.value}</span>
+      },
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/settings/general', name: 'settings', component: settingsPage }],
+    })
+    await router.push('/settings/general')
+    await router.isReady()
+    const view = renderLayout(router)
+    await waitFor(() => expect(view.getByText('initial')).toBeDefined())
+    read.mockResolvedValue('updated')
+    for (const listener of invalidationIngress.listeners) {
+      listener({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
+    }
+    await waitFor(() => expect(view.getByText('updated')).toBeDefined())
+    expect(read).toHaveBeenCalledTimes(2)
+    view.unmount()
+    expect(invalidationIngress.listeners.size).toBe(0)
+  })
+
   test('keeps terminal read context above the settings shell outlet while workspace restore is pending', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({

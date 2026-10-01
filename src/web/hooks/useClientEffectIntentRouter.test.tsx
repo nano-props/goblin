@@ -49,7 +49,9 @@ import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
-vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
+vi.mock('#/web/realtime/notification-ingress.ts', () => ({
+  resetServerNotificationIngressForTests: () => {},
+  subscribeServerInvalidationIngress: () => () => {},
   subscribeServerClientIntentIngress: (cb: (event: ClientEffectIntent) => void) => {
     serverIntentSubscriptionStarts += 1
     intentListeners.add(cb)

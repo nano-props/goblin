@@ -4,7 +4,7 @@ import { toast } from 'vue-sonner'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { onClientLocalEventType } from '#/web/bridge/local-events.ts'
-import { subscribeServerClientIntentIngress } from '#/web/realtime/client-intent-ingress.ts'
+import { subscribeServerClientIntentIngress } from '#/web/realtime/notification-ingress.ts'
 import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import {

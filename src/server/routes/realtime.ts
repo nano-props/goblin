@@ -2,15 +2,12 @@ import { Hono, type Context, type Next } from 'hono'
 import { upgradeWebSocket } from '@hono/node-server'
 import { serverNodeLog } from '#/node/logger.ts'
 import {
-  InvalidationSocketLimitError,
-  registerInvalidationSocket,
-  unregisterInvalidationSocket,
-} from '#/server/realtime/invalidation-broker.ts'
-import {
-  ClientIntentSocketLimitError,
-  registerClientIntentSocket,
-  unregisterClientIntentSocket,
-} from '#/server/realtime/client-intent-broker.ts'
+  NotificationSocketLimitError,
+  registerNotificationSocket,
+  unregisterNotificationSocket,
+  setNotificationClientIntentSubscription,
+} from '#/server/realtime/notification-broker.ts'
+import { isNotificationSubscription } from '#/shared/server-notification.ts'
 import { createWebSocketAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
@@ -23,21 +20,12 @@ interface RealtimeRouteOptions {
   appRealtimeHost: ServerAppRealtimeHost
 }
 
-type RealtimeSubscriberChannel = 'invalidation' | 'client-intent' | 'app'
+type RealtimeSubscriberChannel = 'notifications' | 'app'
 
 const realtimeRoutesLogger = serverNodeLog.child({ module: 'realtime-routes' })
 
-// Server-authoritative realtime for data, plus a dedicated envelope-forwarding
-// channel for client effect intents sourced from `g`-style CLI clients.
-//
-// `/ws/invalidation` and `/ws/app` remain data-plane — they push server-
-// owned state changes (repo invalidations, runtime stream events) to
-// subscribers. `/ws/client-intent` is a control-plane relay: the server
-// receives a view intent over the terminal-command HTTP endpoint (e.g. from `g delta`), wraps it
-// in a JSON envelope, and fans it out to subscribed clients. The server
-// forwards only that narrow protocol. Interpretation
-// happens in the client's existing `useClientEffectIntentRouter`,
-// which owns browser client intent dispatch.
+// Runtime requests and streams use /ws/app; lightweight invalidations and
+// browser navigation intents share /ws/notifications.
 export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeRouteOptions) {
   const warnedSubscriberLimits = new Set<RealtimeSubscriberChannel>()
 
@@ -59,7 +47,7 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
   const auth = createWebSocketAccessTokenMiddleware(accessToken)
 
   const app = new Hono()
-  app.use('/invalidation', auth)
+  app.use('/notifications', auth)
   const appRealtimeAuth = async (c: Context, next: Next) => {
     if (!c.req.query('clientId')) {
       return errorJson(c, 'BAD_REQUEST', 'Missing client id')
@@ -79,64 +67,49 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
   app.use('/app', auth, appRealtimeAuth)
 
   app.get(
-    '/invalidation',
+    '/notifications',
     upgradeWebSocket((c) => {
       const userId = userIdFromContext(c)
       return {
         onOpen(_event, ws) {
           try {
-            if (!userId) throw new Error('invalidation owner missing')
-            registerInvalidationSocket(ws, userId)
+            if (!userId) throw new Error('notification owner missing')
+            registerNotificationSocket(ws, userId)
           } catch (err) {
-            if (err instanceof InvalidationSocketLimitError) {
+            if (err instanceof NotificationSocketLimitError) {
               try {
                 ws.close(1013, 'subscriber limit reached')
               } catch {}
-              warnSubscriberLimitOnce('invalidation', err)
+              warnSubscriberLimitOnce('notifications', err)
               return
             }
             throw err
           }
         },
-        onClose(_event, ws) {
-          unregisterInvalidationSocket(ws)
-        },
-        onError(_event, ws) {
-          unregisterInvalidationSocket(ws)
-        },
-      }
-    }),
-  )
-  // Client-side subscribers opt in to receive client effect intents
-  // forwarded by the server. The client opens this socket once at boot
-  // and feeds incoming payloads into its existing intent router — the
-  // shared client intent path. No server-side
-  // message handling beyond register/unregister; the server never
-  // receives anything from this socket beyond the upgrade.
-  app.get(
-    '/client-intent',
-    auth,
-    upgradeWebSocket(() => {
-      return {
-        onOpen(_event, ws) {
+        onMessage(event, ws) {
+          // This channel accepts only a small subscription declaration, not RPC.
+          if (typeof event.data !== 'string' || event.data.length > 128) {
+            ws.close(1008, 'invalid notification subscription')
+            return
+          }
+          let message: unknown
           try {
-            registerClientIntentSocket(ws)
-          } catch (err) {
-            if (err instanceof ClientIntentSocketLimitError) {
-              try {
-                ws.close(1013, 'subscriber limit reached')
-              } catch {}
-              warnSubscriberLimitOnce('client-intent', err)
-              return
-            }
-            throw err
+            message = JSON.parse(event.data)
+          } catch {
+            ws.close(1008, 'invalid notification subscription')
+            return
           }
+          if (!isNotificationSubscription(message)) {
+            ws.close(1008, 'invalid notification subscription')
+            return
+          }
+          setNotificationClientIntentSubscription(ws, message.enabled)
         },
         onClose(_event, ws) {
-          unregisterClientIntentSocket(ws)
+          unregisterNotificationSocket(ws)
         },
         onError(_event, ws) {
-          unregisterClientIntentSocket(ws)
+          unregisterNotificationSocket(ws)
         },
       }
     }),

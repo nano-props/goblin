@@ -15,16 +15,35 @@ Use this doc for realtime transport and lifecycle rules.
   at every instant: one atomic message may carry the retained bytes past the
   threshold. Reconnect/recovery then restores the client projection.
 
-## Channel categories
+## Channels and message categories
 
-The above rules cover data-plane channels (`/ws/invalidation`, `/ws/app`) — they push server-owned state changes to subscribers. A third category exists for **control-plane relays**: a channel that forwards an action envelope triggered by an out-of-band write (e.g. `g delta` from a PTY arriving at `/ws/client-intent`). A relay is not invalidation (no refetch implied) and not streaming (one-shot per request, not continuous).
+The browser uses two authenticated WebSocket channels:
 
-When adding a new `/ws/*` channel, classify it into one of these three before writing code:
+- `/ws/app` owns runtime requests, continuous terminal output, and workspace
+  pane events. Its connection participates in client presence, and transition
+  responses precede buffered runtime effects.
+- `/ws/notifications` carries lightweight invalidations and client effect
+  intents on one connection. It does not participate in runtime presence or
+  terminal transition ordering.
 
-- **Data plane — invalidation**: server state changed, subscriber should refetch.
-- **Data plane — streaming**: server is producing a continuous event stream (PTY output, etc.).
-- **Control plane — relay**: subscriber should apply an out-of-band action (open a tab, focus a view, run a command). One envelope per trigger; the server doesn't read from these sockets.
+Classify each realtime message by its meaning, independently of its transport:
 
-When an action originates outside the client (CLI or external integration), use the server relay pattern. The server broker delivers the action to an authenticated browser client. See `docs/g-command.md` for the worked example.
+- **Invalidation**: server state changed; the subscriber should refetch.
+- **Streaming**: the server is producing a continuous event stream.
+- **Relay**: an external action requests a browser view change. One envelope
+  per trigger; it neither implies refetch nor acknowledges execution.
 
-Relay channels are one-way by construction: the server never reads from them. Interactive flows (request → response → next state) belong on HTTP, not on a relay.
+Invalidations retain their user-scoped or global broadcast audience. Client
+intents retain their broadcast audience but go only to connections whose
+browser currently subscribes to those intents. The notification connection
+accepts a bounded `{type: "client-intent-subscription", enabled: boolean}`
+declaration at open and when that subscription changes. A data-only listener
+is not a client-intent receiver. A command with no receiver returns `NO_CLIENT`;
+an existing receiver does not guarantee that its view action executed.
+
+When an action originates outside the client (CLI or external integration),
+use the server relay pattern. The server delivers the intent to authenticated
+browser receivers. See `docs/g-command.md` for the worked example.
+
+The notification channel accepts subscription declarations only. Business
+commands enter through HTTP; runtime request/response flows use `/ws/app`.
