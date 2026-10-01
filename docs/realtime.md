@@ -26,6 +26,12 @@ The browser uses two authenticated WebSocket channels:
   intents on one connection. It does not participate in runtime presence or
   terminal transition ordering.
 
+Choose by session contract, not message size or feature name: runtime identity,
+request/response correlation, and transition ordering belong on `/ws/app`;
+session-independent invalidation hints and view intents belong on
+`/ws/notifications`. The connections have no shared ordering guarantee;
+notifications do not confirm delivery of runtime responses or effects.
+
 Classify each realtime message by its meaning, independently of its transport:
 
 - **Invalidation**: server state changed; the subscriber should refetch.

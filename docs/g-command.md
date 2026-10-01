@@ -9,7 +9,7 @@ This document describes the durable architecture, protocol boundary, and failure
 `g`'s design recognises two distinct kinds of operation:
 
 - **Data plane** — read or modify server-owned state (repo info, settings, terminals). Every server-backed `g` command enters through `POST /api/terminal-command` with its command name and bounded payload. The server validates and dispatches the command through the same auth and error boundary used by the application.
-- **Control plane** — push commands into the client (open this tab, focus this view, run that action). Goes over a dedicated WebSocket because rendering is not a query — the client subscribes to a stream and reacts.
+- **Control plane** — relay view intents to subscribed clients over `/ws/notifications`, shared with invalidations. Receiver presence does not acknowledge execution.
 
 The server sits between `g` and the client on the control plane. It does not interpret what an intent means; it envelopes and forwards. The client has one intent router that consumes intents from every supported source and applies them through the same handler chain.
 
@@ -17,8 +17,8 @@ The server sits between `g` and the client on the control plane. It does not int
 
 The server owns the CLI broker because:
 
-- The server can identify the authenticated browser client attached to the
-  requesting terminal.
+- The server authenticates browser receivers and broadcasts view intents only
+  to connections that explicitly subscribe to them.
 - The client has one shared intent router. A new producer adds a subscription,
   not another routing model.
 - HTTP and WS share the same auth and lifecycle. Adding a separate IPC channel would mean a third transport with its own auth model and lifecycle.
