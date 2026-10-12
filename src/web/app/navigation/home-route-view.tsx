@@ -12,7 +12,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 export const HomeRouteView = defineComponent({
   name: 'HomeRouteView',
   setup() {
-    useAppRouteAdmission(useRoute())
+    const routeAdmitted = useAppRouteAdmission(useRoute())
     const navigation = useAppRouteNavigation()
     const workspaceMembershipReady = useStoreSelector(workspacesStore, (state) => state.workspaceMembershipReady)
     const zenMode = useStoreSelector(workspacesStore, (state) => state.zenMode)
@@ -21,7 +21,7 @@ export const HomeRouteView = defineComponent({
       const behavior = workspaceLayoutBehavior({ compact: uiMode.value === 'compact', zenMode: zenMode.value })
       return (
         <main class="flex min-h-0 min-w-0 flex-1">
-          {workspaceMembershipReady.value ? (
+          {workspaceMembershipReady.value && routeAdmitted.value ? (
             <EmptyWorkspaceView onOpenSettings={() => navigation.openSettings('general')} />
           ) : (
             <WorkspaceLayoutSkeleton

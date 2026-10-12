@@ -23,6 +23,7 @@ export function useAppRouteAdmission(route: RouteLocationNormalized) {
       left.workspaceMembershipReady === right.workspaceMembershipReady,
   )
   const routeAdmitted = computed(() => {
+    if (route.name === 'home') return initialWorkspaceRouteSlugFromStore(workspaceState.value) === null
     const workspaceSlug = routeStringParam(route.params.workspaceSlug)
     if (!workspaceSlug) return true
     const workspaceId = workspaceIdFromSlug(workspaceSlug)

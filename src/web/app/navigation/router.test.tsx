@@ -115,6 +115,44 @@ afterEach(() => {
 })
 
 describe('app initial route', () => {
+  test('keeps loading visible while the restored workspace route is pending', async () => {
+    const routeLoad = Promise.withResolvers<void>()
+    const dashboardPath = `/workspace/${workspaceSlugFromId(WORKSPACE_A_ID)}/dashboard`
+    const admitDashboard = vi.fn(() => routeLoad.promise)
+    const removeGuard = appRouter.beforeEach((to) => {
+      if (to.path === dashboardPath) return admitDashboard()
+    })
+    try {
+      const view = renderRouter()
+      await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('home'))
+      expect(view.queryByText('empty workspace')).toBeNull()
+
+      seedWorkspaceCapability(WORKSPACE_A_ID, 'available')
+
+      await waitFor(() => expect(admitDashboard).toHaveBeenCalledOnce())
+      expect(appRouter.currentRoute.value.name).toBe('home')
+      expect(view.queryByText('empty workspace')).toBeNull()
+
+      routeLoad.resolve()
+      await waitFor(() => expect(view.getByTestId('routed-app').textContent).toBe('dashboard'))
+    } finally {
+      routeLoad.resolve()
+      removeGuard()
+      await waitFor(() => expect(appRouter.currentRoute.value.path).toBe(dashboardPath))
+    }
+  })
+
+  test('shows the empty workspace only after membership settles without a workspace', async () => {
+    const view = renderRouter()
+    await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('home'))
+    expect(view.queryByText('empty workspace')).toBeNull()
+
+    workspacesStore.setState({ workspaceMembershipReady: true })
+
+    await waitFor(() => expect(view.getByText('empty workspace')).toBeTruthy())
+    expect(appRouter.currentRoute.value.name).toBe('home')
+  })
+
   test('prefers the restored workspace over the first workspace in order', async () => {
     const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-runtime-a')
     const workspaceB = emptyWorkspace(WORKSPACE_B_ID, 'workspace-runtime-b')
