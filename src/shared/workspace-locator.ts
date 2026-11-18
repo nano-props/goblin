@@ -113,10 +113,6 @@ export function formatWorkspaceLocator(
   return path ? asWorkspaceLocator(`${FILE_PREFIX}${path}`) : null
 }
 
-export function isWorkspaceLocator(input: unknown, platform: WorkspaceLocatorPlatform): input is WorkspaceLocator {
-  return typeof input === 'string' && parseWorkspaceLocator(input, platform) !== null
-}
-
 /** The one accepted grammar for an SSH config profile at every input and execution boundary. */
 export function isValidSshProfile(input: unknown): input is string {
   return typeof input === 'string' && SSH_PROFILE_RE.test(input)

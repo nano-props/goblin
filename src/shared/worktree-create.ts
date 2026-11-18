@@ -13,8 +13,6 @@
 
 import * as v from 'valibot'
 import { isSafeBranchName, isSafeRefName, isSafeRemoteName } from '#/shared/refnames.ts'
-import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type CreateWorktreeMode =
   | { kind: 'newBranch'; newBranch: string; baseRef: string }
@@ -37,13 +35,6 @@ export interface RemoteFetchAuthority {
 export interface CreateWorktreeInput {
   worktreePath: string
   mode: CreateWorktreeMode
-}
-
-/** Wire-shape envelope used by the IPC bridge: includes `cwd` on top of the canonical input. */
-export interface CreateWorktreeIpcInput extends CreateWorktreeInput {
-  cwd: WorkspaceId
-  workspaceRuntimeId: string
-  worktreeBootstrap: WorktreeBootstrapDecision
 }
 
 export function normalizeCreateWorktreeInput(input: unknown): CreateWorktreeInput | null {

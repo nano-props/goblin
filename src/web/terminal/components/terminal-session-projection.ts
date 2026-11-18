@@ -2,7 +2,6 @@ import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import {
   terminalExecutionCoordinates,
   terminalSessionBase,
-  terminalSessionCoordinates,
   type TerminalAttachResult,
   type TerminalCreateSuccess,
   type TerminalRestartResult,
@@ -97,7 +96,6 @@ function createSessionSummaryFromCreate(
   base: TerminalSessionBase,
   result: TerminalCreateSuccess,
 ): ServerTerminalSessionSummary {
-  const coordinates = terminalSessionCoordinates(base)
   const common = {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalRuntimeGeneration: result.terminalRuntimeGeneration,

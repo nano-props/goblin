@@ -12,10 +12,8 @@ import type {
 } from '#/shared/terminal-types.ts'
 import type { ClientTerminal } from '#/web/bridge/types.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/terminal/projection-types.ts'
-import type { ClientAppRealtime, AppRealtimeServerConfig } from '#/web/app/realtime/client.ts'
+import type { ClientAppRealtime } from '#/web/app/realtime/client.ts'
 import type { TerminalNotificationProvider } from '#/web/terminal/notification-provider.ts'
-
-export type ClientServerTerminalConfig = AppRealtimeServerConfig
 
 export function createServerTerminalClient(options: {
   realtime: ClientAppRealtime

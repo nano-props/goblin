@@ -22,7 +22,6 @@ import {
   canonicalRuntimeWorkspacePaneTarget,
   WorkspacePaneFilesystemExecutionTargetSchema,
   WorkspacePaneTabEntrySchema,
-  WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 import {
   TerminalColsSchema,
@@ -96,9 +95,6 @@ const TerminalResizeInputSchema = v.strictObject({
   rows: TerminalRowsSchema,
 })
 const TerminalTakeoverInputSchema = TerminalResizeInputSchema
-const TerminalSessionInputSchema = v.strictObject({
-  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
-})
 const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const TerminalListSessionsInputSchema = v.strictObject({
   workspaceId: WorkspaceIdSchema,

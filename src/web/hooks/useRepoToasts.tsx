@@ -5,7 +5,6 @@ import { toast } from 'vue-sonner'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import type { RepoEvent } from '#/web/stores/workspaces/types.ts'
 import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import {

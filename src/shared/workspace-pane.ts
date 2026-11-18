@@ -32,17 +32,12 @@ type WorkspacePaneStaticTabTypeWithScope<TScope extends WorkspacePaneTabScope> =
 }[WorkspacePaneStaticTabType]
 export type WorkspacePaneBranchTabType = WorkspacePaneStaticTabTypeWithScope<'branch'>
 export type WorkspacePaneWorktreeStaticTabType = WorkspacePaneStaticTabTypeWithScope<'worktree'>
-export type WorkspacePaneWorktreeTabType = WorkspacePaneWorktreeStaticTabType | WorkspacePaneRuntimeTabType
 export const WORKSPACE_PANE_BRANCH_TAB_TYPES = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
   (type): type is WorkspacePaneBranchTabType => WORKSPACE_PANE_STATIC_TAB_SCOPES[type] === 'branch',
 )
 export const WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
   (type): type is WorkspacePaneWorktreeStaticTabType => WORKSPACE_PANE_STATIC_TAB_SCOPES[type] === 'worktree',
 )
-export const WORKSPACE_PANE_WORKTREE_TAB_TYPES = [
-  ...WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
-  ...WORKSPACE_PANE_RUNTIME_TAB_TYPES,
-] satisfies readonly WorkspacePaneWorktreeTabType[]
 // Session-persistence allow-list for selected workspace-pane tab types.
 // Server-owned runtime tab entries are modeled by WORKSPACE_PANE_RUNTIME_TAB_TYPES.
 export const WORKSPACE_PANE_SESSION_TAB_TYPES = WORKSPACE_PANE_TAB_TYPES
@@ -76,12 +71,6 @@ export function isWorkspacePaneBranchTabType(value: string | null | undefined): 
   return isStringIn(WORKSPACE_PANE_BRANCH_TAB_TYPES, value)
 }
 
-export function isWorkspacePaneWorktreeStaticTabType(
-  value: string | null | undefined,
-): value is WorkspacePaneWorktreeStaticTabType {
-  return isStringIn(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES, value)
-}
-
 export function workspacePaneStaticTabScope(tab: WorkspacePaneStaticTabType): WorkspacePaneTabScope {
   return WORKSPACE_PANE_STATIC_TAB_SCOPES[tab]
 }
@@ -100,10 +89,6 @@ export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boo
 
 export function isWorkspacePaneSessionTabType(value: string | null | undefined): value is WorkspacePaneSessionTabType {
   return isStringIn(WORKSPACE_PANE_SESSION_TAB_TYPES, value)
-}
-
-export function isWorkspacePaneTabEntry(value: unknown): value is WorkspacePaneTabEntry {
-  return workspacePaneTabEntryFromUnknown(value) !== null
 }
 
 export function workspacePaneTabEntryFromUnknown(value: unknown): WorkspacePaneTabEntry | null {

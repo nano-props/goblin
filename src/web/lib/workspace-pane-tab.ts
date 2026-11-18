@@ -1,6 +1,5 @@
 import {
   isWorkspacePaneBranchTabType,
-  isWorkspacePaneTabType,
   type WorkspacePaneBranchTabType,
   type WorkspacePaneTabType,
   type WorkspacePaneTabScope,
@@ -14,10 +13,6 @@ import {
 
 export type BranchLevelWorkspacePaneTab = WorkspacePaneBranchTabType
 export type WorktreeLevelWorkspacePaneTab = Exclude<WorkspacePaneTabType, BranchLevelWorkspacePaneTab>
-
-export function isWorkspacePaneTab(value: string | null | undefined): value is WorkspacePaneTabType {
-  return isWorkspacePaneTabType(value)
-}
 
 export function workspacePaneTabScope(tab: WorkspacePaneTabType): WorkspacePaneTabScope {
   return sharedWorkspacePaneTabScope(tab)

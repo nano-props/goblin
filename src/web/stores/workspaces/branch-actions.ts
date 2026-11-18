@@ -7,11 +7,7 @@ import type {
   RepoOperationReason,
   RepoOperationTarget,
 } from '#/web/stores/workspaces/operations.ts'
-import {
-  updateIfFresh,
-  workspaceCanExecute,
-  workspaceOperationalFailureReason,
-} from '#/web/stores/workspaces/workspace-guards.ts'
+import { workspaceCanExecute, workspaceOperationalFailureReason } from '#/web/stores/workspaces/workspace-guards.ts'
 import { repoOperation, repoLocalBranchActionScheduleGuard } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import type {
   CreateWorktreeAction,

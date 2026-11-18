@@ -1,6 +1,5 @@
 import type { QueryClient } from '@tanstack/query-core'
 import type {
-  ExternalAppsSnapshot,
   GitHubCliState,
   WorkspaceSettingsState,
   RuntimeRecentWorkspacesState,
@@ -59,15 +58,6 @@ export function updateWorkspaceSettingsStateCache(queryClient: QueryClient, next
     ...current,
     workspaceSettings: next.workspaceSettings,
   }))
-}
-
-export function updateExternalAppsCache(
-  queryClient: QueryClient,
-  update: (current: ExternalAppsSnapshot) => ExternalAppsSnapshot,
-): void {
-  queryClient.setQueryData(externalAppsQueryKey(), (current: ExternalAppsSnapshot | undefined) =>
-    current ? update(current) : current,
-  )
 }
 
 export function updateGitHubCliCache(

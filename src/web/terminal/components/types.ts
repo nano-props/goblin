@@ -1,7 +1,5 @@
 import type {
   TerminalClientRole,
-  TerminalExitEvent,
-  TerminalOutputEvent,
   TerminalSessionBase,
   TerminalSessionPhase,
   TerminalSize,

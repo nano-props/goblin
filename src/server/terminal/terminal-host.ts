@@ -16,12 +16,9 @@ import type {
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 
-type MaybePromise<T> = T | Promise<T>
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 
-// The terminal host uses the broker's realtime socket contract directly.
-import type { ServerAppRealtimeHost, ServerAppRealtimeSocket } from '#/server/realtime/app-realtime-host.ts'
-export type TerminalRealtimeSocket = ServerAppRealtimeSocket
-export type ServerTerminalSocket = ServerAppRealtimeSocket
+type MaybePromise<T> = T | Promise<T>
 
 export type ServerTerminalHostState = 'running' | 'shutting-down'
 

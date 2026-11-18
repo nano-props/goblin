@@ -35,9 +35,6 @@ export type PtyWorkerMessage =
   | { type: 'pty-exit'; ptySessionId: string; code: number | null; signal: NodeJS.Signals | null }
   | { type: 'pty-process-name-changed'; ptySessionId: string; processName: string }
 
-export const PTY_WORKER_REQUEST_ACTIONS = ['pty-spawn', 'pty-write', 'pty-resize', 'pty-kill', 'shutdown'] as const
-export type PtyWorkerRequestAction = (typeof PTY_WORKER_REQUEST_ACTIONS)[number]
-
 // Validate the worker → host IPC trust boundary before dispatch.
 const PtySessionIdStringSchema = v.pipe(v.string(), v.minLength(1))
 const PtySpawnResultSuccessSchema = v.object({

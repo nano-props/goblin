@@ -1,13 +1,10 @@
 import * as v from 'valibot'
 import { normalizeTerminalCreateResult, TerminalCreateInputSchema } from '#/shared/terminal-validators.ts'
 import type {
-  WorkspacePaneRuntimeCloseInput,
   WorkspacePaneRuntimeCloseResult,
-  WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
 import {
-  canonicalRuntimeWorkspacePaneTarget,
   normalizeWorkspacePaneTabsSnapshot,
   WorkspacePaneFilesystemExecutionTargetSchema,
   WorkspacePaneOptionalTabIdentitySchema,
@@ -75,22 +72,6 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
     message: v.string(),
   }),
 ])
-
-export function normalizeWorkspacePaneRuntimeOpenInput(value: unknown): WorkspacePaneRuntimeOpenInput | null {
-  const parsed = v.safeParse(WorkspacePaneRuntimeOpenInputSchema, value)
-  if (!parsed.success) return null
-  const target = canonicalRuntimeWorkspacePaneTarget(parsed.output.request.target)
-  return target && target.kind !== 'git-branch'
-    ? { ...parsed.output, request: { ...parsed.output.request, target } }
-    : null
-}
-
-export function normalizeWorkspacePaneRuntimeCloseInput(value: unknown): WorkspacePaneRuntimeCloseInput | null {
-  const parsed = v.safeParse(WorkspacePaneRuntimeCloseInputSchema, value)
-  if (!parsed.success) return null
-  const target = canonicalRuntimeWorkspacePaneTarget(parsed.output.target.target)
-  return target && target.kind !== 'git-branch' ? { ...parsed.output, target: { target } } : null
-}
 
 export function normalizeWorkspacePaneRuntimeOpenResult(value: unknown): WorkspacePaneRuntimeOpenResult | null {
   const parsed = v.safeParse(WorkspacePaneRuntimeOpenResultEnvelopeSchema, value)

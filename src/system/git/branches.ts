@@ -15,14 +15,12 @@ import {
   DEFAULT_REPOSITORY_LOG_COUNT,
   repoLogTargetRevision,
   type BranchSnapshotInfo,
-  type ExecResult,
   type LogEntry,
   type RepoLogTarget,
   type RepoWorktreeTargetProjection,
   type WorkspacePaneBranchTargetIdentity,
   type WorkspacePaneTargetIdentitySet,
   type WorkspacePaneWorktreeTargetIdentity,
-  type WorktreeInfo,
 } from '#/shared/git-types.ts'
 import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
 import { decodeGitUpstream, GIT_UPSTREAM_FORMAT, type GitUpstream } from '#/system/git/upstream.ts'

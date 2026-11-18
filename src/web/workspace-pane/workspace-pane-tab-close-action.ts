@@ -23,7 +23,6 @@ import {
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import type { WorkspacePaneRuntimeTabCloseConfirmRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
@@ -37,10 +36,7 @@ import {
   type WorkspacePaneCloseTransition,
   type WorkspacePaneTabClosePresentationEffects,
 } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
-import {
-  resolveCloseWorkspacePaneTarget,
-  workspacePaneRouteTargetForClose,
-} from '#/web/workspace-pane/workspace-pane-tab-close-target.ts'
+import { resolveCloseWorkspacePaneTarget } from '#/web/workspace-pane/workspace-pane-tab-close-target.ts'
 import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { surfaceWorkspacePaneTabTargetUnavailable } from '#/web/workspace-pane/workspace-pane-tab-action-feedback.ts'

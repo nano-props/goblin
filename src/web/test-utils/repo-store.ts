@@ -29,7 +29,6 @@ import {
   repoWorktreeForBranch,
   type BranchSnapshotInfo,
   type PullRequestInfo,
-  type RepoWorktreeSnapshot,
   type WorkspaceRepoWorktreeSnapshot,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'

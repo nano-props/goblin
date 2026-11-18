@@ -18,7 +18,6 @@ import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pan
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
-  type FilesystemWorkspacePaneTabsTarget,
   type GitBranchWorkspacePaneTabsTarget,
   type GitWorktreeWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
@@ -31,11 +30,8 @@ import {
 } from '#/shared/workspace-runtime.ts'
 import {
   workspacePaneLocationForBranch,
-  workspacePaneLocationBranchName,
   workspacePaneLocationExecutionTarget,
   workspacePaneLocationForWorktree,
-  workspacePaneLocationWorktreePath,
-  workspacePaneLocationForRoot,
   type FilesystemWorkspacePaneLocation,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'

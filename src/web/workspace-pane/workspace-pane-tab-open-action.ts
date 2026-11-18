@@ -12,7 +12,6 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   recordWorkspacePaneTabOpener,

@@ -1,4 +1,3 @@
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   parseCanonicalWorkspaceLocator,
   workspaceLocatorForPath,
@@ -125,15 +124,5 @@ export function workspacePaneTabsTargetForFilesystemTarget(
         kind: 'git-worktree',
         workspaceId: target.workspaceId,
         worktreePath: workspacePaneFilesystemRootPath(target),
-      }
-}
-
-export function workspacePaneFilesystemTerminalBase(target: WorkspacePaneFilesystemTarget): TerminalSessionBase | null {
-  if (!target.capabilities.terminal.available) return null
-  return target.kind === 'workspace-root'
-    ? { target: workspacePaneFilesystemRuntimeTarget(target), presentation: { kind: 'workspace-root' } }
-    : {
-        target: workspacePaneFilesystemRuntimeTarget(target),
-        presentation: { kind: 'git-worktree' },
       }
 }

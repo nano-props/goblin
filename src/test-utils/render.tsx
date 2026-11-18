@@ -2,8 +2,6 @@
 // repository cleanup boundary because Vitest globals are disabled.
 import { cleanup, render } from '@testing-library/vue'
 import type { RenderOptions, RenderResult } from '@testing-library/vue'
-import { VueQueryPlugin } from '@tanstack/vue-query'
-import type { QueryClient } from '@tanstack/vue-query'
 import { defineComponent, isVNode, nextTick, shallowRef } from 'vue'
 import type { Component, ComponentOptions, ShallowRef, VNode } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -151,12 +149,4 @@ export async function flushTestUpdates<T>(callback: () => T | Promise<T>): Promi
   const result = await callback()
   await nextTick()
   return result
-}
-
-export function vueQueryRenderOptions(queryClient: QueryClient): Pick<JsdomRenderOptions, 'global'> {
-  return {
-    global: {
-      plugins: [[VueQueryPlugin, { queryClient }]],
-    },
-  }
 }

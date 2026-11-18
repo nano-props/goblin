@@ -9,7 +9,6 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import { workspacePaneLocationForBranch } from '#/web/workspace-pane/workspace-pane-location.ts'
-import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   workspacePaneTabModelBranchName,
   workspacePaneTabModelWorkspaceId,

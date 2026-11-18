@@ -248,8 +248,6 @@ export type WorkspaceRuntimeOpenResult =
       diagnostics: Array<{ scope: 'git' | 'transport'; message: string }>
     }
   | { ok: false; input: string; reason: string }
-export type WorkspaceRuntimeOpenResponse = { ok: true; workspaceRuntimeId: string } | WorkspaceRuntimeOpenResult
-
 export interface CloneRepoResult extends ExecResult {
   path?: string
 }

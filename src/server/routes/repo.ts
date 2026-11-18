@@ -26,10 +26,7 @@ import {
 } from '#/server/repos/write-paths.ts'
 import { cloneRepo } from '#/server/repos/clone-write.ts'
 import { getServerFetchIntervalSec } from '#/server/settings/source.ts'
-import {
-  publishRepoReadInvalidation,
-  publishUserWorkspaceFilesystemInvalidation,
-} from '#/server/realtime/invalidation-broker.ts'
+import { publishUserWorkspaceFilesystemInvalidation } from '#/server/realtime/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
@@ -56,7 +53,6 @@ import {
   type CreateWorktreeExecResult,
   type RepoMutationExecResult,
 } from '#/shared/git-types.ts'
-import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/repos/source.ts'
 import {

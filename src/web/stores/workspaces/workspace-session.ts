@@ -79,7 +79,6 @@ function createRestorableWorkspaceLifecycleActions(
             restoredWorkspace.workspaceRuntimeId,
             rankById,
           )
-          const workspace = workspaces[restoredWorkspace.workspaceId]
           const nextRestoredWorkspaceId = restoredWorkspaceIdAfterWorkspaceHydration(
             s.restoredWorkspaceId,
             workspaces,

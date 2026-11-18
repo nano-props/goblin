@@ -31,7 +31,7 @@ import {
 } from '#/server/workspace-capability-transition-host.ts'
 import { CodedError } from '#/shared/coded-error.ts'
 import { WORKSPACE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
-import type { WorkspaceId, WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
+import type { WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import { homedir } from 'node:os'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { RuntimeWorkspacePaneTarget, WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'

@@ -1,4 +1,4 @@
-import { nextTick, onBeforeUpdate, onMounted, onScopeDispose, onUpdated, ref, watch } from 'vue'
+import { nextTick, onBeforeUpdate, onMounted, onScopeDispose, onUpdated, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { isPendingWorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'

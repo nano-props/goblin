@@ -83,7 +83,7 @@ const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigator
   setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
-    const { repo, snapshotReadModel, statusReadModel } = useGitWorkspaceNavigatorReadModel(() => props.repo)
+    const { repo, snapshotReadModel } = useGitWorkspaceNavigatorReadModel(() => props.repo)
     const rows = computed(() => {
       if (!repo.value) return []
       return gitWorkspaceNavigatorRows({

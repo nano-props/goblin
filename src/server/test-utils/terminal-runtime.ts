@@ -233,10 +233,6 @@ const activeRuntimeShutdowns = new Set<() => void>()
 export let testWorkspacePaneLayout: WorkspacePaneDurableLayout = { entries: [] }
 export let testWorkspacePaneLayoutWriteError: Error | null = null
 
-export function setWorkspaceRuntimeId(workspaceRuntimeId: string): void {
-  WORKSPACE_RUNTIME_ID = workspaceRuntimeId
-}
-
 export function setMockDataToEmitOnRegistration(data: string | null): void {
   mockDataToEmitOnRegistration = data
 }

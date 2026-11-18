@@ -21,22 +21,13 @@ import {
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
-  workspacePaneTabsTargetFromRuntime,
-  type WorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
-import {
   workspacePaneCommandCoordinates,
-  workspacePaneCommandPaneTarget,
   workspacePaneCommandRouteTarget,
   workspacePaneCommandTargetHasFilesystem,
-  workspacePaneCommandWorktreeHead,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
-import type {
-  FilesystemWorkspacePaneLocation,
-  WorkspacePaneLocation,
-} from '#/web/workspace-pane/workspace-pane-location.ts'
+import type { FilesystemWorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 

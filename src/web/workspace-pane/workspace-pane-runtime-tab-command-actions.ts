@@ -2,7 +2,6 @@ import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   terminalExecutionCoordinates,
-  terminalExecutionPath,
   type TerminalPresentation,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
@@ -33,7 +32,6 @@ import {
   type CreatedTerminalNavigation,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   workspacePaneLocationTerminalBase,
   type FilesystemWorkspacePaneLocation,
@@ -158,7 +156,6 @@ function terminalRuntimeTabActionContext({
   t,
 }: WorkspacePaneTerminalRuntimeCommandOptions): WorkspacePaneRuntimeTabCommandContext {
   const { capabilities, workspacePaneRoute } = target
-  const workspaceId = target.location.workspaceId
   return workspacePaneRuntimeTabCommandContext({
     location: target.location,
     capabilities,
@@ -282,7 +279,7 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   const terminal = context.terminal
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
-  const { base, bridge } = terminal
+  const { bridge } = terminal
   const result = await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
     location: terminal.location,
     createTerminal: bridge.createTerminalWithAdmission,

@@ -13,7 +13,6 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   workspacePaneLocationForBranchTarget,

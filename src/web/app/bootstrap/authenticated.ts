@@ -128,7 +128,7 @@ async function restoreBootSession(
 ): Promise<WorkspaceRestoreOutcome> {
   try {
     const presentation = await readClientWorkspaceState()
-    const snapshot = await waitForPromiseWithSignal(settingsSnapshot, signal)
+    await waitForPromiseWithSignal(settingsSnapshot, signal)
     if (signal.aborted) throw abortReason(signal)
     const restored = await waitForPromiseWithSignal(
       restoreWorkspaceAtBoot(readClientPageId(), {

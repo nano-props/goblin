@@ -214,13 +214,6 @@ export function remoteWorkspaceConnectionTarget(
   return null
 }
 
-/** Whether the lifecycle is in the transient `connecting` state. */
-export function isRemoteWorkspaceConnectionConnecting(
-  lifecycle: RemoteWorkspaceConnectionLifecycle | null | undefined,
-): boolean {
-  return !!lifecycle && lifecycle.kind === 'connecting'
-}
-
 /** Whether the lifecycle has converged to a terminal state. */
 export function isRemoteWorkspaceConnectionTerminal(
   lifecycle: RemoteWorkspaceConnectionLifecycle | null | undefined,

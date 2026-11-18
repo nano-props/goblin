@@ -464,7 +464,6 @@ type TestRepoReadInvalidation = {
   domain: 'metadata' | 'worktree-status' | 'operations'
 }
 type TestRepoMetadataInvalidation = { repoId: string; domain: 'metadata' }
-type TestRepoWorktreeStatusInvalidation = { repoId: string; domain: 'worktree-status' }
 
 function repoReadInvalidationEvents(): TestRepoReadInvalidation[] {
   return hoistedMocks.publishRepoReadInvalidation.mock.calls.map(([event]) => event as TestRepoReadInvalidation)
@@ -476,25 +475,10 @@ export function repoMetadataInvalidations(): TestRepoMetadataInvalidation[] {
   )
 }
 
-export function repoWorktreeStatusInvalidations(): TestRepoWorktreeStatusInvalidation[] {
-  return repoReadInvalidationEvents().filter(
-    (event): event is TestRepoWorktreeStatusInvalidation => event.domain === 'worktree-status',
-  )
-}
-
 export function expectRepoMetadataInvalidations(...events: TestRepoMetadataInvalidation[]): void {
   expect(repoMetadataInvalidations()).toEqual(events)
 }
 
 export function expectNoRepoMetadataInvalidations(): void {
   expectRepoMetadataInvalidations()
-}
-
-export function expectRepoOperationSettledBeforeProjectionInvalidation(): void {
-  const domains = repoReadInvalidationEvents().map((event) => event.domain)
-  const firstProjectionInvalidation = domains.findIndex((domain) => domain !== 'operations')
-  const finalOperationInvalidation = domains.lastIndexOf('operations')
-  expect(firstProjectionInvalidation).toBeGreaterThanOrEqual(0)
-  expect(finalOperationInvalidation).toBeGreaterThanOrEqual(0)
-  expect(finalOperationInvalidation).toBeLessThan(firstProjectionInvalidation)
 }

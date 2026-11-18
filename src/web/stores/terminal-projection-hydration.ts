@@ -83,14 +83,6 @@ export const terminalProjectionHydrationStore = createStore<TerminalProjectionHy
   },
 }))
 
-export function useTerminalProjectionHydrationPhase(
-  workspaceId: MaybeRefOrGetter<WorkspaceId | null | undefined>,
-  workspaceRuntimeId: MaybeRefOrGetter<string | null | undefined>,
-): ComputedRef<TerminalProjectionHydrationPhase> {
-  const entry = useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId)
-  return computed(() => entry.value.phase)
-}
-
 export function useTerminalProjectionHydrationEntry(
   workspaceId: MaybeRefOrGetter<WorkspaceId | null | undefined>,
   workspaceRuntimeId: MaybeRefOrGetter<string | null | undefined>,
@@ -106,17 +98,5 @@ export function useTerminalProjectionHydrationEntry(
     return current?.workspaceRuntimeId === currentRuntimeId
       ? current
       : { workspaceRuntimeId: currentRuntimeId, phase: 'pending' }
-  })
-}
-
-export function useIsInitialTerminalProjectionHydrating(
-  workspaceId: MaybeRefOrGetter<WorkspaceId | null | undefined>,
-  workspaceRuntimeId: MaybeRefOrGetter<string | null | undefined>,
-): ComputedRef<boolean> {
-  const entry = useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId)
-  return computed(() => {
-    const currentWorkspaceId = toValue(workspaceId)
-    const currentRuntimeId = toValue(workspaceRuntimeId)
-    return !!currentWorkspaceId && !!currentRuntimeId && entry.value.phase === 'pending'
   })
 }

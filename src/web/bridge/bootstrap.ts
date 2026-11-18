@@ -84,7 +84,3 @@ export function readQueryBootstrap(): ClientBootstrapSnapshot | null {
 export function readWebBootstrap(): ClientBootstrapSnapshot {
   return readInjectedWebBootstrap() ?? readQueryBootstrap() ?? EMPTY_BOOTSTRAP
 }
-
-export function emptyBootstrapSnapshot(): ClientBootstrapSnapshot {
-  return EMPTY_BOOTSTRAP
-}

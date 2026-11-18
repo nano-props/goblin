@@ -19,8 +19,6 @@ import {
 /** Server-side result for resolve-target: concrete target or an i18n
  *  key (e.g. `error.ssh-config-changed`, `workspace-picker.open-remote-home-unavailable`).
  *  Callers localize the error message via `t()`. */
-type ResolveTargetResponse = { target: RemoteWorkspaceTarget } | { error: string }
-
 export async function resolveRemoteWorkspaceTarget(
   ref: { alias: string; remotePath: string },
   signal?: AbortSignal,

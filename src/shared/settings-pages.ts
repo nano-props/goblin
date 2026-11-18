@@ -1,5 +1,3 @@
-import { isStringIn } from '#/shared/string-literals.ts'
-
 export const SETTINGS_PAGES = [
   'general',
   'shortcuts',
@@ -13,10 +11,6 @@ export const SETTINGS_PAGES = [
 ] as const
 
 export type SettingsPage = (typeof SETTINGS_PAGES)[number]
-
-export function isSettingsPage(value: string | null | undefined): value is SettingsPage {
-  return isStringIn(SETTINGS_PAGES, value)
-}
 
 export const SETTINGS_PAGE_CONFIG = {
   general: { titleKey: 'settings.group.general', labelKey: 'settings.group.general' },

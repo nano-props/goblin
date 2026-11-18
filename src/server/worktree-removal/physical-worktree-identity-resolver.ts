@@ -7,7 +7,7 @@ import { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts
 import { resolveRemoteWorktree } from '#/system/ssh/git/worktrees.ts'
 import { runRemoteCommand, type RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
-import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   isCurrentWorkspaceRuntime,
   onWorkspaceRuntimeClosed,

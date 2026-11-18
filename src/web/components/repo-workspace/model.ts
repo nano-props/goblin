@@ -4,7 +4,6 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 
-export type CurrentGitWorkspacePane = ReturnType<typeof getCurrentGitWorkspacePane>
 export type CurrentGitWorkspacePanePresentation = ReturnType<typeof getCurrentGitWorkspacePanePresentation>
 
 export interface PullRequestReadPresentation {

@@ -5,7 +5,6 @@ import type {
 } from '#/shared/workspace-pane.ts'
 import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { isStringIn } from '#/shared/string-literals.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
   list: 'workspace-pane-tabs.list',
@@ -14,10 +13,6 @@ export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
 
 export type WorkspacePaneTabsSocketAction =
   (typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS)[keyof typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS]
-
-export function isWorkspacePaneTabsSocketAction(value: unknown): value is WorkspacePaneTabsSocketAction {
-  return isStringIn(Object.values(WORKSPACE_PANE_TABS_SOCKET_ACTIONS), value)
-}
 
 export const WORKSPACE_PANE_TABS_REALTIME_EVENTS = {
   changed: 'workspace-pane-tabs.changed',

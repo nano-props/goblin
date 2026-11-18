@@ -11,8 +11,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
-import type { WorktreeStatus } from '#/shared/git-types.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
@@ -27,13 +26,6 @@ export function updateRepoForTest(mutator: (repo: WorkspaceState) => void): void
   })
 }
 
-export function repoBranchNames(): string[] {
-  const repo = workspacesStore.getState().workspaces[REPO_ID]
-  return repo
-    ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.map((candidate) => candidate.name) ?? [])
-    : []
-}
-
 export function repoCurrentBranch(): string | null {
   const repo = workspacesStore.getState().workspaces[REPO_ID]
   return repo ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current ?? null) : null
@@ -41,10 +33,6 @@ export function repoCurrentBranch(): string | null {
 
 export function cachedRepoSnapshot(workspaceRuntimeId: string): RepoSnapshot | undefined {
   return getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId, appQueryClient)
-}
-
-export function cachedRepoStatus(workspaceRuntimeId: string): WorktreeStatus[] | undefined {
-  return getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId, appQueryClient)?.status
 }
 
 export function createWorktreeAction(): CreateWorktreeAction {

@@ -1,9 +1,6 @@
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 export const PULL_REQUEST_CACHE_TTL_MS = 30_000
 export const PULL_REQUEST_TRANSIENT_CACHE_TTL_MS = 2_000
-export const PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS = 2_000
-export const PULL_REQUEST_UNKNOWN_RETRY_LIMIT = 3
-
 export function pullRequestMergeStatusPending(
   pullRequest: Pick<PullRequestInfo, 'mergeable'> | null | undefined,
 ): boolean {

@@ -146,10 +146,6 @@ export function workspaceTerminalAvailable(probe: WorkspaceProbeState | null | u
   return probe?.status === 'ready' && probe.capabilities.terminal.available
 }
 
-export function workspaceWorktreesAvailable(probe: WorkspaceProbeState | null | undefined): boolean {
-  return probe?.status === 'ready' && probe.capabilities.git.status === 'available' && probe.capabilities.git.worktrees
-}
-
 export function bindWorkspacePaneTarget(
   target: RestorableWorkspacePaneTarget,
   workspaceId: WorkspaceId,

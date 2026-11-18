@@ -5,14 +5,8 @@ import {
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   useTerminalSessionReadContext,
 } from '#/web/terminal/components/terminal-session-context.ts'
-import {
-  useTerminalProjectionHydrationEntry,
-  useTerminalProjectionHydrationPhase,
-} from '#/web/stores/terminal-projection-hydration.ts'
-import type {
-  TerminalProjectionHydrationEntry,
-  TerminalProjectionHydrationPhase,
-} from '#/web/stores/terminal-projection-hydration.ts'
+import { useTerminalProjectionHydrationEntry } from '#/web/stores/terminal-projection-hydration.ts'
+import type { TerminalProjectionHydrationEntry } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   TerminalSnapshot,
@@ -172,17 +166,6 @@ export function useTerminalSessionSummaries(
   return useTerminalFilesystemTargetField(terminalFilesystemTargetKey, (snapshot) => snapshot.sessions)
 }
 
-export function useTerminalWorkspaceProjectionPhase(
-  workspaceId: MaybeRefOrGetter<WorkspaceId | null>,
-): ComputedRef<TerminalProjectionHydrationPhase> {
-  const workspaceState = useStoreSelector(workspacesStore, (state) => state.workspaces)
-  const workspaceRuntimeId = computed(() => {
-    const currentWorkspaceId = toValue(workspaceId)
-    return currentWorkspaceId ? workspaceState.value[currentWorkspaceId]?.workspaceRuntimeId : undefined
-  })
-  return useTerminalProjectionHydrationPhase(workspaceId, workspaceRuntimeId)
-}
-
 export function useTerminalWorkspaceProjectionHydrationEntry(
   workspaceId: MaybeRefOrGetter<WorkspaceId | null>,
 ): ComputedRef<TerminalProjectionHydrationEntry> {
@@ -192,13 +175,6 @@ export function useTerminalWorkspaceProjectionHydrationEntry(
     return currentWorkspaceId ? workspaceState.value[currentWorkspaceId]?.workspaceRuntimeId : undefined
   })
   return useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId)
-}
-
-export function useTerminalWorkspaceProjectionReady(
-  workspaceId: MaybeRefOrGetter<WorkspaceId | null>,
-): ComputedRef<boolean> {
-  const phase = useTerminalWorkspaceProjectionPhase(workspaceId)
-  return computed(() => phase.value === 'ready')
 }
 
 export function useTerminalSnapshot(terminalSessionId: MaybeRefOrGetter<string | null>): ComputedRef<TerminalSnapshot> {

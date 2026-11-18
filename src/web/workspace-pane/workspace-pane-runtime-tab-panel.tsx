@@ -1,6 +1,5 @@
 import { defineComponent } from 'vue'
 import type { VNodeChild } from 'vue'
-import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { TerminalSessionView } from '#/web/terminal/components/TerminalSessionView.tsx'

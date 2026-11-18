@@ -1,8 +1,8 @@
 // Query options are the read boundary for server-backed settings projections.
 import { computed, onScopeDispose, toValue } from 'vue'
-import type { ComputedRef, MaybeRefOrGetter } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/api-types.ts'
+import type { GitHubCliState } from '#/shared/api-types.ts'
 import { getExternalAppsSnapshot, getGitHubCliState, getLanInfo, getSettingsSnapshot } from '#/web/settings/client.ts'
 import { subscribeSettingsInvalidation } from '#/web/settings/invalidation-ingress.ts'
 import {
@@ -64,11 +64,6 @@ function lanInfoQueryOptions() {
 
 export function useSettingsSnapshotQuery() {
   return useQuery(settingsSnapshotQueryOptions())
-}
-
-export function useSettingsSnapshotReadModel(): ComputedRef<SettingsSnapshot | undefined> {
-  const query = useSettingsSnapshotQuery()
-  return computed(() => query.data.value)
 }
 
 export function useExternalAppsQuery() {

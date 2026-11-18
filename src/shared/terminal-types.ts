@@ -99,8 +99,6 @@ export function terminalSessionCoordinates(session: Pick<TerminalSessionBase, 't
   return terminalExecutionCoordinates(session.target)
 }
 
-export type WorkspaceRuntimeInput = WorkspaceRuntimeScope
-
 export interface TerminalAttachInput {
   /**
    * Server terminal-runtime identity used to address attach/write/resize/

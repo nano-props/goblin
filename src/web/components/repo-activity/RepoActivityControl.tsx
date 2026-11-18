@@ -1,7 +1,6 @@
 import { computed, defineComponent, onScopeDispose, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { Check, Loader2, RefreshCw } from '@lucide/vue'
-import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { Tip } from '#/web/components/Tip.tsx'

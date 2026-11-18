@@ -12,8 +12,6 @@ export type RepoViewClientIntent = { type: 'show-workspace-pane-tab-requested'; 
 
 export type ClientEffectIntent = RepoViewClientIntent | TerminalBellClickIntent
 
-export type ClientEffectIntentType = ClientEffectIntent['type']
-
 export function isClientEffectIntent(event: unknown): event is ClientEffectIntent {
   if (!isRecord(event)) return false
   switch (event.type) {

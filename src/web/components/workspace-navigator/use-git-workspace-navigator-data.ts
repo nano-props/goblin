@@ -63,5 +63,5 @@ export function useGitWorkspaceNavigatorReadModel(repoShell: MaybeRefOrGetter<Gi
     }
   })
 
-  return { repo, snapshotReadModel, statusReadModel }
+  return { repo, snapshotReadModel }
 }

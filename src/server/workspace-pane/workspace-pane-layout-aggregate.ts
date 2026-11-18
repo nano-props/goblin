@@ -42,7 +42,6 @@ import {
   projectCanonicalEntries,
   runtimeTargetKey,
   targetMap,
-  targetProjectionKey,
   type WorkspacePaneTargetProjection,
 } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 

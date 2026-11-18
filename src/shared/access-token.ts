@@ -15,10 +15,5 @@ export const ACCESS_TOKEN_QUERY = 't'
  *  cookie via `POST /api/login`, and stripped from the URL. */
 export const ACCESS_TOKEN_URL_PARAM = 'accessToken'
 
-/** Server-side cookie lifetime. The cookie is the long-lived auth
- *  artifact; the token stays in the file (and in the server's
- *  in-memory state) for as long as the file is on disk. */
-export const ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
-
 /** File name under the server data directory that holds the persistent access token. */
 export const ACCESS_TOKEN_FILE_NAME = 'server-token'

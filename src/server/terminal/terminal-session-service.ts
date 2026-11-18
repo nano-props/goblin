@@ -12,7 +12,6 @@ import type {
   WorkspacePaneTabsUpdateInput,
   WorkspacePaneTabsWriteResult,
 } from '#/shared/workspace-pane-tabs.ts'
-import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
 import { isWorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope, terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'

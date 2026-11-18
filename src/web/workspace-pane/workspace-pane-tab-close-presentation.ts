@@ -2,7 +2,6 @@ import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneTabEntryIdentity, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { workspacePaneSurfaceTabEntries } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {

@@ -20,11 +20,7 @@ import {
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
-import {
-  workspaceGitAvailable,
-  type WorkspaceProbeState,
-  type WorkspaceSettledProbeState,
-} from '#/shared/workspace-runtime.ts'
+import { workspaceGitAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RestoreWorkspaceTabsInput {

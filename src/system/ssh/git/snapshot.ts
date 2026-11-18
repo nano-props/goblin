@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { isValidRemotePath, parseRemoteSnapshot } from '#/system/ssh/git/codec.ts'
 import type { RemoteRepoSnapshot } from '#/system/ssh/git/codec.ts'

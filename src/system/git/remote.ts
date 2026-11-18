@@ -1,10 +1,4 @@
-import {
-  git,
-  gitCommandResultWithOptions,
-  gitResultWithOptions,
-  gitScalar,
-  NETWORK_TIMEOUT_MS,
-} from '#/system/git/git-exec.ts'
+import { git, gitCommandResultWithOptions, gitScalar, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { commandMayHaveRun, withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
 import {
   GIT_OBJECT_ID_OR_PREFIX_RE,

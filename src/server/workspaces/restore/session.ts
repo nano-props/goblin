@@ -414,16 +414,6 @@ type OpenedWorkspaceRuntimeTransport = {
 
 type OpenedWorkspaceRuntimeInput = OpenedWorkspaceRuntimeInputBase & OpenedWorkspaceRuntimeTransport
 
-function requiredWorkspaceProbe(
-  userId: string,
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-): WorkspaceProbeState {
-  const probe = workspaceProbeStateForRuntime(userId, workspaceId, workspaceRuntimeId)
-  if (!probe) throw new Error('workspace runtime was superseded during restore')
-  return probe
-}
-
 function serverLocatorPlatform(): 'posix' | 'win32' {
   return process.platform === 'win32' ? 'win32' : 'posix'
 }

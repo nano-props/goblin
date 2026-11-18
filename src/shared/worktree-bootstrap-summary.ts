@@ -1,5 +1,3 @@
-export type WorktreeBootstrapMode = 'copy' | 'symlink' | 'hardlink'
-
 export interface WorktreeBootstrapPathSummary {
   count: number
   paths: string[]

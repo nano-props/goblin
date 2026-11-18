@@ -12,7 +12,6 @@ import { appQueryClient } from '#/web/app/query-client.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import {
   repoDataQueryKey,
-  repoOperationsQueryKey,
   repoOperationsQueryPrefix,
   repoPullRequestsQueryPrefix,
   repoSnapshotQueryKey,

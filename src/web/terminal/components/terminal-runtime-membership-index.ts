@@ -30,19 +30,6 @@ export function runtimeMembershipIndexFromEntries(
   return index
 }
 
-export function runtimeMembershipIndexEqual(
-  left: TerminalRuntimeMembershipIndex,
-  right: TerminalRuntimeMembershipIndex,
-): boolean {
-  if (left === right) return true
-  if (left.size !== right.size) return false
-  for (const [workspaceId, current] of left) {
-    const next = right.get(workspaceId)
-    if (!next || current.workspaceRuntimeId !== next.workspaceRuntimeId) return false
-  }
-  return true
-}
-
 function terminalRuntimeMembershipEntriesFromRepos(
   workspaces: WorkspacesStore['workspaces'],
 ): TerminalRuntimeMembershipEntry[] {

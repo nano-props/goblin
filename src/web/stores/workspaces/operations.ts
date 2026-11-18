@@ -109,12 +109,11 @@ export function settleOperation(
   operation: RepoOperationState,
   operationId: number,
   _options?: { error?: string | null },
-): boolean {
-  if (operation.operationId !== operationId) return false
+): void {
+  if (operation.operationId !== operationId) return
   operation.phase = 'idle'
   operation.reason = null
   operation.target = null
-  return true
 }
 
 export function operationBusy(operation: RepoOperationState): boolean {

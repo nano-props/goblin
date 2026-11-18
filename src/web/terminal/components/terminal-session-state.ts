@@ -7,11 +7,7 @@ import type {
   TerminalSearchResult,
   TerminalSnapshot,
 } from '#/web/terminal/components/types.ts'
-import type {
-  TerminalControllerViewModel,
-  TerminalIdentityViewModel,
-  TerminalLifecycleViewModel,
-} from '#/web/terminal/projection-types.ts'
+import type { TerminalControllerViewModel, TerminalLifecycleViewModel } from '#/web/terminal/projection-types.ts'
 
 const TERMINAL_COMPOSER_HISTORY_LIMIT = 50
 

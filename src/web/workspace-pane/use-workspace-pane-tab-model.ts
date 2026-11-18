@@ -19,7 +19,6 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceRepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { workspaceRootFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import {

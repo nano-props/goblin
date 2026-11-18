@@ -109,7 +109,6 @@ import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphq
 import type { PullRequestEntry, RepoPullRequestScope, RepoSnapshot } from '#/shared/api-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
-import { isRemoteWorkspaceRuntimeFailure } from '#/server/workspaces/runtime/remote-failure.ts'
 import { parseWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   physicalWorktreeExecutionBinding,

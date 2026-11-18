@@ -13,12 +13,7 @@ const CanonicalIsoTimestampSchema = v.pipe(
   }, 'timestamp must use canonical ISO format'),
 )
 
-export const AckResponseSchema = v.strictObject({ ok: v.literal(true) })
 export const StringArrayResponseSchema = v.array(v.string())
-
-function pathSummarySchema() {
-  return v.strictObject({ count: NonNegativeIntegerSchema, paths: v.array(v.string()) })
-}
 
 export const WorkspaceCapabilitiesResponseSchema = v.strictObject({
   files: v.strictObject({ read: v.literal(true), write: v.boolean() }),

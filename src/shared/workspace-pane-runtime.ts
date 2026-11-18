@@ -1,6 +1,5 @@
 import type { TerminalCreateInput, TerminalCreateSuccess, TerminalExecutionTarget } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 
 export const WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS = {

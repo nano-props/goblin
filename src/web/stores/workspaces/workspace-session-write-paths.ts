@@ -1,7 +1,7 @@
 import { KeyedSerialQueue } from '#/web/lib/keyed-serial-queue.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspaces/runtime/capability-refresh.ts'
-import { requestInitialRepoSnapshotLoad, requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestInitialRepoSnapshotLoad } from '#/web/stores/workspaces/refresh.ts'
 import { closeWorkspaceRuntime, openWorkspaceRuntime, openWorkspaceRuntimeForInput } from '#/web/workspaces/client.ts'
 import { addWorkspaceToSession, recordRecentWorkspace, removeWorkspaceFromSession } from '#/web/settings/actions.ts'
 import {
@@ -65,19 +65,6 @@ function workspaceAdmissionFromInput(input: string | WorkspaceSessionEntry): Wor
   const parsed = parseRemoteWorkspaceId(input)
   const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
   return ref ? { kind: 'workspace-entry', entry: { id: ref.id } } : { kind: 'command-input', input }
-}
-
-export async function openLocalWorkspaceRuntimeForInput(
-  input: string | WorkspaceSessionEntry,
-  onOpened?: (opened: RuntimeOpenResolvedWorkspace) => void | Promise<void>,
-): Promise<RuntimeOpenResolvedWorkspace> {
-  const admission = workspaceAdmissionFromInput(input)
-  const workspaceInput = admission.kind === 'workspace-entry' ? admission.entry.id : admission.input
-  return runWorkspaceRuntimeMembershipCommand(workspaceInput, async () => {
-    const opened = await openLocalWorkspaceRuntimeForCommandInput(workspaceInput)
-    await onOpened?.(opened)
-    return opened
-  })
 }
 
 async function openLocalWorkspaceRuntimeForCommandInput(workspaceInput: string): Promise<RuntimeOpenResolvedWorkspace> {

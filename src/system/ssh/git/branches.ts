@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { parseLog } from '#/system/git/parsers.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { commandMayHaveRun, withoutMutationCommand } from '#/system/command-execution.ts'

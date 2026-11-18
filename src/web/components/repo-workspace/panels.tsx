@@ -21,8 +21,6 @@ import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import {
-  workspacePaneFilesystemTargetForLocation,
-  workspacePaneLocationExecutionTarget,
   workspacePaneLocationForWorktree,
   workspacePaneLocationTerminalBase,
 } from '#/web/workspace-pane/workspace-pane-location.ts'

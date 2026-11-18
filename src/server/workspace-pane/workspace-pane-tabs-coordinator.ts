@@ -1,9 +1,5 @@
-import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneTabsEntry,
-  WorkspacePaneTabsSnapshot,
-  WorkspacePaneTabsUpdateOperation,
-} from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'

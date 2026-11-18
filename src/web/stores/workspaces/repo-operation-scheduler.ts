@@ -199,8 +199,6 @@ interface RepoOperationScheduler {
 }
 
 const repoOperationSchedulers = new Map<WorkspaceId, RepoOperationScheduler>()
-const operationIdleWaiters = new Map<WorkspaceId, Set<() => void>>()
-
 function createRepoOperationScheduler(): RepoOperationScheduler {
   return {
     nextOperationId: 1,
@@ -292,54 +290,10 @@ export function settleRepoOperationTargets(
 ): void {
   const runtime = repoOperationSchedulers.get(repoId)
   if (!runtime) return
-  let settled = false
   for (const target of targets) {
     const operation = runtime.operations[target.key]
-    if (operation && settleOperation(operation, operationId, { error })) settled = true
+    if (operation) settleOperation(operation, operationId, { error })
   }
-  if (settled) notifyOperationIdleWaiters(repoId)
-}
-
-function notifyOperationIdleWaiters(repoId: WorkspaceId): void {
-  const waiters = operationIdleWaiters.get(repoId)
-  if (!waiters) return
-  for (const waiter of [...waiters]) waiter()
-}
-
-export function waitForRepoOperationsIdle(repoId: WorkspaceId, keys: string[], signal?: AbortSignal): Promise<void> {
-  if (keys.every((key) => !repoOperationBusy(repoId, key))) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const cleanup = () => {
-      operationIdleWaiters.get(repoId)?.delete(check)
-      signal?.removeEventListener('abort', abort)
-    }
-    const finish = () => {
-      if (settled) return
-      settled = true
-      cleanup()
-      resolve()
-    }
-    const fail = (reason: unknown) => {
-      if (settled) return
-      settled = true
-      cleanup()
-      reject(reason)
-    }
-    const check = () => {
-      if (keys.every((key) => !repoOperationBusy(repoId, key))) finish()
-    }
-    const abort = () => fail(signal?.reason ?? new RepoOperationCancelledError())
-    if (signal?.aborted) {
-      abort()
-      return
-    }
-    const waiters = operationIdleWaiters.get(repoId) ?? new Set<() => void>()
-    waiters.add(check)
-    operationIdleWaiters.set(repoId, waiters)
-    signal?.addEventListener('abort', abort, { once: true })
-    check()
-  })
 }
 
 export function scheduleRepoOperation<T>(
@@ -356,8 +310,6 @@ export function disposeRepoOperationScheduler(repoId: WorkspaceId): void {
   if (!runtime) return
   for (const queue of Object.values(runtime.queues)) queue.cancelAll()
   repoOperationSchedulers.delete(repoId)
-  notifyOperationIdleWaiters(repoId)
-  operationIdleWaiters.delete(repoId)
 }
 
 export function disposeAllRepoOperationSchedulers(): void {

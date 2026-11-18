@@ -1,15 +1,4 @@
-import type {
-  RestorableWorkspaceActions,
-  WorkspaceMembershipActions,
-  WorkspaceNavigationHistoryActions,
-} from '#/web/stores/workspaces/types.ts'
-
-interface RestorableWorkspaceLayoutStoreActions {
-  resetLayout: RestorableWorkspaceActions['resetLayout']
-  toggleZenMode: RestorableWorkspaceActions['toggleZenMode']
-}
-
-interface RestorableWorkspaceLayoutPreferenceStoreActions extends RestorableWorkspaceLayoutStoreActions {}
+import type { WorkspaceMembershipActions, WorkspaceNavigationHistoryActions } from '#/web/stores/workspaces/types.ts'
 
 interface RuntimeCoherentWorkspaceOpenStoreActions {
   openWorkspaceMembership: WorkspaceMembershipActions['openWorkspaceMembership']
@@ -19,15 +8,10 @@ interface RuntimeCoherentWorkspaceNavigationStoreActions {
   closeWorkspace: WorkspaceMembershipActions['closeWorkspace']
 }
 
-interface RuntimeCoherentWorkspaceProjectionStoreActions
-  extends RuntimeCoherentWorkspaceOpenStoreActions, RuntimeCoherentWorkspaceNavigationStoreActions {}
-
 interface AppNavigationStoreActions extends RuntimeCoherentWorkspaceNavigationStoreActions {
   peekWorkspaceNavigation: WorkspaceNavigationHistoryActions['peekWorkspaceNavigation']
   commitWorkspaceNavigation: WorkspaceNavigationHistoryActions['commitWorkspaceNavigation']
 }
-
-interface WorkspacePickerStoreActions extends RuntimeCoherentWorkspaceOpenStoreActions {}
 
 export function runtimeCoherentWorkspaceOpenStoreActionsFromStore(
   state: RuntimeCoherentWorkspaceOpenStoreActions,
@@ -45,52 +29,10 @@ export function runtimeCoherentWorkspaceNavigationStoreActionsFromStore(
   }
 }
 
-export function restorableWorkspaceLayoutStoreActionsFromStore(
-  state: RestorableWorkspaceLayoutStoreActions,
-): RestorableWorkspaceLayoutStoreActions {
-  return {
-    resetLayout: state.resetLayout,
-    toggleZenMode: state.toggleZenMode,
-  }
-}
-
-export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
-  state: RestorableWorkspaceLayoutPreferenceStoreActions,
-): RestorableWorkspaceLayoutPreferenceStoreActions {
-  return {
-    resetLayout: state.resetLayout,
-    toggleZenMode: state.toggleZenMode,
-  }
-}
-
-export function runtimeCoherentWorkspaceProjectionStoreActionsFromStore(
-  state: RuntimeCoherentWorkspaceProjectionStoreActions,
-): RuntimeCoherentWorkspaceProjectionStoreActions {
-  const open = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
-    openWorkspaceMembership: state.openWorkspaceMembership,
-  })
-  const navigation = runtimeCoherentWorkspaceNavigationStoreActionsFromStore({
-    closeWorkspace: state.closeWorkspace,
-  })
-  return {
-    openWorkspaceMembership: open.openWorkspaceMembership,
-    closeWorkspace: navigation.closeWorkspace,
-  }
-}
-
 export function appNavigationStoreActionsFromStore(state: AppNavigationStoreActions): AppNavigationStoreActions {
   return {
     closeWorkspace: state.closeWorkspace,
     peekWorkspaceNavigation: state.peekWorkspaceNavigation,
     commitWorkspaceNavigation: state.commitWorkspaceNavigation,
-  }
-}
-
-export function workspacePickerStoreActionsFromStore(state: WorkspacePickerStoreActions): WorkspacePickerStoreActions {
-  const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
-    openWorkspaceMembership: state.openWorkspaceMembership,
-  })
-  return {
-    openWorkspaceMembership: runtimeCoherent.openWorkspaceMembership,
   }
 }

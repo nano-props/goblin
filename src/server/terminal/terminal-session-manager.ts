@@ -50,7 +50,6 @@ import {
   terminalPtyGeneration,
   terminalPtyIdentityRevision,
   terminalPtyProcessName,
-  type TerminalPtyBoundState,
 } from '#/server/terminal/terminal-pty-state.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-worktree-identity.ts'

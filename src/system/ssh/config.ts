@@ -181,14 +181,3 @@ function normalizePort(value: string | null): number | null {
   const port = Number(value)
   return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null
 }
-
-export function findSshAliasForHost(configContent: string, host: string, user: string, port: number): string | null {
-  const hosts = parseSshConfigHosts(configContent)
-  for (const h of hosts) {
-    const effectiveHost = h.hostName ?? h.alias
-    if (effectiveHost === host && h.user === user && h.port === port) {
-      return h.alias
-    }
-  }
-  return null
-}

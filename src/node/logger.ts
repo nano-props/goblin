@@ -35,5 +35,3 @@ export const nodeLogger: Logger = pino({
 export const serverNodeLog = nodeLogger.child({ tag: 'server' })
 export const ghosttyNodeLog = nodeLogger.child({ tag: 'ghostty' })
 export const pullRequestsNodeLog = nodeLogger.child({ tag: 'pull-requests' })
-export const serverRepoNodeLog = nodeLogger.child({ tag: 'server-repo' })
-export const accessTokenNodeLog = nodeLogger.child({ tag: 'access-token' })

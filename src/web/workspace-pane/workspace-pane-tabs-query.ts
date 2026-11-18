@@ -12,7 +12,6 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { goblinLog } from '#/web/logger.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsSnapshot
@@ -129,16 +128,6 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(queryKey, next)
   notifyWorkspacePaneTabsPersistenceChanged()
   return true
-}
-
-export function refreshWorkspacePaneTabs(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  queryClient: QueryClient = appQueryClient,
-): void {
-  void refreshWorkspacePaneTabsQueryData(workspaceId, workspaceRuntimeId, { queryClient }).catch((err) => {
-    goblinLog.warn('workspace pane tabs refresh failed', { workspaceId, workspaceRuntimeId, err })
-  })
 }
 
 export async function refreshWorkspacePaneTabsQueryData(

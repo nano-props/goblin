@@ -12,11 +12,6 @@ export interface KeyboardShortcutMatch {
   shiftKey?: boolean
 }
 
-export interface HelpShortcutDefinition {
-  combos: string[][]
-  labelKey: DictKey
-}
-
 export interface AcceleratorShortcutDefinition {
   accelerator: string
   labelKey: DictKey
