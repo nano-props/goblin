@@ -3,7 +3,7 @@ import { defineComponent } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
-import { GitWorkspaceNavigator } from '#/web/components/GitWorkspaceNavigator.tsx'
+import { GitWorkspaceNavigatorView } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorView.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import { NavigatorSectionHeader } from '#/web/components/workspace-navigator/NavigatorSectionHeader.tsx'
 import { WorkspaceRootNavigator } from '#/web/components/workspace-navigator/WorkspaceRootNavigator.tsx'
@@ -12,6 +12,7 @@ import {
   CreateWorktreeRowAction,
   RepoSyncAction,
 } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Separator } from '#/web/components/ui/separator.tsx'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { WorkspaceDashboardRowAction } from '#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx'
@@ -75,25 +76,25 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
               style={{ height: `${WORKSPACE_TOOLBAR_HEIGHT_PX}px` }}
             />
           ) : null}
-          <WorkspaceShellPrimaryActions
-            workspaceId={props.workspaceId}
-            onCreateWorktree={props.onCreateWorktree}
-            onOpenDashboard={props.onOpenDashboard}
-            dashboardSelected={props.dashboardSelected}
-            newWorktreeSelected={props.newWorktreeSelected}
-            gitAvailable={props.git !== null}
-          />
-          {props.workspaceId ? (
-            <>
-              <WorkspaceShellNavigatorHeader
-                workspaceId={props.workspaceId}
-                title={t(navigatorTitleKey)}
-                gitAvailable={props.git !== null}
-              />
-              <div class={cn('flex min-h-0 flex-1', backgroundClass)}>
+          <ScrollArea class="min-h-0 flex-1">
+            <WorkspaceShellPrimaryActions
+              workspaceId={props.workspaceId}
+              onCreateWorktree={props.onCreateWorktree}
+              onOpenDashboard={props.onOpenDashboard}
+              dashboardSelected={props.dashboardSelected}
+              newWorktreeSelected={props.newWorktreeSelected}
+              gitAvailable={props.git !== null}
+            />
+            {props.workspaceId ? (
+              <>
+                <WorkspaceShellNavigatorHeader
+                  workspaceId={props.workspaceId}
+                  title={t(navigatorTitleKey)}
+                  gitAvailable={props.git !== null}
+                />
                 {props.navigatorContent ??
                   (props.git ? (
-                    <GitWorkspaceNavigator
+                    <GitWorkspaceNavigatorView
                       repoId={props.workspaceId}
                       onSelectBranch={props.onSelectBranch}
                       currentBranchName={props.currentBranchName}
@@ -106,11 +107,9 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
                       onSelect={props.onSelectWorkspaceRoot}
                     />
                   ))}
-              </div>
-            </>
-          ) : (
-            <div class={cn('flex min-h-0 flex-1', backgroundClass)} />
-          )}
+              </>
+            ) : null}
+          </ScrollArea>
           <SidebarSettingsButton backgroundClass={backgroundClass} onOpenSettings={props.onOpenSettings} />
         </aside>
       )

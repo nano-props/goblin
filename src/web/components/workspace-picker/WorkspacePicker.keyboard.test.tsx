@@ -44,35 +44,6 @@ describe('WorkspacePicker keyboard navigation', () => {
 
     expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
   })
-
-  test('reveals the workspace selected outside the list without moving focus', async () => {
-    const first = workspace('workspace-a', 'goblin+file:///tmp/workspace-a')
-    const second = workspace('workspace-b', 'goblin+file:///tmp/workspace-b')
-    const { rerender } = renderInJsdom(WorkspacePicker, {
-      props: {
-        workspaces: [first, second],
-        currentWorkspaceId: first.id,
-        labels,
-        onActivate: vi.fn(),
-        onClose: vi.fn(),
-        onOpenLocal: vi.fn(),
-        onOpenRemote: vi.fn(),
-        onClone: vi.fn(),
-      },
-    })
-
-    const addButton = screen.getByRole('button', { name: labels.open })
-    addButton.focus()
-    const workspaceButton = screen.getByRole('button', { name: second.name })
-    const scrollIntoView = vi.fn()
-    workspaceButton.scrollIntoView = scrollIntoView
-
-    await rerender({ currentWorkspaceId: second.id })
-
-    expect(workspaceButton.getAttribute('aria-current')).toBe('true')
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
-    expect(document.activeElement).toBe(addButton)
-  })
 })
 
 function workspace(name: string, id: string): WorkspacePickerItem {

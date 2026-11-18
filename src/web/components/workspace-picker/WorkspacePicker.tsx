@@ -1,6 +1,6 @@
 import { Download, FolderOpen, Plus, Server } from '@lucide/vue'
 import { PopoverTrigger } from 'reka-ui'
-import { defineComponent, onMounted, ref, watch } from 'vue'
+import { defineComponent, ref } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -8,7 +8,6 @@ import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/workspace-navigator/n
 import { NavigatorSectionHeader } from '#/web/components/workspace-navigator/NavigatorSectionHeader.tsx'
 import { ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
-import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { WorkspacePickerRow } from '#/web/components/workspace-picker/WorkspacePickerRow.tsx'
 import type { WorkspacePickerItem, WorkspacePickerLabels } from '#/web/components/workspace-picker/types.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -41,14 +40,6 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
     const compact = useIsCompactUi()
     const menuOpen = ref(false)
     const focusRegistry = useFocusRegistry<WorkspaceId, HTMLButtonElement>()
-
-    function revealCurrentWorkspace(): void {
-      const id = props.currentWorkspaceId
-      if (id) focusRegistry.getRef(id)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
-    }
-
-    onMounted(revealCurrentWorkspace)
-    watch(() => props.currentWorkspaceId, revealCurrentWorkspace, { flush: 'post' })
 
     function navigateWorkspace(event: KeyboardEvent, index: number): void {
       const count = props.workspaces.length
@@ -121,24 +112,22 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
             </PopoverContent>
           </Popover>
           {props.workspaces.length > 0 ? (
-            <ScrollArea class="max-h-[min(10.5rem,26dvh)]">
-              <ul class={NAVIGATOR_ROW_LIST_CLASS}>
-                {props.workspaces.map((workspace, index) => (
-                  <WorkspacePickerRow
-                    key={workspace.id}
-                    workspace={workspace}
-                    selected={workspace.id === props.currentWorkspaceId}
-                    compact={compact.value}
-                    unavailableLabel={props.labels.unavailable}
-                    closeLabel={props.labels.close}
-                    buttonRef={focusRegistry.setRef(workspace.id)}
-                    onActivate={() => props.onActivate(workspace.id)}
-                    onClose={() => props.onClose(workspace.id)}
-                    onKeydown={(event) => navigateWorkspace(event, index)}
-                  />
-                ))}
-              </ul>
-            </ScrollArea>
+            <ul class={NAVIGATOR_ROW_LIST_CLASS}>
+              {props.workspaces.map((workspace, index) => (
+                <WorkspacePickerRow
+                  key={workspace.id}
+                  workspace={workspace}
+                  selected={workspace.id === props.currentWorkspaceId}
+                  compact={compact.value}
+                  unavailableLabel={props.labels.unavailable}
+                  closeLabel={props.labels.close}
+                  buttonRef={focusRegistry.setRef(workspace.id)}
+                  onActivate={() => props.onActivate(workspace.id)}
+                  onClose={() => props.onClose(workspace.id)}
+                  onKeydown={(event) => navigateWorkspace(event, index)}
+                />
+              ))}
+            </ul>
           ) : null}
         </nav>
       )
