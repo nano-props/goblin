@@ -711,6 +711,7 @@ export const ko: Record<DictKey, string> = {
 
   'settings.web.qr': 'QR 코드',
   'settings.web.qr-scan': 'QR 코드',
+  'settings.web.qr-unavailable': 'QR 코드를 표시할 수 없습니다. 위 주소는 계속 사용할 수 있습니다.',
   'settings.about': '정보',
   'settings.terminal.ghostty': 'Ghostty',
   'settings.terminal.terminal': 'Terminal.app',

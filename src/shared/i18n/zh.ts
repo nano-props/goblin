@@ -678,6 +678,7 @@ export const zh: Record<DictKey, string> = {
 
   'settings.web.qr': '二维码',
   'settings.web.qr-scan': '二维码',
+  'settings.web.qr-unavailable': '无法显示二维码，仍可使用上方的地址。',
   'settings.about': '关于',
   'settings.terminal.ghostty': 'Ghostty',
   'settings.terminal.terminal': 'Terminal.app',

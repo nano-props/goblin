@@ -190,7 +190,8 @@ const QrCodeCell = defineComponent<{ target: string; label: string }>({
   },
 
   setup(props) {
-    const dataUrl = ref<string | null>(null)
+    const t = useT()
+    const qr = ref<{ kind: 'loading' } | { kind: 'ready'; dataUrl: string } | { kind: 'failed' }>({ kind: 'loading' })
     // QR generation is a lazy async resource owned by the current target.
     watch(
       () => props.target,
@@ -199,14 +200,14 @@ const QrCodeCell = defineComponent<{ target: string; label: string }>({
         onCleanup(() => {
           current = false
         })
-        dataUrl.value = null
+        qr.value = { kind: 'loading' }
         void (async () => {
           try {
             const { default: QRCode } = await import('qrcode')
             const url = await QRCode.toDataURL(target, { width: 180, margin: 2 })
-            if (current) dataUrl.value = url
+            if (current) qr.value = { kind: 'ready', dataUrl: url }
           } catch {
-            if (current) dataUrl.value = null
+            if (current) qr.value = { kind: 'failed' }
           }
         })()
       },
@@ -215,8 +216,17 @@ const QrCodeCell = defineComponent<{ target: string; label: string }>({
     return () => (
       <div class="flex flex-col items-center gap-2">
         <code class="text-sm text-muted-foreground break-all">{props.target}</code>
-        {dataUrl.value ? (
-          <img src={dataUrl.value} alt={props.label} width={180} height={180} class="rounded border" />
+        {qr.value.kind === 'ready' ? (
+          <img src={qr.value.dataUrl} alt={props.label} width={180} height={180} class="rounded border" />
+        ) : qr.value.kind === 'failed' ? (
+          <>
+            <p role="status" class="text-sm text-muted-foreground">
+              {t('settings.web.qr-unavailable')}
+            </p>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              {t('help.row.reload-page')}
+            </Button>
+          </>
         ) : (
           <div class="h-[180px] w-[180px] animate-pulse rounded border bg-muted" />
         )}

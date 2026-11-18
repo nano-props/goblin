@@ -723,6 +723,7 @@ export const ja: Record<DictKey, string> = {
 
   'settings.web.qr': 'QRコード',
   'settings.web.qr-scan': 'QRコード',
+  'settings.web.qr-unavailable': 'QRコードを表示できません。上のアドレスは引き続き使用できます。',
   'settings.about': '情報',
   'settings.terminal.ghostty': 'Ghostty',
   'settings.terminal.terminal': 'Terminal.app',

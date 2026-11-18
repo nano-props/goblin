@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { QueryClient } from '@tanstack/vue-query'
-import { fireEvent } from '@testing-library/vue'
+import { fireEvent, screen } from '@testing-library/vue'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
@@ -16,6 +16,7 @@ const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }))
 const fetchServerJsonMock = vi.hoisted(() => vi.fn())
+const qrCodeMocks = vi.hoisted(() => ({ toDataURL: vi.fn() }))
 const accessTokenReadMock = vi.fn()
 const testWindow = window as unknown as {
   __GOBLIN_BOOTSTRAP__?: unknown
@@ -25,6 +26,7 @@ beforeEach(() => {
   setClientBridgeForTests(null)
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
+  qrCodeMocks.toDataURL.mockResolvedValue('data:image/png;base64,AA==')
   fetchServerJsonMock.mockReset()
   accessTokenReadMock.mockReset()
   accessTokenReadMock.mockResolvedValue({ accessToken: 'active-secret' })
@@ -155,6 +157,21 @@ describe('WebSettings', () => {
     expect(writeText).toHaveBeenCalledTimes(1)
   })
 
+  test('shows QR failure and a reload action while keeping the access address available', async () => {
+    seedWebBootstrap()
+    qrCodeMocks.toDataURL.mockRejectedValue(new Error('QR generation failed'))
+    const lanUrl = 'http://192.168.1.20:32100'
+    const { container } = await renderPage({
+      lanInfo: { host: '0.0.0.0', port: 32100, lanUrls: [lanUrl] },
+    })
+
+    expect((await screen.findAllByText('settings.web.qr-unavailable')).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'help.row.reload-page' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('img', { name: 'settings.web.qr-scan' })).toBeNull()
+    expect(container.querySelector('#settings-web-url')?.textContent).toBe(window.location.origin)
+    expect(container.textContent).toContain(lanUrl)
+  })
+
   test('shows server-reported LAN addresses in the web runtime without a native LAN toggle', async () => {
     seedWebBootstrap()
     const lanUrl = 'http://192.168.1.20:32100'
@@ -177,3 +194,5 @@ vi.mock('vue-sonner', () => ({
 vi.mock('#/web/lib/server-fetch.ts', () => ({
   fetchServerJson: fetchServerJsonMock,
 }))
+
+vi.mock('qrcode', () => ({ default: qrCodeMocks }))

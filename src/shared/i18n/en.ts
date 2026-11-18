@@ -715,6 +715,7 @@ export const en = {
 
   'settings.web.qr': 'QR codes',
   'settings.web.qr-scan': 'QR code',
+  'settings.web.qr-unavailable': 'Unable to display the QR code. You can still use the address above.',
   'settings.about': 'About',
   'settings.terminal.ghostty': 'Ghostty',
   'settings.terminal.terminal': 'Terminal.app',
