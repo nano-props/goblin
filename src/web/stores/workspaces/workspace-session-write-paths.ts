@@ -1,4 +1,4 @@
-import PQueue from 'p-queue'
+import { KeyedSerialQueue } from '#/web/lib/keyed-serial-queue.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspaces/runtime/capability-refresh.ts'
 import { requestInitialRepoSnapshotLoad, requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
@@ -50,7 +50,7 @@ export interface RuntimeOpenResolvedWorkspace {
   workspaceProbe?: WorkspaceProbeState
 }
 
-const workspaceCommandQueues = new Map<string, PQueue>()
+const workspaceCommandQueues = new KeyedSerialQueue()
 
 export interface InitialWorkspaceRefresh {
   id: WorkspaceId
@@ -149,21 +149,8 @@ async function closeWorkspaceRuntimeWithCacheNow(workspaceId: WorkspaceId, works
   }
 }
 
-async function runWorkspaceCommand<T>(workspaceKey: string, command: () => Promise<T>): Promise<T> {
-  let queue = workspaceCommandQueues.get(workspaceKey)
-  if (!queue) {
-    queue = new PQueue({ concurrency: 1 })
-    workspaceCommandQueues.set(workspaceKey, queue)
-  }
-  try {
-    return await queue.add(command)
-  } finally {
-    void queue.onIdle().then(() => {
-      if (workspaceCommandQueues.get(workspaceKey) === queue && queue.size === 0 && queue.pending === 0) {
-        workspaceCommandQueues.delete(workspaceKey)
-      }
-    })
-  }
+function runWorkspaceCommand<T>(workspaceKey: string, command: () => Promise<T>): Promise<T> {
+  return workspaceCommandQueues.run(workspaceKey, command)
 }
 
 async function discardRejectedRemoteWorkspaceOpen(

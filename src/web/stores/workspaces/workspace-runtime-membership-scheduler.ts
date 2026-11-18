@@ -1,6 +1,6 @@
-import PQueue from 'p-queue'
+import { KeyedSerialQueue } from '#/web/lib/keyed-serial-queue.ts'
 
-const workspaceRuntimeMembershipQueues = new Map<string, PQueue>()
+const workspaceRuntimeMembershipQueues = new KeyedSerialQueue()
 const activeWorkspaceRuntimeMembershipCommands = new Set<Promise<unknown>>()
 let workspaceRuntimeMembershipExclusiveTail: Promise<void> = Promise.resolve()
 
@@ -9,25 +9,15 @@ export async function runWorkspaceRuntimeMembershipCommand<T>(
   command: () => Promise<T>,
 ): Promise<T> {
   const precedingExclusive = workspaceRuntimeMembershipExclusiveTail
-  let queue = workspaceRuntimeMembershipQueues.get(workspaceKey)
-  if (!queue) {
-    queue = new PQueue({ concurrency: 1 })
-    workspaceRuntimeMembershipQueues.set(workspaceKey, queue)
-  }
   const work = (async () => {
     await precedingExclusive
-    return queue.add(command)
+    return workspaceRuntimeMembershipQueues.run(workspaceKey, command)
   })()
   activeWorkspaceRuntimeMembershipCommands.add(work)
   try {
     return await work
   } finally {
     activeWorkspaceRuntimeMembershipCommands.delete(work)
-    void queue.onIdle().then(() => {
-      if (workspaceRuntimeMembershipQueues.get(workspaceKey) === queue && queue.size === 0 && queue.pending === 0) {
-        workspaceRuntimeMembershipQueues.delete(workspaceKey)
-      }
-    })
   }
 }
 
