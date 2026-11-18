@@ -15,7 +15,12 @@ and `g` command. It requires the matching OS and CPU architecture, Git, a local
 shell, and SSH for remote workspaces. Application data lives outside the binary.
 
 `serve` and `open` accept `--host` / `--port`, defaulting to `GOBLIN_SERVER_HOST` /
-`GOBLIN_SERVER_PORT` or `127.0.0.1:32100`. Use the same address settings for both.
+`GOBLIN_SERVER_PORT` or `127.0.0.1:32100`. For direct connections, use the
+same address settings for both. Use `goblin open --url https://example.com`
+to open a workspace through an HTTPS reverse proxy. The URL must be an HTTP
+or HTTPS origin with an optional port and trailing slash. It takes precedence
+over the environment variables and is mutually exclusive with `--host` and
+`--port`.
 The server accepts `--data-dir` and `--token`. Without an explicit token it stores
 one in `<dataDir>/server-token` and prints it for browser login. To rotate that
 token, stop the server, delete the file, and restart. The source checkout also

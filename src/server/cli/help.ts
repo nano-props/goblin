@@ -18,6 +18,7 @@ serve options:
   --token <token>       Use an explicit access token
 
 open options:
+  --url <url>           HTTP or HTTPS server origin (alternative to --host / --port)
   --host <host>         Server address (default: 127.0.0.1)
   --port <port>         Server port (default: 32100)
 

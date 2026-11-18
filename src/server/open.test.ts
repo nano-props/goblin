@@ -66,6 +66,41 @@ describe('open a workspace URL in the browser', () => {
     )
   })
 
+  test.each([
+    [' https://example.com/ ', 'https://example.com'],
+    ['http://example.com:8080', 'http://example.com:8080'],
+  ])('opens the workspace at the explicit server origin %s', async (address, origin) => {
+    await openGoblin(['--url', address, '/srv/example'])
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      [`${origin}/open?path=%2Fsrv%2Fexample`],
+      expect.any(Object),
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    'example.com',
+    'ftp://example.com',
+    'https://user:pass@example.com',
+    'https://example.com/app',
+    'https://example.com/?query',
+    'https://example.com/#fragment',
+    'https://exa\nmple.com',
+    'https://exa\tmple.com',
+  ])('rejects an invalid server origin %s', async (address) => {
+    await expect(openGoblin(['--url', address])).rejects.toThrow('Provide an HTTP or HTTPS server origin')
+    expect(mocks.spawn).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    ['--host', 'example.com'],
+    ['--port', '8080'],
+  ])('rejects combining --url with %s', async (option, value) => {
+    await expect(openGoblin(['--url', 'https://example.com', option, value])).rejects.toThrow('Use --url by itself')
+    expect(mocks.spawn).not.toHaveBeenCalled()
+  })
+
   test.each([['first', 'second'], ['--token', 'example'], ['/' + 'a'.repeat(4096)], ['/srv/line\nbreak']])(
     'rejects invalid input without launching a browser: %j',
     async (...args) => {
