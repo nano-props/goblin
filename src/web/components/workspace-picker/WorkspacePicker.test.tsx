@@ -3,12 +3,16 @@
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { screen } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { VNode } from 'vue'
+
+beforeEach(() => {
+  vi.stubGlobal('matchMedia', createMatchMedia(false))
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -19,9 +23,9 @@ describe('WorkspacePicker', () => {
     render(
       <WorkspacePicker
         workspaces={[
-          workspace('Folder', 'goblin+file:///tmp/folder', { gitCapability: 'unavailable' }),
+          workspace('Folder', 'goblin+file:///tmp/folder', { gitAvailable: false }),
           workspace('Git', 'goblin+file:///tmp/git'),
-          workspace('Remote', 'goblin+ssh://example/tmp/remote', { gitCapability: 'unavailable' }),
+          workspace('Remote', 'goblin+ssh://example/tmp/remote', { gitAvailable: false }),
         ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/folder')}
         labels={labels}
@@ -33,342 +37,55 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    const current = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/folder"]')
-    expect(current?.querySelector('.lucide-folder')).not.toBeNull()
-    expect(current?.querySelector('.lucide-folder-git-2')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Folder' }).querySelector('.lucide-folder')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Git' }).querySelector('.lucide-folder-git-2')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Remote' }).querySelector('.lucide-server')).not.toBeNull()
   })
 
-  test('keeps the current workspace button as the only workspace chrome inside the current workspace group', () => {
+  test('shows open projects in order and dispatches selection and close separately', async () => {
+    const user = userEvent.setup()
+    const onActivate = vi.fn()
+    const onClose = vi.fn()
+    const firstId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
+    const secondId = workspaceIdForTest('goblin+file:///tmp/workspace-b')
+
     render(
       <WorkspacePicker
-        workspaces={[
-          workspace('Repo-A', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
+        workspaces={[workspace('Repo-A', firstId), workspace('Repo-B', secondId, { terminalBellCount: 3 })]}
+        currentWorkspaceId={firstId}
         labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
+        onActivate={onActivate}
+        onClose={onClose}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
         onClone={() => {}}
       />,
     )
 
-    const currentWorkspaceGroup = document.body.querySelector('[data-current-workspace-group]')
-    expect(currentWorkspaceGroup).not.toBeNull()
-    expect(
-      currentWorkspaceGroup?.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]'),
-    ).not.toBeNull()
-    // The "All repositories" chevron button is gone — the tab is the
-    // single popover trigger now.
-    expect(currentWorkspaceGroup?.querySelector('button[aria-label="More"]')).toBeNull()
-    expect(document.body.querySelector('button[aria-label="More"]')).toBeNull()
-  })
+    const first = screen.getByRole('button', { name: 'Repo-A' })
+    const second = screen.getByRole('button', { name: /^Repo-B/ })
+    expect(screen.getAllByRole('listitem').map((row) => row.querySelector('button'))).toEqual([first, second])
+    expect(first.getAttribute('aria-current')).toBe('true')
+    expect(first.closest('li')?.classList.contains('bg-selected')).toBe(true)
+    expect(second.getAttribute('title')).toBe('/tmp/workspace-b')
+    expect(second.closest('li')?.textContent).toContain('3')
 
-  test('exposes the current workspace button as a selected tab in a horizontal tablist', () => {
-    render(
-      <WorkspacePicker
-        workspaces={[
-          workspace('Repo-A', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-      />,
-    )
+    await user.click(second)
+    screen.getByRole('button', { name: 'Close Repo-A' }).focus()
+    await user.keyboard('{Enter}')
 
-    const tablist = document.body.querySelector('[data-current-workspace-group]')
-    expect(tablist?.getAttribute('role')).toBe('tablist')
-    expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
+    expect(onActivate.mock.calls).toEqual([[secondId]])
+    expect(onClose.mock.calls).toEqual([[firstId]])
 
-    const activeTab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
-    if (!(activeTab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
-    expect(activeTab.getAttribute('role')).toBe('tab')
-    expect(activeTab.getAttribute('aria-selected')).toBe('true')
-    expect(activeTab.tabIndex).toBe(0)
-  })
-
-  test('renders the sidebar surface as a plain full-width picker button instead of a tab strip', () => {
-    render(
-      <WorkspacePicker
-        workspaces={[
-          workspace('Repo-A', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-        surface="sidebar"
-      />,
-    )
-
-    expect(document.body.querySelector('[data-current-workspace-group]')).toBeNull()
-
-    const currentWorkspaceButton = document.body.querySelector(
-      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
-    )
-    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
-    expect(currentWorkspaceButton.getAttribute('role')).toBeNull()
-    expect(currentWorkspaceButton.getAttribute('aria-selected')).toBeNull()
-    expect(currentWorkspaceButton.className).toContain('w-full')
-    expect(currentWorkspaceButton.className).toContain('shrink-0')
-    expect(currentWorkspaceButton.className).not.toContain('flex-1')
-    const workspaceLabel = currentWorkspaceButton.querySelector('.uppercase')
-    expect(workspaceLabel).not.toBeNull()
-    expect(workspaceLabel?.className).not.toContain('font-medium')
-    expect(currentWorkspaceButton.textContent).toContain('Repo-A')
-    expect(currentWorkspaceButton.hasAttribute('data-interactive')).toBe(true)
-    expect(currentWorkspaceButton.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
-  })
-
-  test('opens the workspace menu popover from the sidebar surface', async () => {
-    render(
-      <WorkspacePicker
-        workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-        surface="sidebar"
-      />,
-    )
-
-    const trigger = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
-    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing sidebar workspace trigger')
-
+    const trigger = screen.getByRole('button', { name: 'Open' })
+    expect(trigger.contains(screen.getByText(labels.workspaces))).toBe(false)
+    expect(trigger.classList.contains('opacity-0')).toBe(false)
     await clickPopoverTrigger(trigger)
 
-    const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
-      item.textContent?.includes('workspace-a'),
-    )
-    expect(selectedItem).not.toBeNull()
-    expect(document.body.textContent).toContain('/tmp/workspace-b')
-  })
-
-  test('renders canonical workspace ids as user-facing locations in the workspace menu', async () => {
-    const workspaceId = workspaceIdForTest('goblin+file:///workspace/sample-project')
-    render(
-      <WorkspacePicker
-        workspaces={[workspace('sample-project', workspaceId), workspace('other', 'goblin+file:///workspace/other')]}
-        currentWorkspaceId={workspaceId}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-        surface="sidebar"
-      />,
-    )
-
-    const trigger = document.body.querySelector(`[data-current-workspace-id="${workspaceId}"]`)
-    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing sidebar workspace trigger')
-    await clickPopoverTrigger(trigger)
-
-    expect(document.body.textContent).toContain('/workspace/sample-project')
-    expect(document.body.textContent).not.toContain('goblin+file://')
-  })
-
-  test('opens the workspace menu popover when the current workspace tab is clicked', async () => {
-    render(
-      <WorkspacePicker
-        workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-      />,
-    )
-
-    const tab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
-
-    await clickPopoverTrigger(tab)
-
-    const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
-      item.textContent?.includes('workspace-a'),
-    )
-    expect(selectedItem).not.toBeNull()
-    expect(selectedItem?.className).toContain('bg-selected')
-  })
-
-  test('shows unread terminal bell badges on the trigger and matching workspace rows', async () => {
-    render(
-      <WorkspacePicker
-        workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a', { terminalBellCount: 4 }),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b', { terminalBellCount: 2 }),
-          workspace('workspace-c', 'goblin+file:///tmp/workspace-c', { terminalBellCount: 1 }),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-      />,
-    )
-
-    const trigger = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
-    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
-    const triggerBadge = trigger.querySelector('.bg-notification')
-    expect(triggerBadge?.textContent).toBe('7')
-
-    await clickPopoverTrigger(trigger)
-
-    const workspaceARow = document.body.querySelector('button[aria-current="true"]')
-    const workspaceBRow = [...document.body.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('workspace-b'),
-    )
-    const workspaceCRow = [...document.body.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('workspace-c'),
-    )
-    expect(workspaceARow?.querySelector('.bg-notification')?.textContent).toBe('4')
-    expect(workspaceBRow?.querySelector('.bg-notification')?.textContent).toBe('2')
-    expect(workspaceCRow?.querySelector('.bg-notification')?.textContent).toBe('1')
-  })
-
-  test('renders only the current workspace button when multiple workspaces are open, with the rest in the popover', () => {
-    vi.stubGlobal('matchMedia', createMatchMedia(false))
-
-    render(
-      <WorkspacePicker
-        workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-          workspace('workspace-c', 'goblin+file:///tmp/workspace-c'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-b')}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-      />,
-    )
-
-    expect(document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-b"]')).not.toBeNull()
-    expect(document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')).toBeNull()
-    expect(document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-c"]')).toBeNull()
-    // No standalone "All repositories" button — the tab is the trigger.
-    expect(document.body.querySelector('button[aria-label="More"]')).toBeNull()
-  })
-
-  test('keeps current workspace chrome borderless with hover and shows two-line rows with path in the popover', async () => {
-    render(
-      <WorkspacePicker
-        workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-      />,
-    )
-
-    const currentWorkspaceButton = document.body.querySelector(
-      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
-    )
-    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
-
-    const currentWorkspaceChrome = currentWorkspaceButton.closest('[data-current-workspace-chrome]')
-    expect(currentWorkspaceChrome?.className).toContain('border-transparent')
-    expect(currentWorkspaceChrome?.className).not.toContain('border-separator')
-    expect(currentWorkspaceChrome?.className).toContain('hover:bg-accent/70')
-    // The chrome now reads in text-foreground by default to match the
-    // action buttons, so there's no hover:text-foreground shift anymore.
-    expect(currentWorkspaceChrome?.className).toContain('text-foreground')
-    // The close button used to live in the chrome; it now lives in
-    // each popover row instead.
-    expect(currentWorkspaceChrome?.querySelector('button[aria-label="Close workspace-a"]')).toBeNull()
-
-    // No internal vertical separator between tab and chevron — the
-    // chevron is part of the tab now.
-    expect(
-      currentWorkspaceChrome?.parentElement?.querySelector(
-        ':scope > [data-slot="separator"][data-orientation="vertical"]',
-      ),
-    ).toBeNull()
-
-    const tab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
-
-    await clickPopoverTrigger(tab)
-
-    const closeButton = document.body.querySelector('button[aria-label="Close workspace-a"]')
-    expect(closeButton).not.toBeNull()
-    expect(closeButton?.className).not.toContain('opacity-0')
-    expect(closeButton?.className).not.toContain('group-hover:opacity-100')
-    const popoverContent = document.body.querySelector('[data-slot="popover-content"]')
-    expect((popoverContent as HTMLElement | null)?.style.minWidth).toBe('max(16rem, var(--reka-popover-trigger-width))')
-
-    // Each popover row is now two lines: name on top, locator (path
-    // or remote target) below in mono muted text. The locator for a
-    // local workspace is the tilde-expanded path.
-    const workspaceARow = [...document.body.querySelectorAll('button[aria-current]')].find((btn) =>
-      btn.textContent?.includes('workspace-a'),
-    )
-    expect(workspaceARow).not.toBeNull()
-    expect(workspaceARow?.className).toContain('min-h-11')
-    const locator = workspaceARow?.querySelector('.font-mono')
-    expect(locator).not.toBeNull()
-    expect(locator?.textContent?.trim()).toBe('/tmp/workspace-a')
-  })
-
-  test('renders a placeholder button on the sidebar surface when no workspace is open', async () => {
-    const onOpenLocal = vi.fn()
-
-    render(
-      <WorkspacePicker
-        workspaces={[]}
-        currentWorkspaceId={null}
-        labels={labels}
-        onActivate={() => {}}
-        onClose={() => {}}
-        onOpenLocal={onOpenLocal}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-        surface="sidebar"
-      />,
-    )
-
-    const placeholder = document.body.querySelector('[data-testid="workspace-picker-placeholder"]')
-    if (!(placeholder instanceof HTMLButtonElement)) throw new Error('missing workspace picker placeholder')
-    expect(placeholder.textContent).toContain('Select workspace')
-    expect(placeholder.className).toContain('w-full')
-
-    await clickPopoverTrigger(placeholder)
-
-    expect(document.body.textContent).toContain('Open local repository…')
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: labels.openLocal })).toBeTruthy()
+    expect(screen.getByRole('button', { name: labels.openRemote })).toBeTruthy()
+    expect(screen.getByRole('button', { name: labels.clone })).toBeTruthy()
   })
 
   test('shows a + button that opens the action popover when no workspace is open', async () => {
@@ -419,7 +136,7 @@ function render(element: VNode) {
   return renderInJsdom(element)
 }
 
-async function clickPopoverTrigger(trigger: HTMLButtonElement): Promise<void> {
+async function clickPopoverTrigger(trigger: HTMLElement): Promise<void> {
   await userEvent.setup().click(trigger)
   await screen.findByRole('dialog')
 }
@@ -428,8 +145,7 @@ function workspace(name: string, id: string, overrides: Partial<WorkspacePickerI
   return {
     id: workspaceIdForTest(id),
     name,
-    gitCapability: 'available',
-    git: { remoteDetails: [] },
+    gitAvailable: true,
     lifecycle: null,
     ...overrides,
   }
@@ -439,7 +155,6 @@ const labels = {
   workspaces: 'Workspaces',
   closeWithName: (name: string) => `Close ${name}`,
   open: 'Open',
-  placeholder: 'Select workspace',
   openLocal: 'Open local repository…',
   openRemote: 'Open remote repository…',
   clone: 'Clone repository…',

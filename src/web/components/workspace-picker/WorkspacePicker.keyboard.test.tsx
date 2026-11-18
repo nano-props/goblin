@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { screen } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
@@ -16,7 +17,7 @@ beforeEach(() => {
 })
 
 describe('WorkspacePicker keyboard navigation', () => {
-  test('moves between workspaces from the current workspace button', async () => {
+  test('moves between workspaces from the sidebar project list', async () => {
     const user = userEvent.setup()
     const onActivate = vi.fn()
 
@@ -36,47 +37,41 @@ describe('WorkspacePicker keyboard navigation', () => {
       />,
     )
 
-    const currentWorkspaceButton = document.body.querySelector(
-      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
-    )
-    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
+    screen.getByRole('button', { name: 'workspace-a' }).focus()
+    await user.keyboard('{ArrowDown}')
 
-    currentWorkspaceButton.focus()
-    await user.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'workspace-b' }))
 
     expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
   })
 
-  test('moves between workspaces from the sidebar current workspace button', async () => {
-    const user = userEvent.setup()
-    const onActivate = vi.fn()
+  test('reveals the workspace selected outside the list without moving focus', async () => {
+    const first = workspace('workspace-a', 'goblin+file:///tmp/workspace-a')
+    const second = workspace('workspace-b', 'goblin+file:///tmp/workspace-b')
+    const { rerender } = renderInJsdom(WorkspacePicker, {
+      props: {
+        workspaces: [first, second],
+        currentWorkspaceId: first.id,
+        labels,
+        onActivate: vi.fn(),
+        onClose: vi.fn(),
+        onOpenLocal: vi.fn(),
+        onOpenRemote: vi.fn(),
+        onClone: vi.fn(),
+      },
+    })
 
-    renderInJsdom(
-      <WorkspacePicker
-        workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={onActivate}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-        surface="sidebar"
-      />,
-    )
+    const addButton = screen.getByRole('button', { name: labels.open })
+    addButton.focus()
+    const workspaceButton = screen.getByRole('button', { name: second.name })
+    const scrollIntoView = vi.fn()
+    workspaceButton.scrollIntoView = scrollIntoView
 
-    const currentWorkspaceButton = document.body.querySelector(
-      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
-    )
-    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
+    await rerender({ currentWorkspaceId: second.id })
 
-    currentWorkspaceButton.focus()
-    await user.keyboard('{ArrowRight}')
-
-    expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
+    expect(workspaceButton.getAttribute('aria-current')).toBe('true')
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
+    expect(document.activeElement).toBe(addButton)
   })
 })
 
@@ -84,8 +79,7 @@ function workspace(name: string, id: string): WorkspacePickerItem {
   return {
     id: workspaceIdForTest(id),
     name,
-    gitCapability: 'available',
-    git: { remoteDetails: [] },
+    gitAvailable: true,
     lifecycle: null,
   }
 }
@@ -94,7 +88,6 @@ const labels = {
   workspaces: 'Workspaces',
   closeWithName: (name: string) => `Close ${name}`,
   open: 'Open',
-  placeholder: 'Select workspace',
   openLocal: 'Open local repository…',
   openRemote: 'Open remote repository…',
   clone: 'Clone repository…',

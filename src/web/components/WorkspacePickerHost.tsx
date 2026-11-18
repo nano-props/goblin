@@ -8,7 +8,7 @@ import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/terminal-session-store.ts'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
-import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
+import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { reportCloseWorkspaceFailure } from '#/web/lib/open-workspace-result-feedback.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -19,12 +19,11 @@ interface WorkspacePickerHostProps {
   onOpenWorkspacePathDialog: () => void
   onOpenRemote: () => void
   onClone: () => void
-  surface?: WorkspacePickerSurface
 }
 
 export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
   name: 'WorkspacePickerHost',
-  props: ['currentWorkspaceId', 'onOpenWorkspacePathDialog', 'onOpenRemote', 'onClone', 'surface'],
+  props: ['currentWorkspaceId', 'onOpenWorkspacePathDialog', 'onOpenRemote', 'onClone'],
 
   setup(props) {
     const t = useT()
@@ -36,16 +35,10 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
           .map<WorkspacePickerItem | null>((id) => {
             const workspace = state.workspaces[id]
             if (!workspace) return null
-            const gitAvailable = workspace.capability.kind === 'git'
             return {
               id: workspace.id,
               name: workspaceNameFromLocator(workspace.id),
-              gitCapability: gitAvailable
-                ? 'available'
-                : workspace.capability.kind === 'filesystem'
-                  ? 'unavailable'
-                  : 'unknown',
-              git: gitAvailable ? { remoteDetails: undefined } : null,
+              gitAvailable: workspace.capability.kind === 'git',
               lifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,
             }
           })
@@ -58,16 +51,11 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
       summaries.value.map<WorkspacePickerItem>((workspace) => ({
         id: workspace.id,
         name: workspace.name,
-        gitCapability: workspace.gitCapability,
-        git: workspace.git,
+        gitAvailable: workspace.gitAvailable,
         lifecycle: workspace.lifecycle,
         terminalBellCount: terminalBellCounts.value[workspace.id] ?? 0,
       })),
     )
-
-    async function openLocalWorkspace(): Promise<void> {
-      props.onOpenWorkspacePathDialog()
-    }
 
     async function closeWorkspace(workspaceId: WorkspaceId): Promise<void> {
       const workspace = workspacesStore.getState().workspaces[workspaceId]
@@ -76,29 +64,25 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
       reportCloseWorkspaceFailure(result, t)
     }
 
-    return () => {
-      return (
-        <WorkspacePicker
-          workspaces={summariesWithTerminalBells.value}
-          currentWorkspaceId={props.currentWorkspaceId}
-          labels={{
-            workspaces: t('workspace-picker.workspaces'),
-            closeWithName: (name) => t('workspace-picker.close-named', { name }),
-            open: t('app-chrome.open'),
-            placeholder: t('workspace-picker.placeholder'),
-            openLocal: t('workspace-picker.open-local'),
-            openRemote: t('workspace-picker.open-remote'),
-            clone: t('workspace-picker.clone'),
-            unavailable: t('workspace-unavailable.title'),
-          }}
-          onActivate={navigation.activateWorkspace}
-          onClose={(workspaceId) => void closeWorkspace(workspaceId)}
-          onOpenLocal={() => void openLocalWorkspace()}
-          onOpenRemote={props.onOpenRemote}
-          onClone={props.onClone}
-          surface={props.surface ?? 'toolbar'}
-        />
-      )
-    }
+    return () => (
+      <WorkspacePicker
+        workspaces={summariesWithTerminalBells.value}
+        currentWorkspaceId={props.currentWorkspaceId}
+        labels={{
+          workspaces: t('workspace-picker.workspaces'),
+          closeWithName: (name) => t('workspace-picker.close-named', { name }),
+          open: t('app-chrome.open'),
+          openLocal: t('workspace-picker.open-local'),
+          openRemote: t('workspace-picker.open-remote'),
+          clone: t('workspace-picker.clone'),
+          unavailable: t('workspace-unavailable.title'),
+        }}
+        onActivate={navigation.activateWorkspace}
+        onClose={(workspaceId) => void closeWorkspace(workspaceId)}
+        onOpenLocal={props.onOpenWorkspacePathDialog}
+        onOpenRemote={props.onOpenRemote}
+        onClone={props.onClone}
+      />
+    )
   },
 })

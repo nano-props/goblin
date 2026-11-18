@@ -5,12 +5,14 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { WORKSPACE_TOOLBAR_HEIGHT_PX } from '#/web/components/workspace-toolbar-layout.ts'
 import { GitWorkspaceNavigator } from '#/web/components/GitWorkspaceNavigator.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
+import { NavigatorSectionHeader } from '#/web/components/workspace-navigator/NavigatorSectionHeader.tsx'
 import { WorkspaceRootNavigator } from '#/web/components/workspace-navigator/WorkspaceRootNavigator.tsx'
 import {
   BranchFilterAction,
   CreateWorktreeRowAction,
   RepoSyncAction,
 } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
+import { Separator } from '#/web/components/ui/separator.tsx'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { WorkspaceDashboardRowAction } from '#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx'
 import { WorkspaceRefreshAction } from '#/web/components/workspace-toolbar/WorkspaceRefreshAction.tsx'
@@ -62,7 +64,7 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
     const t = useT()
 
     return () => {
-      const navigatorTitleKey = props.git ? 'tab.branches' : 'workspace.navigation-title'
+      const navigatorTitleKey = props.git ? 'tab.branches' : 'workspace.directory-title'
       const backgroundClass = props.compact ? 'bg-background' : 'bg-navigation'
       return (
         <aside class={cn('flex min-h-0 min-w-0 flex-1 flex-col', backgroundClass)}>
@@ -126,22 +128,21 @@ interface WorkspaceShellPrimaryActionsProps {
 }
 
 const WorkspaceShellPrimaryActions: FunctionalComponent<WorkspaceShellPrimaryActionsProps> = (props) => (
-  <div class="shrink-0 px-3 pt-4">
-    <div class="flex min-w-0 flex-col gap-1">
-      <WorkspacePickerRow workspaceId={props.workspaceId} />
-      {props.workspaceId ? (
-        <>
-          <WorkspaceDashboardRowAction selected={props.dashboardSelected} onOpenDashboard={props.onOpenDashboard} />
-          {props.gitAvailable ? (
-            <CreateWorktreeRowAction
-              repoId={props.workspaceId}
-              selected={props.newWorktreeSelected}
-              onCreateWorktree={props.onCreateWorktree}
-            />
-          ) : null}
-        </>
-      ) : null}
-    </div>
+  <div class="shrink-0 pt-4">
+    <SidebarWorkspacePicker workspaceId={props.workspaceId} />
+    {props.workspaceId ? (
+      <div class="flex min-w-0 flex-col gap-1 px-3">
+        <Separator class="my-2" />
+        <WorkspaceDashboardRowAction selected={props.dashboardSelected} onOpenDashboard={props.onOpenDashboard} />
+        {props.gitAvailable ? (
+          <CreateWorktreeRowAction
+            repoId={props.workspaceId}
+            selected={props.newWorktreeSelected}
+            onCreateWorktree={props.onCreateWorktree}
+          />
+        ) : null}
+      </div>
+    ) : null}
   </div>
 )
 
@@ -154,21 +155,18 @@ WorkspaceShellPrimaryActions.props = [
   'gitAvailable',
 ]
 
-const WorkspacePickerRow = defineComponent<{ workspaceId?: WorkspaceId }>({
-  name: 'WorkspacePickerRow',
+const SidebarWorkspacePicker = defineComponent<{ workspaceId?: WorkspaceId }>({
+  name: 'SidebarWorkspacePicker',
   props: ['workspaceId'],
   setup(props) {
     const overlayActions = useLayoutOverlayActions()
     return () => (
-      <div class="flex h-8 min-w-0 shrink-0 items-center">
-        <WorkspacePickerHost
-          currentWorkspaceId={props.workspaceId ?? null}
-          onOpenWorkspacePathDialog={overlayActions?.openWorkspacePathDialog ?? NOOP}
-          onOpenRemote={overlayActions?.openRemoteWorkspace ?? NOOP}
-          onClone={overlayActions?.openCloneRepo ?? NOOP}
-          surface="sidebar"
-        />
-      </div>
+      <WorkspacePickerHost
+        currentWorkspaceId={props.workspaceId ?? null}
+        onOpenWorkspacePathDialog={overlayActions?.openWorkspacePathDialog ?? NOOP}
+        onOpenRemote={overlayActions?.openRemoteWorkspace ?? NOOP}
+        onClone={overlayActions?.openCloneRepo ?? NOOP}
+      />
     )
   },
 })
@@ -180,17 +178,14 @@ interface WorkspaceShellNavigatorHeaderProps {
 }
 
 const WorkspaceShellNavigatorHeader: FunctionalComponent<WorkspaceShellNavigatorHeaderProps> = (props) => (
-  <div class="shrink-0 px-3 pb-2 pt-3">
-    <div class="flex h-8 min-w-0 items-center gap-2 px-3">
-      <div class="min-w-0 flex-1 truncate text-[13px] font-semibold text-muted-foreground">{props.title}</div>
-      {props.gitAvailable ? <BranchFilterAction repoId={props.workspaceId} /> : null}
-      {props.gitAvailable ? (
-        <RepoSyncAction repoId={props.workspaceId} />
-      ) : (
-        <WorkspaceRefreshAction workspaceId={props.workspaceId} />
-      )}
-    </div>
-  </div>
+  <NavigatorSectionHeader title={props.title} class="pt-3">
+    {props.gitAvailable ? <BranchFilterAction repoId={props.workspaceId} /> : null}
+    {props.gitAvailable ? (
+      <RepoSyncAction repoId={props.workspaceId} />
+    ) : (
+      <WorkspaceRefreshAction workspaceId={props.workspaceId} />
+    )}
+  </NavigatorSectionHeader>
 )
 
 WorkspaceShellNavigatorHeader.props = ['workspaceId', 'title', 'gitAvailable']

@@ -19,7 +19,6 @@ export const zh: Record<DictKey, string> = {
   // ---- Workspace picker ----------------------------------------------------
   'workspace-picker.workspaces': '工作区',
   'workspace-picker.close-named': '关闭 {name}',
-  'workspace-picker.placeholder': '选择工作区',
   'workspace-picker.open-local': '打开工作区…',
   'workspace-picker.open-remote': '打开远程工作区…',
   'workspace-open.invalid-path': '链接必须包含一个绝对目录路径（最多 4096 个字符）。',
@@ -188,7 +187,7 @@ export const zh: Record<DictKey, string> = {
   'worktree-status.changes-unavailable': '不可用',
   'worktree-status.open-history': '打开 {commit} 的历史记录',
   'tab.branches': '分支',
-  'workspace.navigation-title': '工作区',
+  'workspace.directory-title': '目录',
   'tab.status': '状态',
   'tab.changes': '变更',
   'tab.changes-with-count': '变更 · {count}个',

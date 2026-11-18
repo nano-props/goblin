@@ -3,3 +3,4 @@ export const NAVIGATOR_ROW_GRID_CLASS = 'grid min-h-8 grid-cols-[minmax(0,1fr)_a
 export const NAVIGATOR_ROW_CONTENT_CLASS = 'flex min-w-0 items-center px-3 py-1'
 export const NAVIGATOR_ROW_ACTION_SLOT_CLASS = 'flex shrink-0 items-center py-1 pr-3'
 export const NAVIGATOR_ROW_ACTION_BOX_CLASS = 'relative flex h-6 min-w-6 items-center justify-center'
+export const NAVIGATOR_ROW_LABEL_CLASS = 'truncate text-[13px] font-normal leading-5'

@@ -24,7 +24,6 @@ export const en = {
   // ---- Workspace picker -----------------------------------------------------
   'workspace-picker.workspaces': 'Workspaces',
   'workspace-picker.close-named': 'Close {name}',
-  'workspace-picker.placeholder': 'Select workspace',
   'workspace-picker.open-local': 'Open Workspace…',
   'workspace-picker.open-remote': 'Open Remote Workspace…',
   'workspace-open.invalid-path': 'The link must contain one absolute directory path (up to 4096 characters).',
@@ -197,7 +196,7 @@ export const en = {
   'worktree-status.changes-unavailable': 'unavailable',
   'worktree-status.open-history': 'Open history at {commit}',
   'tab.branches': 'Branches',
-  'workspace.navigation-title': 'Workspace',
+  'workspace.directory-title': 'Directory',
   'tab.status': 'Status',
   'tab.changes': 'Changes',
   'tab.changes-with-count': 'Changes · {count}',

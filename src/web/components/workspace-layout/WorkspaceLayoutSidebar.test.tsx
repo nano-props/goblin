@@ -102,7 +102,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-button"]')).toBeNull()
     expect(container.querySelector('[data-testid="workspace-root-navigator"]')).not.toBeNull()
-    expect(container.textContent).toContain('workspace.navigation-title')
+    expect(container.textContent).toContain('workspace.directory-title')
     expect(container.textContent).not.toContain('tab.branches')
     expect(container.textContent).toContain('workspace.dashboard')
     expect(container.querySelector('button[aria-label="menu.view.refresh"]')).not.toBeNull()

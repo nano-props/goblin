@@ -47,12 +47,11 @@ describe('workspacePickerItemsEqual', () => {
     const item: WorkspacePickerItem = {
       id: workspaceIdForTest('goblin+file:///tmp/workspace'),
       name: 'workspace',
-      gitCapability: 'unavailable',
-      git: null,
+      gitAvailable: false,
       lifecycle: null,
     }
 
-    expect(workspacePickerItemsEqual([item], [{ ...item, gitCapability: 'available' }])).toBe(false)
+    expect(workspacePickerItemsEqual([item], [{ ...item, gitAvailable: true }])).toBe(false)
   })
 
   test('treats remote lifecycle target changes as unequal even when repo id stays the same', async () => {
@@ -60,8 +59,7 @@ describe('workspacePickerItemsEqual', () => {
       {
         id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
         name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [] },
+        gitAvailable: true,
         lifecycle: {
           kind: 'ready',
           target: {
@@ -80,8 +78,7 @@ describe('workspacePickerItemsEqual', () => {
       {
         id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
         name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [] },
+        gitAvailable: true,
         lifecycle: {
           kind: 'ready',
           target: {
@@ -114,8 +111,7 @@ describe('workspacePickerItemsEqual', () => {
       {
         id: target.id,
         name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [] },
+        gitAvailable: true,
         lifecycle: {
           kind: 'failed',
           reason: 'timeout',
@@ -127,8 +123,7 @@ describe('workspacePickerItemsEqual', () => {
       {
         id: target.id,
         name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [] },
+        gitAvailable: true,
         lifecycle: {
           kind: 'failed',
           reason: 'timeout',
@@ -150,8 +145,7 @@ describe('workspacePickerItemsEqual', () => {
       {
         id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [] },
+        gitAvailable: true,
         terminalBellCount: 1,
         lifecycle: null,
       },
@@ -160,8 +154,7 @@ describe('workspacePickerItemsEqual', () => {
       {
         id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [] },
+        gitAvailable: true,
         terminalBellCount: 2,
         lifecycle: null,
       },

@@ -290,7 +290,6 @@ const WorkspacePaneTabChrome: FunctionalComponent<WorkspacePaneTabChromeProps> =
         },
       }}
       containerClass={toolbarTabChromeClassName({
-        variant: 'workspace-pane',
         active: props.isActive,
         dragging: props.isDragging ?? false,
         compact: props.compact ?? false,
