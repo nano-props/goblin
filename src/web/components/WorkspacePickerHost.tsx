@@ -6,6 +6,8 @@ import { toast } from 'vue-sonner'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
+import { useAppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/terminal-session-store.ts'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
@@ -29,6 +31,8 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
   setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
+    const routeNavigation = useAppRouteNavigation()
+    const compact = useIsCompactUi()
     const summaries = useStoreSelector(
       workspacesStore,
       (state) =>
@@ -79,7 +83,13 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
           unavailable: t('workspace-unavailable.title'),
         }}
         onActivate={(workspaceId, onCommit) => {
-          const result = navigation.activateWorkspace(workspaceId, onCommit ? { onCommit } : undefined)
+          const options = onCommit ? { onCommit } : undefined
+          if (compact.value) {
+            routeNavigation.openWorkspaceNavigator(workspaceId, options)
+            return
+          }
+
+          const result = navigation.activateWorkspace(workspaceId, options)
           if (result === 'blocked')
             toast.warning(t('workspace-picker.switch-blocked'), { id: 'workspace-switch-blocked' })
         }}

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { screen } from '@testing-library/vue'
+import { userEvent } from '@testing-library/user-event'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -10,17 +12,35 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
+const navigationMocks = vi.hoisted(() => ({
+  activateWorkspace: vi.fn(),
+  openWorkspaceNavigator: vi.fn(),
+  compact: { value: false },
+}))
+
+vi.mock('#/web/app/navigation/route-navigation.ts', () => ({
+  useAppRouteNavigation: () => ({ openWorkspaceNavigator: navigationMocks.openWorkspaceNavigator }),
+}))
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => navigationMocks.compact,
+}))
+
 vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
   useWorkspaceTerminalBellCounts: () => ({ value: {} }),
 }))
 vi.mock('#/web/app/navigation/context.tsx', () => ({
   useAppNavigation: () => ({
-    activateWorkspace: vi.fn(),
+    activateWorkspace: navigationMocks.activateWorkspace,
     closeWorkspace: vi.fn(async () => ({ ok: true })),
   }),
 }))
 
-beforeEach(resetWorkspacesStore)
+beforeEach(() => {
+  resetWorkspacesStore()
+  navigationMocks.compact.value = false
+  navigationMocks.activateWorkspace.mockClear()
+  navigationMocks.openWorkspaceNavigator.mockClear()
+})
 
 describe('WorkspacePickerHost', () => {
   test('binds a remote workspace directory name into the picker from its canonical id', async () => {
@@ -39,6 +59,35 @@ describe('WorkspacePickerHost', () => {
 
     expect(container.textContent).toContain('Documents')
     expect(container.textContent).not.toContain('example:Documents')
+  })
+
+  test.each([
+    { compact: true, action: 'openWorkspaceNavigator', otherAction: 'activateWorkspace' },
+    { compact: false, action: 'activateWorkspace', otherAction: 'openWorkspaceNavigator' },
+  ] as const)('switches using $action when compact is $compact', async ({ compact, action, otherAction }) => {
+    navigationMocks.compact.value = compact
+    const first = workspaceIdForTest('goblin+file:///tmp/sample-one')
+    const second = workspaceIdForTest('goblin+file:///tmp/sample-two')
+    workspacesStore.setState({
+      workspaces: {
+        [first]: emptyWorkspace(first, 'workspace-runtime-one'),
+        [second]: emptyWorkspace(second, 'workspace-runtime-two'),
+      },
+      workspaceOrder: [first, second],
+    })
+    renderInJsdom(
+      <WorkspacePickerHost
+        currentWorkspaceId={first}
+        onOpenWorkspacePathDialog={vi.fn()}
+        onOpenRemote={vi.fn()}
+        onClone={vi.fn()}
+      />,
+    )
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'sample-two' }))
+
+    expect(navigationMocks[action]).toHaveBeenCalledWith(second, undefined)
+    expect(navigationMocks[otherAction]).not.toHaveBeenCalled()
   })
 })
 
