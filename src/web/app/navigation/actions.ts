@@ -78,6 +78,7 @@ export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommit
 interface CreateAppNavigationActionsOptions {
   currentWorkspaceId: WorkspaceId | null
   workspaceOrder: WorkspaceId[]
+  closeLanding: 'navigator' | 'restore'
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   peekWorkspaceNavigation: (
     workspaceId: WorkspaceId,
@@ -90,6 +91,7 @@ interface CreateAppNavigationActionsOptions {
 export function createAppNavigationActions({
   currentWorkspaceId,
   workspaceOrder,
+  closeLanding,
   closeWorkspace,
   peekWorkspaceNavigation,
   commitWorkspaceNavigation,
@@ -122,19 +124,20 @@ export function createAppNavigationActions({
       return restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, routeOptions, 'stay')
     },
     async closeWorkspace(workspaceId) {
-      const nextWorkspaceId =
-        workspaceId === currentWorkspaceId ? nextWorkspaceIdAfterClose(workspaceOrder, workspaceId) : null
-      const navigationGeneration = workspaceId === currentWorkspaceId ? beginAppNavigation() : null
+      if (workspaceId !== currentWorkspaceId) return closeWorkspace(workspaceId)
+
+      const nextWorkspaceId = nextWorkspaceIdAfterClose(workspaceOrder, workspaceId)
+      const routeOptions = { navigationGeneration: beginAppNavigation() }
       const result = await closeWorkspace(workspaceId)
-      if (!result.ok || workspaceId !== currentWorkspaceId) return result
-      if (nextWorkspaceId) {
-        restoreWorkspacePresentationOrOpenDashboard(
-          nextWorkspaceId,
-          routeNavigation,
-          { navigationGeneration: navigationGeneration! },
-          'dashboard',
-        )
-      } else routeNavigation.openHome({ navigationGeneration: navigationGeneration! })
+      if (!result.ok) return result
+
+      if (!nextWorkspaceId) {
+        routeNavigation.openHome(routeOptions)
+      } else if (closeLanding === 'navigator') {
+        routeNavigation.openWorkspaceNavigator(nextWorkspaceId, routeOptions)
+      } else {
+        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, routeOptions, 'dashboard')
+      }
       return result
     },
     selectRepoBranch(target, options) {

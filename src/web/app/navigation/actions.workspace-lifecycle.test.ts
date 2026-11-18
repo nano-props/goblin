@@ -197,6 +197,28 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     )
   })
 
+  test('returns to the neighboring workspace navigator after a compact close', async () => {
+    workspacesStore.getState().recordWorkspaceNavigation({
+      workspaceId: REPO_C_ID,
+      route: { kind: 'dashboard' },
+    })
+    const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_B_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
+      closeLanding: 'navigator',
+      closeWorkspace,
+      routeNavigation: navigation,
+    })
+
+    await actions.closeWorkspace(REPO_B_ID)
+
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
+    expect(navigation.openWorkspaceNavigator).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
+  })
+
   test('closes the current repo into the next repo dashboard when its history restore is blocked', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

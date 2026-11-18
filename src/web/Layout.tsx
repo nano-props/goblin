@@ -11,6 +11,7 @@ import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/app/bootstrap/authenticated.ts'
 import { useBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { createAppNavigationActions } from '#/web/app/navigation/actions.ts'
@@ -84,6 +85,7 @@ const AuthenticatedAppShell = defineComponent({
     const route = useRoute()
     const queryClient = useQueryClient()
     const overlays = useAppOverlays()
+    const compact = useIsCompactUi()
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const workspaceOrder = useStoreSelector(workspacesStore, (state) => state.workspaceOrder)
     const routeContext = computed(() => workspaceRouteContextFromVueRoute(route))
@@ -129,6 +131,7 @@ const AuthenticatedAppShell = defineComponent({
       createAppNavigationActions({
         currentWorkspaceId: hydratedRouteWorkspaceId.value,
         workspaceOrder: workspaceOrder.value,
+        closeLanding: compact.value ? 'navigator' : 'restore',
         closeWorkspace,
         peekWorkspaceNavigation,
         commitWorkspaceNavigation,
