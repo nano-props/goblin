@@ -321,7 +321,7 @@ describe('remote ssh command builders', () => {
       filePath: link,
     })
 
-    const result = await execa('sh', ['-lc', invocation.script], {
+    const result = await execa('sh', ['-c', invocation.script], {
       env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
       reject: false,
     })
