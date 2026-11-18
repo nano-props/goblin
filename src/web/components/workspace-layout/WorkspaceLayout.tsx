@@ -1,6 +1,7 @@
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, PropType, VNodeChild } from 'vue'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
+import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-boundary.tsx'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { WorkspaceLayoutMode } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
@@ -95,7 +96,9 @@ export const CompactWorkspaceLayout = defineComponent<{
             inert={active || undefined}
             class="goblin-compact-workspace__pane goblin-compact-workspace__pane--navigator absolute inset-0 flex min-h-0 min-w-0 bg-background"
           >
-            {active ? (retainedSidebarPane.value?.content ?? props.sidebarPane) : props.sidebarPane}
+            <FloatingSurfaceBoundary active={!active}>
+              {active ? (retainedSidebarPane.value?.content ?? props.sidebarPane) : props.sidebarPane}
+            </FloatingSurfaceBoundary>
           </div>
           <div
             data-compact-workspace-pane="workspace"
