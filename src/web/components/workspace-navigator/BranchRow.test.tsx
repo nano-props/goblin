@@ -497,7 +497,7 @@ describe('BranchRow', () => {
     const className = shell?.className ?? ''
     expect(container.querySelector('li')?.className).toContain('group')
     expect(className).toContain('opacity-0')
-    expect(className).toContain('group-hover:pointer-events-auto')
+    expect(className).toContain('group-hover/navigator-row:pointer-events-auto')
   })
 
   test.each([

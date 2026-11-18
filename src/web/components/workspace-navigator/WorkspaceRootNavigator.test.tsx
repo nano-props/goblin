@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent } from '@testing-library/vue'
+import { fireEvent, screen } from '@testing-library/vue'
+import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { VNode } from 'vue'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -72,6 +73,29 @@ describe('WorkspaceRootNavigator', () => {
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
+  test('selects the workspace using Enter and Space and keeps the action menu separately focusable', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    renderNavigator(<WorkspaceRootNavigator workspaceId={WORKSPACE_ID} selected={false} onSelect={onSelect} />)
+
+    const title = screen.getByRole('button', { name: 'workspace-root-navigator-test' })
+    await user.tab()
+    expect(document.activeElement).toBe(title)
+
+    await user.keyboard('{Enter}')
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    await user.keyboard(' ')
+    expect(onSelect).toHaveBeenCalledTimes(2)
+    expect(workspaceCommandMocks.showTab).not.toHaveBeenCalled()
+
+    const menu = screen.getByRole('button', { name: 'action.menu' })
+    await user.tab()
+    expect(document.activeElement).toBe(menu)
+    await user.keyboard('{Enter}')
+    expect(menu.getAttribute('aria-expanded')).toBe('true')
+    expect(onSelect).toHaveBeenCalledTimes(2)
+  })
+
   test.each(['status', 'files'] as const)('dispatches the %s workspace tab action', async (tab) => {
     const { container } = renderNavigator(<WorkspaceRootNavigator workspaceId={WORKSPACE_ID} selected={false} />)
 
@@ -83,10 +107,11 @@ describe('WorkspaceRootNavigator', () => {
     )
   })
 
-  test('opens the status tab when the workspace root is double-clicked', async () => {
-    const { container } = renderNavigator(<WorkspaceRootNavigator workspaceId={WORKSPACE_ID} selected={false} />)
+  test('opens the status tab when the workspace title button is double-clicked', async () => {
+    const user = userEvent.setup()
+    renderNavigator(<WorkspaceRootNavigator workspaceId={WORKSPACE_ID} selected={false} />)
 
-    await fireEvent.dblClick(workspaceRow(container))
+    await user.dblClick(screen.getByRole('button', { name: 'workspace-root-navigator-test' }))
 
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'status' }),
@@ -146,8 +171,8 @@ describe('WorkspaceRootNavigator', () => {
     if (!(action instanceof HTMLElement)) throw new Error('missing workspace root action wrapper')
 
     expect(action.className).toContain('opacity-0')
-    expect(action.className).toContain('group-hover:opacity-100')
-    expect(action.className).toContain('group-has-[:focus-visible]:opacity-100')
+    expect(action.className).toContain('group-hover/navigator-row:opacity-100')
+    expect(action.className).toContain('group-has-[:focus-visible]/navigator-row:opacity-100')
 
     await fireEvent.click(menuTrigger)
 

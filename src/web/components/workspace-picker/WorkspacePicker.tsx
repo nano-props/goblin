@@ -107,18 +107,13 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
                   <FilterIcon aria-hidden="true" />
                 </Button>
               </Tip>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  data-interactive
-                  aria-label={props.labels.open}
-                  title={props.labels.open}
-                >
-                  <Plus aria-hidden="true" />
-                </Button>
-              </PopoverTrigger>
+              <Tip label={props.labels.open}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon-lg" data-interactive aria-label={props.labels.open}>
+                    <Plus aria-hidden="true" />
+                  </Button>
+                </PopoverTrigger>
+              </Tip>
             </NavigatorSectionHeader>
             <PopoverContent align="end" aria-label={props.labels.open} class={ACTION_POPOVER_CONTENT_CLASS}>
               <div class="space-y-0.5 p-1">

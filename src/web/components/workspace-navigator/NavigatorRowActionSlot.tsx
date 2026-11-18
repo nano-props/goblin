@@ -21,16 +21,16 @@ export const NavigatorRowActionSlot: FunctionalComponent<NavigatorRowActionSlotP
   return (
     <div class={NAVIGATOR_ROW_ACTION_BOX_CLASS}>
       {indicator ? (
-        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-has-[:focus-visible]:opacity-0">
+        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover/navigator-row:opacity-0 group-has-[:focus-visible]/navigator-row:opacity-0">
           {indicator}
         </div>
       ) : null}
       <div
         class={cn(
-          'relative',
-          !props.actionHidden && 'pointer-events-auto',
-          props.actionHidden &&
-            'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100',
+          'relative transition-opacity duration-100',
+          props.actionHidden
+            ? 'pointer-events-none opacity-0 group-hover/navigator-row:pointer-events-auto group-hover/navigator-row:opacity-100 group-has-[:focus-visible]/navigator-row:pointer-events-auto group-has-[:focus-visible]/navigator-row:opacity-100'
+            : 'pointer-events-auto opacity-100',
         )}
       >
         {props.action}

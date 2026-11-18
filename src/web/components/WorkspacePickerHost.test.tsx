@@ -67,6 +67,28 @@ describe('WorkspacePickerHost', () => {
     expect(container.textContent).not.toContain('example:Documents')
   })
 
+  test('shows a tooltip for opening a workspace and opens the menu from the same button', async () => {
+    const user = userEvent.setup()
+    const openLocal = vi.fn()
+    renderInJsdom(
+      <WorkspacePickerHost
+        currentWorkspaceId={null}
+        onOpenWorkspacePathDialog={openLocal}
+        onOpenRemote={vi.fn()}
+        onClone={vi.fn()}
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: 'workspace-picker.open-title' })
+    await user.hover(trigger)
+    expect((await screen.findByRole('tooltip')).textContent).toBe('workspace-picker.open-title')
+
+    await user.click(trigger)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    await user.click(screen.getByRole('button', { name: 'workspace-picker.open-local' }))
+    expect(openLocal).toHaveBeenCalledOnce()
+  })
+
   test('toggles the list and follows the current workspace while filtered', async () => {
     const first = workspaceIdForTest('goblin+file:///tmp/sample-one')
     const second = workspaceIdForTest('goblin+file:///tmp/sample-two')

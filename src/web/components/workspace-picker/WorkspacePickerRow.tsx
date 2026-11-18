@@ -4,7 +4,10 @@ import { isRemoteWorkspaceId, remoteWorkspaceConnectionTarget } from '#/shared/r
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import { toButtonVNodeRef } from '#/web/components/ui/refs.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
-import { NAVIGATOR_ROW_LABEL_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
+import {
+  NAVIGATOR_ROW_CONTENT_BUTTON_CLASS,
+  NAVIGATOR_ROW_LABEL_CLASS,
+} from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
 import { NavigatorRowActionSlot } from '#/web/components/workspace-navigator/NavigatorRowActionSlot.tsx'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
@@ -74,10 +77,7 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
               ref={toButtonVNodeRef(props.buttonRef)}
               type="button"
               data-interactive
-              class={cn(
-                'pointer-events-auto flex min-w-0 flex-1 cursor-pointer touch-manipulation items-center gap-1.5 rounded-sm text-left outline-none',
-                focusRing,
-              )}
+              class={cn(NAVIGATOR_ROW_CONTENT_BUTTON_CLASS, focusRing)}
               aria-current={props.selected ? 'true' : undefined}
               aria-label={label}
               aria-description={location}
@@ -96,11 +96,7 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
                 )}
               </span>
               <span
-                class={cn(
-                  NAVIGATOR_ROW_LABEL_CLASS,
-                  'uppercase',
-                  props.selected ? 'text-selected-foreground' : 'text-foreground',
-                )}
+                class={cn(NAVIGATOR_ROW_LABEL_CLASS, props.selected ? 'text-selected-foreground' : 'text-foreground')}
               >
                 {workspace.name}
               </span>

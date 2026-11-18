@@ -6,10 +6,16 @@ import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
-import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
+import { focusRing } from '#/web/components/ui/focus.ts'
+import {
+  NAVIGATOR_ROW_CONTENT_BUTTON_CLASS,
+  NAVIGATOR_ROW_LABEL_CLASS,
+  NAVIGATOR_ROW_LIST_CLASS,
+} from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
 import { NavigatorRowActionSlot } from '#/web/components/workspace-navigator/NavigatorRowActionSlot.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
+import { cn } from '#/web/lib/cn.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -74,14 +80,23 @@ export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProp
             selected={props.selected}
             onClick={props.onSelect}
             onDblclick={target ? () => showStaticTab('status') : undefined}
-            contentClass="gap-2"
             content={
-              <>
-                <FolderTree size={16} class="shrink-0 text-muted-foreground" />
-                <span class="min-w-0 flex-1 truncate text-sm" title={currentWorkspace.name}>
+              <button
+                type="button"
+                data-interactive
+                aria-current={props.selected ? 'true' : undefined}
+                class={cn(NAVIGATOR_ROW_CONTENT_BUTTON_CLASS, focusRing)}
+              >
+                <span class="flex w-4 shrink-0 items-center justify-center">
+                  <FolderTree size={14} class="text-brand-text" aria-hidden="true" />
+                </span>
+                <span
+                  class={cn(NAVIGATOR_ROW_LABEL_CLASS, props.selected ? 'text-selected-foreground' : 'text-foreground')}
+                  title={currentWorkspace.name}
+                >
                   {currentWorkspace.name}
                 </span>
-              </>
+              </button>
             }
             actions={
               <NavigatorRowActionSlot

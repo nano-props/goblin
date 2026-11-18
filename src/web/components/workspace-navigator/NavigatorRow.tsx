@@ -13,7 +13,6 @@ interface NavigatorRowProps extends Omit<LiHTMLAttributes, 'content'> {
   content: VNodeChild
   actions: VNodeChild
   rowRef?: ElementRef<HTMLLIElement>
-  contentClass?: string
 }
 
 export const NavigatorRow: FunctionalComponent<NavigatorRowProps> = (props, { attrs }) => {
@@ -24,18 +23,16 @@ export const NavigatorRow: FunctionalComponent<NavigatorRowProps> = (props, { at
       ref={toLiVNodeRef(props.rowRef)}
       class={cn(
         NAVIGATOR_ROW_GRID_CLASS,
-        'group relative cursor-pointer transition-colors duration-100',
+        'group/navigator-row relative cursor-pointer transition-colors duration-100',
         props.selected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
         classValue,
       )}
     >
-      <div class={cn(NAVIGATOR_ROW_CONTENT_CLASS, 'pointer-events-none relative z-10', props.contentClass)}>
-        {props.content}
-      </div>
+      <div class={cn(NAVIGATOR_ROW_CONTENT_CLASS, 'pointer-events-none relative z-10')}>{props.content}</div>
       <div class={cn(NAVIGATOR_ROW_ACTION_SLOT_CLASS, 'pointer-events-none relative z-20')}>{props.actions}</div>
     </li>
   )
 }
 
-NavigatorRow.props = ['selected', 'content', 'actions', 'rowRef', 'contentClass']
+NavigatorRow.props = ['selected', 'content', 'actions', 'rowRef']
 NavigatorRow.inheritAttrs = false

@@ -96,7 +96,7 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
           filterStatus: filterStatusLabel.value,
           workspaces: t('workspace-picker.workspaces'),
           close: t('workspace-picker.close'),
-          open: t('app-chrome.open'),
+          open: t('workspace-picker.open-title'),
           openLocal: t('workspace-picker.open-local'),
           openRemote: t('workspace-picker.open-remote'),
           clone: t('workspace-picker.clone'),
