@@ -11,6 +11,8 @@ export interface WorkspacePickerItem {
 
 export interface WorkspacePickerLabels {
   workspaces: string
+  filter: string
+  filterStatus: string
   close: string
   open: string
   openLocal: string

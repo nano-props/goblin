@@ -1,8 +1,9 @@
-import { Download, FolderOpen, Plus, Server } from '@lucide/vue'
+import { Download, FolderOpen, List, ListFilter, Plus, Server } from '@lucide/vue'
 import { PopoverTrigger } from 'reka-ui'
 import { defineComponent, ref } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
+import { Tip } from '#/web/components/Tip.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { NavigatorSectionHeader } from '#/web/components/workspace-navigator/NavigatorSectionHeader.tsx'
@@ -15,6 +16,8 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 interface WorkspacePickerProps {
   workspaces: WorkspacePickerItem[]
   currentWorkspaceId: WorkspaceId | null
+  showActiveWorkspaceOnly: boolean
+  onShowActiveWorkspaceOnlyChange: (enabled: boolean) => void
   labels: WorkspacePickerLabels
   onActivate: (id: WorkspaceId, onCommit?: () => void) => void
   onOpenDashboard: (id: WorkspaceId) => void
@@ -29,6 +32,8 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
   props: [
     'workspaces',
     'currentWorkspaceId',
+    'showActiveWorkspaceOnly',
+    'onShowActiveWorkspaceOnlyChange',
     'labels',
     'onActivate',
     'onOpenDashboard',
@@ -58,6 +63,7 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
       const nextWorkspace = props.workspaces[nextIndex]
       if (!nextWorkspace || event.defaultPrevented) return
       event.preventDefault()
+      if (nextIndex === index) return
       const source = document.activeElement
       props.onActivate(nextWorkspace.id, () => {
         if (document.activeElement === source) focusRegistry.focus(nextWorkspace.id)
@@ -65,6 +71,8 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
     }
 
     return () => {
+      const activeOnly = props.showActiveWorkspaceOnly
+      const FilterIcon = activeOnly ? ListFilter : List
       const actions = [
         { label: props.labels.openLocal, icon: FolderOpen, select: props.onOpenLocal },
         { label: props.labels.openRemote, icon: Server, select: props.onOpenRemote },
@@ -80,17 +88,35 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
             }}
           >
             <NavigatorSectionHeader title={props.labels.workspaces}>
+              <Tip label={props.labels.filterStatus}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  data-interactive
+                  aria-label={props.labels.filter}
+                  aria-description={props.labels.filterStatus}
+                  aria-pressed={activeOnly}
+                  onClick={() => props.onShowActiveWorkspaceOnlyChange(!activeOnly)}
+                  class={
+                    activeOnly
+                      ? 'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground'
+                      : undefined
+                  }
+                >
+                  <FilterIcon aria-hidden="true" />
+                </Button>
+              </Tip>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-lg"
                   data-interactive
                   aria-label={props.labels.open}
                   title={props.labels.open}
-                  class="text-muted-foreground"
                 >
-                  <Plus class="size-4" aria-hidden="true" />
+                  <Plus aria-hidden="true" />
                 </Button>
               </PopoverTrigger>
             </NavigatorSectionHeader>

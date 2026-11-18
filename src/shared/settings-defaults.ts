@@ -17,6 +17,7 @@ export function defaultServerWorkspaceState(): ServerWorkspaceState {
 export function defaultClientWorkspaceState(): ClientWorkspaceState {
   return {
     restoredWorkspaceId: null,
+    showActiveWorkspaceOnly: false,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalFilesystemTarget: {},

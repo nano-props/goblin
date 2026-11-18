@@ -232,6 +232,24 @@ describe('useClientWorkspacePersistence', () => {
     )
   })
 
+  test('persists a workspace filter change on its own', async () => {
+    useFakeTimers()
+    workspacesStore.setState({ workspaceMembershipReady: true, sessionPersistenceReady: true })
+    renderInJsdom(<Harness />)
+    writePresentationMock.mockClear()
+
+    await flushTestUpdates(() => {
+      workspacesStore.getState().setShowActiveWorkspaceOnly(true)
+    })
+    await flushTestUpdates(() => {
+      vi.advanceTimersByTime(200)
+    })
+
+    expect(writePresentationMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ showActiveWorkspaceOnly: true }),
+    )
+  })
+
   test('flushes a pending local presentation synchronously on pagehide', async () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({

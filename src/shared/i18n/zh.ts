@@ -17,6 +17,10 @@ export const zh: Record<DictKey, string> = {
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Workspace picker ----------------------------------------------------
+  'workspace-picker.filter-label': '筛选工作区',
+  'workspace-picker.filter-tooltip.all': '全部工作区',
+  'workspace-picker.filter-tooltip.active': '仅当前工作区',
+  'workspace-picker.filter-tooltip.pending': '选中工作区后生效',
   'workspace-picker.workspaces': '工作区',
   'workspace-picker.switch-blocked': '目标工作区有操作正在进行。请等操作完成后再切换。',
   'workspace-picker.close': '关闭',

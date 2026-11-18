@@ -205,6 +205,7 @@ export function resetWorkspacesStore(): void {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+    showActiveWorkspaceOnly: false,
     branchViewModeByWorkspace: {},
     tabOpenerIdentityByScope: {},
     navigationHistoryByWorkspace: {},

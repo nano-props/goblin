@@ -28,6 +28,7 @@ interface ClientWorkspacePersistenceInput {
   workspaces: ReturnType<typeof workspacesStore.getState>['workspaces']
   workspaceOrder: WorkspaceId[]
   restoredWorkspaceId: WorkspaceId | null
+  showActiveWorkspaceOnly: boolean
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
@@ -47,6 +48,7 @@ export function useClientWorkspacePersistence({
     (state): Omit<ClientWorkspacePersistenceInput, 'filetreeInteractionByScope'> => ({
       restoredWorkspaceId: state.restoredWorkspaceId,
       workspaceOrder: state.workspaceOrder,
+      showActiveWorkspaceOnly: state.showActiveWorkspaceOnly,
       zenMode: state.zenMode,
       workspacePaneSize: state.workspacePaneSize,
       selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
@@ -147,6 +149,7 @@ function clientWorkspaceFromPersistenceInput(
     restorableWorkspaceState: restorableWorkspaceStateFromStore({
       workspaceOrder: input.workspaceOrder,
       restoredWorkspaceId: lastRoutedWorkspaceId ?? input.restoredWorkspaceId,
+      showActiveWorkspaceOnly: input.showActiveWorkspaceOnly,
       zenMode: input.zenMode,
       workspacePaneSize: input.workspacePaneSize,
       selectedTerminalSessionIdByTerminalFilesystemTarget: input.selectedTerminalSessionIdByTerminalFilesystemTarget,

@@ -31,6 +31,7 @@ export const workspacesStore = createStore<WorkspacesStore>()((set, get) => ({
   // Restorable workspace state.
   workspaceOrder: [],
   restoredWorkspaceId: null,
+  showActiveWorkspaceOnly: false,
   zenMode: DEFAULT_ZEN_MODE,
   workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   selectedTerminalSessionIdByTerminalFilesystemTarget: {},

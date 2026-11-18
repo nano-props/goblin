@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { defineComponent, ref } from 'vue'
 import { screen } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
@@ -64,6 +65,64 @@ describe('WorkspacePickerHost', () => {
 
     expect(container.textContent).toContain('Documents')
     expect(container.textContent).not.toContain('example:Documents')
+  })
+
+  test('toggles the list and follows the current workspace while filtered', async () => {
+    const first = workspaceIdForTest('goblin+file:///tmp/sample-one')
+    const second = workspaceIdForTest('goblin+file:///tmp/sample-two')
+    workspacesStore.setState({
+      workspaces: {
+        [first]: emptyWorkspace(first, 'workspace-runtime-one'),
+        [second]: emptyWorkspace(second, 'workspace-runtime-two'),
+      },
+      workspaceOrder: [first, second],
+    })
+    const currentWorkspaceId = ref<WorkspacePickerItem['id'] | null>(first)
+    const Harness = defineComponent(() => () => (
+      <WorkspacePickerHost
+        currentWorkspaceId={currentWorkspaceId.value}
+        onOpenWorkspacePathDialog={vi.fn()}
+        onOpenRemote={vi.fn()}
+        onClone={vi.fn()}
+      />
+    ))
+    renderInJsdom(<Harness />)
+
+    const user = userEvent.setup()
+    const filter = screen.getByRole('button', { name: 'workspace-picker.filter-label' })
+    expect(screen.getByRole('button', { name: 'sample-two' })).toBeTruthy()
+    await user.click(filter)
+    expect(filter.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'sample-one' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'sample-two' })).toBeNull()
+
+    const currentRow = screen.getByRole('button', { name: 'sample-one' })
+    currentRow.focus()
+    await user.keyboard('{ArrowDown}{ArrowUp}{Home}{End}')
+    expect(document.activeElement).toBe(currentRow)
+    expect(navigationMocks.activateWorkspace).not.toHaveBeenCalled()
+
+    await flushTestUpdates(() => {
+      currentWorkspaceId.value = second
+    })
+    expect(screen.queryByRole('button', { name: 'sample-one' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'sample-two' })).toBeTruthy()
+
+    await flushTestUpdates(() => {
+      currentWorkspaceId.value = null
+    })
+    expect(screen.getByRole('button', { name: 'sample-one' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'sample-two' })).toBeTruthy()
+    expect(filter.getAttribute('aria-pressed')).toBe('true')
+    expect(filter.getAttribute('aria-description')).toBe('workspace-picker.filter-tooltip.pending')
+
+    await flushTestUpdates(() => {
+      currentWorkspaceId.value = second
+    })
+    await user.click(filter)
+    expect(filter.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'sample-one' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'sample-two' })).toBeTruthy()
   })
 
   test.each([

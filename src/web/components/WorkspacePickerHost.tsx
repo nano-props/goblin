@@ -50,10 +50,26 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
           .filter((workspace): workspace is WorkspacePickerItem => workspace !== null),
       workspacePickerItemsEqual,
     )
-    const workspaceIds = computed(() => summaries.value.map((workspace) => workspace.id))
+    const showActiveWorkspaceOnly = useStoreSelector(workspacesStore, (state) => state.showActiveWorkspaceOnly)
+    const currentWorkspace = computed(() =>
+      summaries.value.find((workspace) => workspace.id === props.currentWorkspaceId),
+    )
+    const visibleSummaries = computed(() => {
+      const current = currentWorkspace.value
+      return showActiveWorkspaceOnly.value && current ? [current] : summaries.value
+    })
+    const filterStatusLabel = computed(() => {
+      const labelKey = !showActiveWorkspaceOnly.value
+        ? 'workspace-picker.filter-tooltip.all'
+        : currentWorkspace.value
+          ? 'workspace-picker.filter-tooltip.active'
+          : 'workspace-picker.filter-tooltip.pending'
+      return t(labelKey)
+    })
+    const workspaceIds = computed(() => visibleSummaries.value.map((workspace) => workspace.id))
     const terminalBellCounts = useWorkspaceTerminalBellCounts(workspaceIds)
     const summariesWithTerminalBells = computed(() =>
-      summaries.value.map<WorkspacePickerItem>((workspace) => ({
+      visibleSummaries.value.map<WorkspacePickerItem>((workspace) => ({
         id: workspace.id,
         name: workspace.name,
         gitAvailable: workspace.gitAvailable,
@@ -73,7 +89,11 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
       <WorkspacePicker
         workspaces={summariesWithTerminalBells.value}
         currentWorkspaceId={props.currentWorkspaceId}
+        showActiveWorkspaceOnly={showActiveWorkspaceOnly.value}
+        onShowActiveWorkspaceOnlyChange={(enabled) => workspacesStore.getState().setShowActiveWorkspaceOnly(enabled)}
         labels={{
+          filter: t('workspace-picker.filter-label'),
+          filterStatus: filterStatusLabel.value,
           workspaces: t('workspace-picker.workspaces'),
           close: t('workspace-picker.close'),
           open: t('app-chrome.open'),

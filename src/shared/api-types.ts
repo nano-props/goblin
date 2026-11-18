@@ -56,6 +56,7 @@ export type BranchViewMode = 'all' | 'worktrees'
 export interface ClientWorkspaceState {
   /** Workspace restored when opening `/`; null when none were open. */
   restoredWorkspaceId: WorkspaceId | null
+  showActiveWorkspaceOnly: boolean
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>

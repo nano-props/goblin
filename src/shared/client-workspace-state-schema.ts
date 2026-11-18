@@ -25,6 +25,7 @@ const FiletreeSessionViewStateSchema = v.strictObject({
 export const ClientWorkspaceStateSchema = v.pipe(
   v.strictObject({
     restoredWorkspaceId: v.nullable(WorkspaceIdSchema),
+    showActiveWorkspaceOnly: v.optional(v.boolean(), false),
     zenMode: v.boolean(),
     workspacePaneSize: v.pipe(
       v.number(),

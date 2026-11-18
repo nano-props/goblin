@@ -28,6 +28,8 @@ describe('WorkspacePicker keyboard navigation', () => {
           workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
         ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
+        showActiveWorkspaceOnly={false}
+        onShowActiveWorkspaceOnlyChange={() => {}}
         labels={labels}
         onActivate={onActivate}
         onOpenDashboard={() => {}}
@@ -62,6 +64,8 @@ function workspace(name: string, id: string): WorkspacePickerItem {
 
 const labels = {
   workspaces: 'Workspaces',
+  filter: 'Filter workspaces',
+  filterStatus: 'All workspaces',
   close: 'Close',
   open: 'Open',
   openLocal: 'Open local repository…',

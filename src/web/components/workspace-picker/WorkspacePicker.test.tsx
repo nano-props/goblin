@@ -28,6 +28,8 @@ describe('WorkspacePicker', () => {
           workspace('Remote', 'goblin+ssh://example/tmp/remote', { gitAvailable: false }),
         ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/folder')}
+        showActiveWorkspaceOnly={false}
+        onShowActiveWorkspaceOnlyChange={() => {}}
         labels={labels}
         onActivate={() => {}}
         onOpenDashboard={() => {}}
@@ -54,6 +56,8 @@ describe('WorkspacePicker', () => {
       <WorkspacePicker
         workspaces={[workspace('Repo-A', firstId), workspace('Repo-B', secondId, { terminalBellCount: 3 })]}
         currentWorkspaceId={firstId}
+        showActiveWorkspaceOnly={false}
+        onShowActiveWorkspaceOnlyChange={() => {}}
         labels={labels}
         onActivate={onActivate}
         onOpenDashboard={() => {}}
@@ -110,6 +114,8 @@ describe('WorkspacePicker', () => {
       <WorkspacePicker
         workspaces={[]}
         currentWorkspaceId={null}
+        showActiveWorkspaceOnly={false}
+        onShowActiveWorkspaceOnlyChange={() => {}}
         labels={labels}
         onActivate={() => {}}
         onOpenDashboard={() => {}}
@@ -167,6 +173,8 @@ function workspace(name: string, id: string, overrides: Partial<WorkspacePickerI
 
 const labels = {
   workspaces: 'Workspaces',
+  filter: 'Filter workspaces',
+  filterStatus: 'All workspaces',
   close: 'Close',
   open: 'Open',
   openLocal: 'Open local repository…',

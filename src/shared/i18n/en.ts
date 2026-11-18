@@ -22,6 +22,10 @@ export const en = {
   // ---- Dependencies -------------------------------------------------------
 
   // ---- Workspace picker -----------------------------------------------------
+  'workspace-picker.filter-label': 'Filter workspaces',
+  'workspace-picker.filter-tooltip.all': 'All workspaces',
+  'workspace-picker.filter-tooltip.active': 'Active workspace only',
+  'workspace-picker.filter-tooltip.pending': 'Applies when a workspace is selected',
   'workspace-picker.workspaces': 'Workspaces',
   'workspace-picker.switch-blocked':
     'Wait for the pending operation in that workspace to finish, then try switching again.',

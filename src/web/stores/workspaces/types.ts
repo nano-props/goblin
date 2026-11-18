@@ -122,6 +122,7 @@ export interface RestorableWorkspaceState {
    * The route owns the current workspace.
    */
   restoredWorkspaceId: WorkspaceId | null
+  showActiveWorkspaceOnly: boolean
   /** Large-screen Zen Mode restored from ClientWorkspaceState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
@@ -241,6 +242,7 @@ export interface RestorableWorkspaceActions {
     selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>,
   ) => void
   applySessionBranchViewModes: (branchViewModeByWorkspace: Record<string, BranchViewMode>) => void
+  setShowActiveWorkspaceOnly: (enabled: boolean) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void

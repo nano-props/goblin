@@ -92,6 +92,7 @@ describe('client workspace persistence', () => {
       preferredWorkspacePaneTabByTargetByWorkspace: state.preferredWorkspacePaneTabByTargetByWorkspace,
       selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
       branchViewModeByWorkspace: state.branchViewModeByWorkspace,
+      showActiveWorkspaceOnly: state.showActiveWorkspaceOnly,
       workspacePaneSize: state.workspacePaneSize,
       zenMode: state.zenMode,
       restoredWorkspaceId: state.restoredWorkspaceId,

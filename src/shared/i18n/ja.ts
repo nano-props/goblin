@@ -18,6 +18,10 @@ export const ja: Record<DictKey, string> = {
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Workspace picker ----------------------------------------------------
+  'workspace-picker.filter-label': 'ワークスペースをフィルター',
+  'workspace-picker.filter-tooltip.all': 'すべてのワークスペース',
+  'workspace-picker.filter-tooltip.active': '現在のワークスペースのみ',
+  'workspace-picker.filter-tooltip.pending': 'ワークスペースを選択すると適用',
   'workspace-picker.workspaces': 'ワークスペース',
   'workspace-picker.switch-blocked':
     '切り替え先のワークスペースで操作を実行中です。完了後にもう一度切り替えてください。',

@@ -4,13 +4,22 @@ import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 
 describe('client workspace state JSON codec', () => {
   test('persists the state object directly without a version envelope', () => {
-    const state = { ...defaultClientWorkspaceState(), zenMode: true }
+    const state = { ...defaultClientWorkspaceState(), zenMode: true, showActiveWorkspaceOnly: true }
     const serialized = stringifyClientWorkspaceState(state)
 
     expect(JSON.parse(serialized)).toEqual(state)
     expect(JSON.parse(serialized)).not.toHaveProperty('version')
     expect(JSON.parse(serialized)).not.toHaveProperty('state')
     expect(parseClientWorkspaceStateJson(serialized)).toEqual(state)
+  })
+
+  test('defaults the workspace filter to all when omitted from a saved snapshot', () => {
+    const { showActiveWorkspaceOnly, ...snapshot } = defaultClientWorkspaceState()
+
+    expect(parseClientWorkspaceStateJson(JSON.stringify(snapshot))).toEqual({
+      ...snapshot,
+      showActiveWorkspaceOnly,
+    })
   })
 
   test('rejects a version envelope instead of creating a second persistence format', () => {

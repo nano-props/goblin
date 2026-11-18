@@ -116,6 +116,7 @@ describe('app bootstrap hooks', () => {
       },
       {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
+        showActiveWorkspaceOnly: true,
         zenMode: false,
         workspacePaneSize: 45,
         selectedTerminalSessionIdByTerminalFilesystemTarget: {
@@ -150,6 +151,7 @@ describe('app bootstrap hooks', () => {
     })
 
     const state = workspacesStore.getState()
+    expect(state.showActiveWorkspaceOnly).toBe(true)
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalSessionIdByTerminalFilesystemTarget).toEqual({

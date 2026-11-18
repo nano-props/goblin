@@ -181,6 +181,7 @@ function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): vo
     workspacesStore.getState()
   restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByFilesystemTargetByWorkspace)
   applySessionLayoutState(normalizedLayout)
+  workspacesStore.getState().setShowActiveWorkspaceOnly(restoredWorkspaceState.showActiveWorkspaceOnly)
   applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget)
   applySessionBranchViewModes(restoredWorkspaceState.branchViewModeByWorkspace)
 }

@@ -5,7 +5,7 @@ One workspace for Git branches and worktrees.
 ## Requirements
 
 - Linux or macOS
-- Bun 1.4.2+
+- Bun 1.4.4+
 - Git; SSH for remote workspaces
 - Node.js 24.15+ (LTS) or 26+ for development checks and tests
 

@@ -18,6 +18,10 @@ export const ko: Record<DictKey, string> = {
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Workspace picker ----------------------------------------------------
+  'workspace-picker.filter-label': '워크스페이스 필터',
+  'workspace-picker.filter-tooltip.all': '모든 워크스페이스',
+  'workspace-picker.filter-tooltip.active': '현재 워크스페이스만',
+  'workspace-picker.filter-tooltip.pending': '워크스페이스를 선택하면 적용',
   'workspace-picker.workspaces': '워크스페이스',
   'workspace-picker.switch-blocked': '대상 워크스페이스에서 작업이 진행 중입니다. 완료 후 다시 전환하세요.',
   'workspace-picker.close': '닫기',

@@ -90,6 +90,7 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
   )
   const clientWorkspace: ClientWorkspaceState = {
     restoredWorkspaceId: restorableWorkspaceState.restoredWorkspaceId,
+    showActiveWorkspaceOnly: restorableWorkspaceState.showActiveWorkspaceOnly,
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
     selectedTerminalSessionIdByTerminalFilesystemTarget: selectedTerminalSessionsForClientWorkspace(
@@ -355,6 +356,7 @@ function selectedTerminalSessionsForClientWorkspace(
  *  subsequent local updates flow through useClientWorkspacePersistence. */
 interface RestoredWorkspaceStateFromClientWorkspace {
   restoredWorkspaceId: RestorableWorkspaceState['restoredWorkspaceId']
+  showActiveWorkspaceOnly: RestorableWorkspaceState['showActiveWorkspaceOnly']
   zenMode: RestorableWorkspaceState['zenMode']
   workspacePaneSize: RestorableWorkspaceState['workspacePaneSize']
   selectedTerminalSessionIdByTerminalFilesystemTarget: RestorableWorkspaceState['selectedTerminalSessionIdByTerminalFilesystemTarget']
@@ -368,6 +370,7 @@ export function restoreRestorableWorkspaceStateFromClientWorkspace(
 ): RestoredWorkspaceStateFromClientWorkspace {
   return {
     restoredWorkspaceId,
+    showActiveWorkspaceOnly: clientWorkspace.showActiveWorkspaceOnly,
     zenMode: clientWorkspace.zenMode,
     workspacePaneSize: clientWorkspace.workspacePaneSize,
     selectedTerminalSessionIdByTerminalFilesystemTarget:

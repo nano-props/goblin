@@ -68,6 +68,10 @@ function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspa
       set({ branchViewModeByWorkspace: { ...branchViewModeByWorkspace } })
     },
 
+    setShowActiveWorkspaceOnly(enabled: boolean) {
+      set((s) => (s.showActiveWorkspaceOnly === enabled ? s : { showActiveWorkspaceOnly: enabled }))
+    },
+
     setZenMode(enabled: boolean) {
       set((s) => (s.zenMode === enabled ? s : { zenMode: enabled }))
     },

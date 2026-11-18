@@ -29,6 +29,7 @@ export function restorableWorkspaceStateFromStore(state: RestorableWorkspaceStat
   return {
     workspaceOrder: state.workspaceOrder,
     restoredWorkspaceId: state.restoredWorkspaceId,
+    showActiveWorkspaceOnly: state.showActiveWorkspaceOnly,
     zenMode: state.zenMode,
     workspacePaneSize: state.workspacePaneSize,
     selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
