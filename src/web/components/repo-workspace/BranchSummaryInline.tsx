@@ -10,6 +10,7 @@ import { useT } from '#/web/stores/i18n-vue.ts'
 import type { BranchSnapshotInfo, RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
+import { NAVIGATOR_ROW_LABEL_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { worktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
@@ -233,7 +234,8 @@ export const BranchSummaryInline = defineComponent<BranchSummaryInlineProps>({
           <span class="flex min-w-0 items-center gap-1.5 overflow-hidden">
             <span
               class={cn(
-                'shrink-0 truncate text-[13px] font-normal leading-5',
+                'shrink-0',
+                NAVIGATOR_ROW_LABEL_CLASS,
                 selected ? 'text-selected-foreground' : 'text-foreground',
               )}
             >

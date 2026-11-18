@@ -9,7 +9,6 @@ import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover
 import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
 import { NavigatorRowActionSlot } from '#/web/components/workspace-navigator/NavigatorRowActionSlot.tsx'
-import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
@@ -69,73 +68,71 @@ export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProp
       const target = commandTarget.value
       const actionVisible = compact.value || menuOpen.value
       return (
-        <ScrollArea class="h-full min-h-0 flex-1" data-testid="workspace-root-navigator">
-          <ul class={NAVIGATOR_ROW_LIST_CLASS}>
-            <NavigatorRow
-              data-testid="workspace-root-row"
-              selected={props.selected}
-              onClick={props.onSelect}
-              onDblclick={target ? () => showStaticTab('status') : undefined}
-              contentClass="gap-2"
-              content={
-                <>
-                  <FolderTree size={16} class="shrink-0 text-muted-foreground" />
-                  <span class="min-w-0 flex-1 truncate text-sm" title={currentWorkspace.name}>
-                    {currentWorkspace.name}
-                  </span>
-                </>
-              }
-              actions={
-                <NavigatorRowActionSlot
-                  actionHidden={!actionVisible}
-                  terminalBellCount={0}
-                  terminalOutputActive={false}
-                  action={
-                    <ActionPopover
-                      label={t('action.menu')}
-                      open={menuOpen.value}
-                      onOpenChange={(open) => {
-                        menuOpen.value = open
-                      }}
-                    >
-                      {({ close }: { close: () => void }) => (
-                        <div class="space-y-0.5 p-1" role="list">
+        <ul class={NAVIGATOR_ROW_LIST_CLASS} data-testid="workspace-root-navigator">
+          <NavigatorRow
+            data-testid="workspace-root-row"
+            selected={props.selected}
+            onClick={props.onSelect}
+            onDblclick={target ? () => showStaticTab('status') : undefined}
+            contentClass="gap-2"
+            content={
+              <>
+                <FolderTree size={16} class="shrink-0 text-muted-foreground" />
+                <span class="min-w-0 flex-1 truncate text-sm" title={currentWorkspace.name}>
+                  {currentWorkspace.name}
+                </span>
+              </>
+            }
+            actions={
+              <NavigatorRowActionSlot
+                actionHidden={!actionVisible}
+                terminalBellCount={0}
+                terminalOutputActive={false}
+                action={
+                  <ActionPopover
+                    label={t('action.menu')}
+                    open={menuOpen.value}
+                    onOpenChange={(open) => {
+                      menuOpen.value = open
+                    }}
+                  >
+                    {({ close }: { close: () => void }) => (
+                      <div class="space-y-0.5 p-1" role="list">
+                        <WorkspaceAction
+                          label={t('tab.status')}
+                          icon={<FileText />}
+                          close={close}
+                          onSelect={target ? () => showStaticTab('status') : undefined}
+                        />
+                        <WorkspaceAction
+                          label={t('tab.files')}
+                          icon={<FolderTree />}
+                          close={close}
+                          onSelect={target ? () => showStaticTab('files') : undefined}
+                        />
+                        {currentWorkspace.terminalAvailable && target ? (
                           <WorkspaceAction
-                            label={t('tab.status')}
-                            icon={<FileText />}
+                            label={t('tab.terminal')}
+                            icon={<Terminal />}
                             close={close}
-                            onSelect={target ? () => showStaticTab('status') : undefined}
+                            onSelect={() => {
+                              void runTerminalPrimaryActionCommand({
+                                workspaceId: props.workspaceId,
+                                target,
+                                navigation,
+                                t,
+                              })
+                            }}
                           />
-                          <WorkspaceAction
-                            label={t('tab.files')}
-                            icon={<FolderTree />}
-                            close={close}
-                            onSelect={target ? () => showStaticTab('files') : undefined}
-                          />
-                          {currentWorkspace.terminalAvailable && target ? (
-                            <WorkspaceAction
-                              label={t('tab.terminal')}
-                              icon={<Terminal />}
-                              close={close}
-                              onSelect={() => {
-                                void runTerminalPrimaryActionCommand({
-                                  workspaceId: props.workspaceId,
-                                  target,
-                                  navigation,
-                                  t,
-                                })
-                              }}
-                            />
-                          ) : null}
-                        </div>
-                      )}
-                    </ActionPopover>
-                  }
-                />
-              }
-            />
-          </ul>
-        </ScrollArea>
+                        ) : null}
+                      </div>
+                    )}
+                  </ActionPopover>
+                }
+              />
+            }
+          />
+        </ul>
       )
     }
   },

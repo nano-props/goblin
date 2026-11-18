@@ -6,7 +6,6 @@ export function appNavigationActionsForTest(overrides: Partial<AppNavigationActi
   return {
     activateWorkspace: unexpectedNavigationAction('activateWorkspace'),
     closeWorkspace: unexpectedNavigationAction('closeWorkspace'),
-    cycleWorkspace: unexpectedNavigationAction('cycleWorkspace'),
     selectRepoBranch: unexpectedNavigationAction('selectRepoBranch'),
     selectRepoWorktree: unexpectedNavigationAction('selectRepoWorktree'),
     commitFilesystemWorkspacePaneRoute: unexpectedNavigationAction('commitFilesystemWorkspacePaneRoute'),

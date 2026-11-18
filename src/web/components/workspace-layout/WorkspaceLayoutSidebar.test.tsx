@@ -101,8 +101,11 @@ describe('WorkspaceLayoutSidebar', () => {
 
     expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-button"]')).toBeNull()
-    expect(container.querySelector('[data-testid="workspace-root-navigator"]')).not.toBeNull()
-    expect(container.textContent).toContain('workspace.navigation-title')
+    const viewports = container.querySelectorAll('[data-reka-scroll-area-viewport]')
+    expect(viewports).toHaveLength(1)
+    expect(viewports[0]?.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
+    expect(viewports[0]?.querySelector('[data-testid="workspace-root-navigator"]')).not.toBeNull()
+    expect(container.textContent).toContain('workspace.directory-title')
     expect(container.textContent).not.toContain('tab.branches')
     expect(container.textContent).toContain('workspace.dashboard')
     expect(container.querySelector('button[aria-label="menu.view.refresh"]')).not.toBeNull()

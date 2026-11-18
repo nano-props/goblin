@@ -12,19 +12,17 @@ interface NavigatorRowActionSlotProps {
 }
 
 export const NavigatorRowActionSlot: FunctionalComponent<NavigatorRowActionSlotProps> = (props) => {
-  const showBellBadge = props.terminalBellCount > 0 && props.actionHidden
-  const showOutputActivity = props.terminalOutputActive && props.actionHidden && !showBellBadge
+  const indicator = !props.actionHidden ? null : props.terminalBellCount > 0 ? (
+    <TerminalBellBadge count={props.terminalBellCount} />
+  ) : props.terminalOutputActive ? (
+    <TerminalOutputActivityIndicator />
+  ) : null
 
   return (
     <div class={NAVIGATOR_ROW_ACTION_BOX_CLASS}>
-      {showBellBadge ? (
-        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
-          <TerminalBellBadge count={props.terminalBellCount} />
-        </div>
-      ) : null}
-      {showOutputActivity ? (
-        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
-          <TerminalOutputActivityIndicator />
+      {indicator ? (
+        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-has-[:focus-visible]:opacity-0">
+          {indicator}
         </div>
       ) : null}
       <div
@@ -32,7 +30,7 @@ export const NavigatorRowActionSlot: FunctionalComponent<NavigatorRowActionSlotP
           'relative',
           !props.actionHidden && 'pointer-events-auto',
           props.actionHidden &&
-            'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+            'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100',
         )}
       >
         {props.action}

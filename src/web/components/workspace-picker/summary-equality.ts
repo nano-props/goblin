@@ -1,9 +1,5 @@
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
-import {
-  isRemoteWorkspaceConnectionTerminal,
-  type RemoteWorkspaceConnectionLifecycle,
-  type RemoteWorkspaceTarget,
-} from '#/shared/remote-workspace.ts'
+import type { RemoteWorkspaceConnectionLifecycle, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 
 /**
  * Structural equality for the lifecycle union as it appears on a
@@ -42,7 +38,7 @@ function lifecycleEqual(
     }
     return true
   }
-  return !isRemoteWorkspaceConnectionTerminal(a) && !isRemoteWorkspaceConnectionTerminal(b)
+  return false
 }
 
 export function workspacePickerItemsEqual(a: WorkspacePickerItem[], b: WorkspacePickerItem[]): boolean {
@@ -54,21 +50,11 @@ export function workspacePickerItemsEqual(a: WorkspacePickerItem[], b: Workspace
     if (
       x.id !== y.id ||
       x.name !== y.name ||
-      x.gitCapability !== y.gitCapability ||
+      x.gitAvailable !== y.gitAvailable ||
       (x.terminalBellCount ?? 0) !== (y.terminalBellCount ?? 0)
     )
       return false
     if (!lifecycleEqual(x.lifecycle, y.lifecycle)) return false
-    if ((x.git === null) !== (y.git === null)) return false
-    if (!x.git || !y.git) continue
-    if (x.git.remoteDetails === y.git.remoteDetails) continue
-    if (!x.git.remoteDetails || !y.git.remoteDetails) return false
-    if (x.git.remoteDetails.length !== y.git.remoteDetails.length) return false
-    for (let j = 0; j < x.git.remoteDetails.length; j++) {
-      const xr = x.git.remoteDetails[j]
-      const yr = y.git.remoteDetails[j]
-      if (!xr || !yr || xr.name !== yr.name || xr.fetchUrl !== yr.fetchUrl || xr.pushUrl !== yr.pushUrl) return false
-    }
   }
   return true
 }

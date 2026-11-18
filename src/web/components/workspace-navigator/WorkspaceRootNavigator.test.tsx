@@ -147,7 +147,7 @@ describe('WorkspaceRootNavigator', () => {
 
     expect(action.className).toContain('opacity-0')
     expect(action.className).toContain('group-hover:opacity-100')
-    expect(action.className).toContain('group-focus-within:opacity-100')
+    expect(action.className).toContain('group-has-[:focus-visible]:opacity-100')
 
     await fireEvent.click(menuTrigger)
 

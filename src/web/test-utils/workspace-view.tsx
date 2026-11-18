@@ -76,14 +76,14 @@ vi.mock('#/web/hooks/useRestoreWorkspaceTabsOnView.ts', () => ({
   useRestoreWorkspaceTabsOnView: restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView,
 }))
 
-vi.mock('#/web/components/GitWorkspaceNavigator.tsx', () => {
-  const GitWorkspaceNavigator: FunctionalComponent<{ repoId: string }> = () => (
+vi.mock('#/web/components/workspace-navigator/GitWorkspaceNavigatorView.tsx', () => {
+  const GitWorkspaceNavigatorView: FunctionalComponent<{ repoId: string }> = () => (
     <button type="button" data-testid="git-workspace-navigator">
       branch
     </button>
   )
-  GitWorkspaceNavigator.props = ['repoId']
-  return { GitWorkspaceNavigator }
+  GitWorkspaceNavigatorView.props = ['repoId']
+  return { GitWorkspaceNavigatorView }
 })
 
 vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {

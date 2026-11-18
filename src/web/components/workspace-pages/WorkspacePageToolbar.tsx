@@ -33,7 +33,7 @@ export const WorkspacePageToolbar = defineComponent<WorkspacePageToolbarProps>({
       const backLabel = t('workspace.back-to-workspace-navigator')
       const tab = (
         <ToolbarClosableTab
-          containerClass={toolbarTabChromeClassName({ variant: 'workspace-pane', active: true })}
+          containerClass={toolbarTabChromeClassName({ active: true })}
           buttonProps={{ role: 'tab', 'aria-selected': true, title: props.label }}
         >
           <Icon size={14} class={toolbarTabIconClassName(true)} />

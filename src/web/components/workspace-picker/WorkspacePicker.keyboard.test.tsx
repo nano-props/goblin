@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { screen } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
@@ -16,9 +17,9 @@ beforeEach(() => {
 })
 
 describe('WorkspacePicker keyboard navigation', () => {
-  test('moves between workspaces from the current workspace button', async () => {
+  test('moves between workspaces from the sidebar project list', async () => {
     const user = userEvent.setup()
-    const onActivate = vi.fn()
+    const onActivate = vi.fn<(id: WorkspacePickerItem['id'], onCommit?: () => void) => void>()
 
     renderInJsdom(
       <WorkspacePicker
@@ -29,6 +30,7 @@ describe('WorkspacePicker keyboard navigation', () => {
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={onActivate}
+        onOpenDashboard={() => {}}
         onClose={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
@@ -36,47 +38,16 @@ describe('WorkspacePicker keyboard navigation', () => {
       />,
     )
 
-    const currentWorkspaceButton = document.body.querySelector(
-      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
-    )
-    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
+    const first = screen.getByRole('button', { name: 'workspace-a' })
+    const second = screen.getByRole('button', { name: 'workspace-b' })
+    first.focus()
+    await user.keyboard('{ArrowDown}')
 
-    currentWorkspaceButton.focus()
-    await user.keyboard('{ArrowRight}')
-
-    expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
-  })
-
-  test('moves between workspaces from the sidebar current workspace button', async () => {
-    const user = userEvent.setup()
-    const onActivate = vi.fn()
-
-    renderInJsdom(
-      <WorkspacePicker
-        workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
-          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
-        ]}
-        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
-        labels={labels}
-        onActivate={onActivate}
-        onClose={() => {}}
-        onOpenLocal={() => {}}
-        onOpenRemote={() => {}}
-        onClone={() => {}}
-        surface="sidebar"
-      />,
-    )
-
-    const currentWorkspaceButton = document.body.querySelector(
-      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
-    )
-    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
-
-    currentWorkspaceButton.focus()
-    await user.keyboard('{ArrowRight}')
-
-    expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
+    expect(document.activeElement).toBe(first)
+    expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b', expect.any(Function))
+    const onCommit = onActivate.mock.calls[0]?.[1]
+    onCommit?.()
+    expect(document.activeElement).toBe(second)
   })
 })
 
@@ -84,17 +55,15 @@ function workspace(name: string, id: string): WorkspacePickerItem {
   return {
     id: workspaceIdForTest(id),
     name,
-    gitCapability: 'available',
-    git: { remoteDetails: [] },
+    gitAvailable: true,
     lifecycle: null,
   }
 }
 
 const labels = {
   workspaces: 'Workspaces',
-  closeWithName: (name: string) => `Close ${name}`,
+  close: 'Close',
   open: 'Open',
-  placeholder: 'Select workspace',
   openLocal: 'Open local repository…',
   openRemote: 'Open remote repository…',
   clone: 'Clone repository…',

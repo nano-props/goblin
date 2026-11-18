@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
+import { defineComponent, ref } from 'vue'
 import type { VNodeChild } from 'vue'
+import { screen } from '@testing-library/vue'
+import { userEvent } from '@testing-library/user-event'
+import { PopoverTrigger } from 'reka-ui'
+import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
@@ -43,6 +48,37 @@ describe('CompactWorkspaceLayout', () => {
     expect(compactPane(container, 'navigator')?.hasAttribute('inert')).toBe(true)
     expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(compactPane(container, 'workspace')?.hasAttribute('inert')).toBe(false)
+  })
+
+  test('closes a navigator popover when its pane becomes inactive and keeps it closed on return', async () => {
+    const user = userEvent.setup()
+    const open = ref(false)
+    const Sidebar = defineComponent({
+      setup: () => () => (
+        <Popover open={open.value} onOpenChange={(value) => (open.value = value)}>
+          <PopoverTrigger>Open sidebar menu</PopoverTrigger>
+          <PopoverContent>Sidebar menu</PopoverContent>
+        </Popover>
+      ),
+    })
+    const layout = (activePane: 'navigator' | 'workspace') => (
+      <CompactWorkspaceLayout activePane={activePane} sidebarPane={<Sidebar />} workspacePane={<div>workspace</div>} />
+    )
+    const { rerender } = renderInJsdom(layout('navigator'))
+
+    const trigger = screen.getByRole('button', { name: 'Open sidebar menu' })
+    await user.click(trigger)
+    await screen.findByRole('dialog')
+
+    await rerender(layout('workspace'))
+    expect(open.value).toBe(false)
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await rerender(layout('navigator'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await user.click(trigger)
+    await screen.findByRole('dialog')
   })
 
   test.each([

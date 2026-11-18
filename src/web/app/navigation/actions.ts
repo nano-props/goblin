@@ -61,9 +61,11 @@ export interface FilesystemWorkspacePaneRouteCommitActions extends WorkspacePane
 }
 
 export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommitActions {
-  activateWorkspace: (workspaceId: WorkspaceId, options?: { navigationGeneration?: AppNavigationGeneration }) => void
+  activateWorkspace: (
+    workspaceId: WorkspaceId,
+    options?: Pick<AppNavigationExecutionOptions, 'navigationGeneration' | 'onCommit'>,
+  ) => 'blocked' | void
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
-  cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (target: GitBranchPaneTargetLease, options?: { replace?: boolean }) => boolean
   selectRepoWorktree: (target: GitWorktreePaneRouteLease, options?: { replace?: boolean }) => boolean
   currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branch: string) => WorkspacePaneRouteTarget | undefined
@@ -76,6 +78,7 @@ export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommit
 interface CreateAppNavigationActionsOptions {
   currentWorkspaceId: WorkspaceId | null
   workspaceOrder: WorkspaceId[]
+  closeLanding: 'navigator' | 'restore'
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   peekWorkspaceNavigation: (
     workspaceId: WorkspaceId,
@@ -88,6 +91,7 @@ interface CreateAppNavigationActionsOptions {
 export function createAppNavigationActions({
   currentWorkspaceId,
   workspaceOrder,
+  closeLanding,
   closeWorkspace,
   peekWorkspaceNavigation,
   commitWorkspaceNavigation,
@@ -114,31 +118,27 @@ export function createAppNavigationActions({
     },
     activateWorkspace(workspaceId, options) {
       const navigationGeneration = options?.navigationGeneration ?? beginAppNavigation()
-      restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationGeneration, {
-        onBlocked: 'stay',
-      })
+      const routeOptions = options?.onCommit
+        ? { navigationGeneration, onCommit: options.onCommit }
+        : { navigationGeneration }
+      return restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, routeOptions, 'stay')
     },
     async closeWorkspace(workspaceId) {
-      const nextWorkspaceId =
-        workspaceId === currentWorkspaceId ? nextWorkspaceIdAfterClose(workspaceOrder, workspaceId) : null
-      const navigationGeneration = workspaceId === currentWorkspaceId ? beginAppNavigation() : null
+      if (workspaceId !== currentWorkspaceId) return closeWorkspace(workspaceId)
+
+      const nextWorkspaceId = nextWorkspaceIdAfterClose(workspaceOrder, workspaceId)
+      const routeOptions = { navigationGeneration: beginAppNavigation() }
       const result = await closeWorkspace(workspaceId)
-      if (!result.ok || workspaceId !== currentWorkspaceId) return result
-      if (nextWorkspaceId)
-        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, navigationGeneration!, {
-          onBlocked: 'dashboard',
-        })
-      else routeNavigation.openHome({ navigationGeneration: navigationGeneration! })
-      return result
-    },
-    cycleWorkspace(direction) {
-      const workspaceId = nextNavigationWorkspaceId(workspaceOrder, currentWorkspaceId, direction)
-      if (workspaceId) {
-        const navigationGeneration = beginAppNavigation()
-        restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationGeneration, {
-          onBlocked: 'stay',
-        })
+      if (!result.ok) return result
+
+      if (!nextWorkspaceId) {
+        routeNavigation.openHome(routeOptions)
+      } else if (closeLanding === 'navigator') {
+        routeNavigation.openWorkspaceNavigator(nextWorkspaceId, routeOptions)
+      } else {
+        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, routeOptions, 'dashboard')
       }
+      return result
     },
     selectRepoBranch(target, options) {
       if (!gitBranchPaneTargetLeaseOwnerIsCurrent(target)) return false
@@ -280,9 +280,9 @@ async function commitWorkspacePaneRoute(
 function restoreWorkspacePresentationOrOpenDashboard(
   workspaceId: WorkspaceId,
   routeNavigation: AppRouteNavigation,
-  navigationGeneration: AppNavigationGeneration,
-  options: { onBlocked: 'stay' | 'dashboard' },
-): void {
+  routeOptions: AppNavigationExecutionOptions,
+  onBlocked: 'stay' | 'dashboard',
+): 'blocked' | void {
   const state = workspacesStore.getState()
   const workspace = state.workspaces[workspaceId]
   const entry = state.navigationHistoryByWorkspace[workspaceId]?.current ?? null
@@ -296,26 +296,15 @@ function restoreWorkspacePresentationOrOpenDashboard(
       ? entry.route.kind !== 'workspace-root'
       : entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
   if (entryCanResume) {
-    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { navigationGeneration })
-    if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return
+    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, routeOptions)
+    if (result.kind === 'accepted') return
+    if (result.kind === 'blocked' && onBlocked === 'stay') return 'blocked'
   }
-  routeNavigation.openWorkspaceDashboard(workspaceId, { navigationGeneration })
+  routeNavigation.openWorkspaceDashboard(workspaceId, routeOptions)
 }
 
 function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspaceId: WorkspaceId): WorkspaceId | null {
   const currentIndex = workspaceOrder.findIndex((workspaceId) => workspaceId === closingWorkspaceId)
   if (currentIndex === -1) return workspaceOrder[0] ?? null
   return workspaceOrder[currentIndex + 1] ?? workspaceOrder[currentIndex - 1] ?? null
-}
-
-function nextNavigationWorkspaceId(
-  workspaceOrder: WorkspaceId[],
-  currentWorkspaceId: WorkspaceId | null,
-  direction: 1 | -1,
-): WorkspaceId | null {
-  if (workspaceOrder.length === 0) return null
-  if (!currentWorkspaceId) return workspaceOrder[0] ?? null
-  const currentIndex = workspaceOrder.findIndex((workspaceId) => workspaceId === currentWorkspaceId)
-  if (currentIndex === -1) return workspaceOrder[0] ?? null
-  return workspaceOrder[(currentIndex + direction + workspaceOrder.length) % workspaceOrder.length] ?? null
 }

@@ -98,7 +98,6 @@ export const navigation: AppNavigationActions = {
   currentWorkspacePaneRoute: () => undefined,
   activateWorkspace: vi.fn(),
   closeWorkspace: vi.fn(),
-  cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),
@@ -200,6 +199,7 @@ export function navigationWithStore(
   const navigation = createAppNavigationActions({
     currentWorkspaceId: REPO_ID,
     workspaceOrder: [REPO_ID],
+    closeLanding: 'restore',
     closeWorkspace: store.closeWorkspace,
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,
     commitWorkspaceNavigation: store.commitWorkspaceNavigation,

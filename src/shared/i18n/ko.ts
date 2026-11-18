@@ -19,8 +19,8 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Workspace picker ----------------------------------------------------
   'workspace-picker.workspaces': '워크스페이스',
-  'workspace-picker.close-named': '{name} 닫기',
-  'workspace-picker.placeholder': '워크스페이스 선택',
+  'workspace-picker.switch-blocked': '대상 워크스페이스에서 작업이 진행 중입니다. 완료 후 다시 전환하세요.',
+  'workspace-picker.close': '닫기',
   'workspace-picker.open-local': '작업 공간 열기…',
   'workspace-picker.open-remote': '원격 작업 공간 열기…',
   'workspace-open.invalid-path': '링크에는 절대 디렉터리 경로 하나가 필요합니다(최대 4096자).',
@@ -194,7 +194,7 @@ export const ko: Record<DictKey, string> = {
   'worktree-status.changes-unavailable': '사용할 수 없음',
   'worktree-status.open-history': '{commit}에서 기록 열기',
   'tab.branches': '브랜치',
-  'workspace.navigation-title': '워크스페이스',
+  'workspace.directory-title': '디렉터리',
   'tab.status': '상태',
   'tab.changes': '변경',
   'tab.changes-with-count': '변경 · {count}개',

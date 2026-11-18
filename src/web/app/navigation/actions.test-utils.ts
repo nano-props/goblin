@@ -100,9 +100,9 @@ export function historyTraversal(target: WorkspaceNavigationHistoryEntry): Works
 type AppNavigationActionOptions = Parameters<typeof createAppNavigationActionsCore>[0]
 type AppNavigationActionTestOptions = Omit<
   AppNavigationActionOptions,
-  'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
+  'closeLanding' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
 > &
-  Partial<Pick<AppNavigationActionOptions, 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>>
+  Partial<Pick<AppNavigationActionOptions, 'closeLanding' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>>
 
 export function createAppNavigationActions(options: AppNavigationActionTestOptions) {
   if (options.currentWorkspaceId && !workspacesStore.getState().workspaces[options.currentWorkspaceId]) {
@@ -113,6 +113,7 @@ export function createAppNavigationActions(options: AppNavigationActionTestOptio
   }
   const store = workspacesStore.getState()
   return createAppNavigationActionsCore({
+    closeLanding: 'restore',
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,
     commitWorkspaceNavigation: store.commitWorkspaceNavigation,
     ...options,

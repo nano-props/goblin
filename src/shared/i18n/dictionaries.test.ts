@@ -53,7 +53,6 @@ describe('i18n dictionaries', () => {
   test('keeps top-level workspace copy independent of Git repository terminology', () => {
     const workspaceKeys = [
       'workspace-picker.workspaces',
-      'workspace-picker.placeholder',
       'workspace-unavailable.title',
       'workspace-unavailable.body',
       'workspace-unavailable.close',

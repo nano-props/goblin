@@ -27,20 +27,6 @@ import {
 beforeEach(setupAppNavigationActionsTests)
 
 describe('createAppNavigationActions workspace lifecycle', () => {
-  test('cycles repos by navigating from the current repo', () => {
-    const navigation = routeNavigation()
-    const actions = createAppNavigationActions({
-      currentWorkspaceId: REPO_A_ID,
-      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
-      closeWorkspace: vi.fn(),
-      routeNavigation: navigation,
-    })
-
-    actions.cycleWorkspace(1)
-
-    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
-  })
-
   test('activates a repo at its current workspace history entry', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_B_ID,
@@ -57,14 +43,13 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       routeNavigation: navigation,
     })
 
-    actions.activateWorkspace(REPO_B_ID)
+    const onCommit = vi.fn()
+    actions.activateWorkspace(REPO_B_ID, { onCommit })
 
-    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
-      REPO_B_ID,
-      'feature/remembered',
-      'history',
-      presentationOptions(),
-    )
+    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(REPO_B_ID, 'feature/remembered', 'history', {
+      navigationGeneration: expect.any(Number),
+      onCommit,
+    })
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
@@ -106,7 +91,9 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       routeNavigation: navigation,
     })
 
-    actions.activateWorkspace(REPO_ID)
+    const onCommit = vi.fn()
+    expect(actions.activateWorkspace(REPO_ID, { onCommit })).toBe('blocked')
+    expect(onCommit).not.toHaveBeenCalled()
 
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
@@ -149,46 +136,6 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     actions.activateWorkspace(workspaceId)
 
     expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(workspaceId, presentationOptions())
-  })
-
-  test('cycles to the target repo current workspace history entry', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_B_ID,
-      branches: [createRepoBranch('feature/remembered')],
-      currentBranchName: 'feature/remembered',
-    })
-    const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'status')
-    workspacesStore.getState().recordWorkspaceNavigation(entry)
-    const navigation = routeNavigation()
-    const actions = createAppNavigationActions({
-      currentWorkspaceId: REPO_A_ID,
-      workspaceOrder: [REPO_A_ID, REPO_B_ID],
-      closeWorkspace: vi.fn(),
-      routeNavigation: navigation,
-    })
-
-    actions.cycleWorkspace(1)
-
-    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
-      REPO_B_ID,
-      'feature/remembered',
-      'status',
-      presentationOptions(),
-    )
-  })
-
-  test('cycles repos backward and wraps around', () => {
-    const navigation = routeNavigation()
-    const actions = createAppNavigationActions({
-      currentWorkspaceId: REPO_A_ID,
-      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
-      closeWorkspace: vi.fn(),
-      routeNavigation: navigation,
-    })
-
-    actions.cycleWorkspace(-1)
-
-    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
   })
 
   test('closes the repo through the store action without navigation when it is not current', async () => {
@@ -248,6 +195,28 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       'history',
       presentationOptions(),
     )
+  })
+
+  test('returns to the neighboring workspace navigator after a compact close', async () => {
+    workspacesStore.getState().recordWorkspaceNavigation({
+      workspaceId: REPO_C_ID,
+      route: { kind: 'dashboard' },
+    })
+    const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_B_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
+      closeLanding: 'navigator',
+      closeWorkspace,
+      routeNavigation: navigation,
+    })
+
+    await actions.closeWorkspace(REPO_B_ID)
+
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
+    expect(navigation.openWorkspaceNavigator).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
   test('closes the current repo into the next repo dashboard when its history restore is blocked', async () => {

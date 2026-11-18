@@ -1,11 +1,13 @@
-import { defineComponent, inject, onMounted, onScopeDispose, provide, ref, toValue, watch } from 'vue'
-import type { InjectionKey, MaybeRefOrGetter } from 'vue'
+import { defineComponent, inject, onMounted, onScopeDispose, provide, toValue, watch } from 'vue'
+import type { InjectionKey, MaybeRefOrGetter, PropType } from 'vue'
 
 interface FloatingSurfaceBoundaryContextValue {
-  registerOpenSurface: () => () => void
+  isActive: () => boolean
+  registerOpenSurface: (close: () => void) => (() => void) | undefined
 }
 
 interface FloatingSurfaceBoundaryProps {
+  active?: boolean
   onPinnedChange?: (pinned: boolean) => void
 }
 
@@ -14,35 +16,47 @@ const floatingSurfaceBoundaryKey: InjectionKey<FloatingSurfaceBoundaryContextVal
 
 const FloatingSurfaceBoundary = defineComponent<FloatingSurfaceBoundaryProps>({
   name: 'FloatingSurfaceBoundary',
-  props: ['onPinnedChange'],
+  props: {
+    active: { type: Boolean, default: true },
+    onPinnedChange: Function as PropType<FloatingSurfaceBoundaryProps['onPinnedChange']>,
+  },
 
   setup(props, { slots }) {
-    const openDescendantCount = ref(0)
+    const openSurfaces = new Set<() => void>()
     let mounted = false
     let lastPinned: boolean | undefined
 
     function notifyPinnedChange(): void {
       if (!mounted) return
-      const pinned = openDescendantCount.value > 0
+      const pinned = openSurfaces.size > 0
       if (pinned === lastPinned) return
       lastPinned = pinned
       props.onPinnedChange?.(pinned)
     }
 
-    function registerOpenSurface(): () => void {
-      let registered = true
-      openDescendantCount.value += 1
+    function registerOpenSurface(close: () => void): (() => void) | undefined {
+      if (props.active === false) {
+        close()
+        return
+      }
+      openSurfaces.add(close)
       notifyPinnedChange()
 
       return () => {
-        if (!registered) return
-        registered = false
-        openDescendantCount.value = Math.max(0, openDescendantCount.value - 1)
-        notifyPinnedChange()
+        if (openSurfaces.delete(close)) notifyPinnedChange()
       }
     }
 
-    provide(floatingSurfaceBoundaryKey, { registerOpenSurface })
+    provide(floatingSurfaceBoundaryKey, { isActive: () => props.active !== false, registerOpenSurface })
+    watch(
+      () => props.active,
+      (active) => {
+        if (active === false) {
+          for (const close of openSurfaces) close()
+        }
+      },
+      { flush: 'sync' },
+    )
     onMounted(() => {
       mounted = true
       notifyPinnedChange()
@@ -52,7 +66,11 @@ const FloatingSurfaceBoundary = defineComponent<FloatingSurfaceBoundaryProps>({
   },
 })
 
-export function useFloatingSurfaceBoundaryPin(open: MaybeRefOrGetter<boolean>): void {
+export function floatingSurfaceBoundaryIsActive(): boolean {
+  return inject(floatingSurfaceBoundaryKey, null)?.isActive() ?? true
+}
+
+export function useFloatingSurfaceBoundaryPin(open: MaybeRefOrGetter<boolean>, close: () => void): void {
   const boundary = inject(floatingSurfaceBoundaryKey, null)
   let unregister: (() => void) | undefined
 
@@ -68,7 +86,7 @@ export function useFloatingSurfaceBoundaryPin(open: MaybeRefOrGetter<boolean>): 
     () => toValue(open),
     (nextOpen) => {
       release()
-      if (nextOpen && boundary) unregister = boundary.registerOpenSurface()
+      if (nextOpen && boundary) unregister = boundary.registerOpenSurface(close)
     },
     { immediate: true, flush: 'sync' },
   )

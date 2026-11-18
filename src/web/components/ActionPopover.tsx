@@ -1,11 +1,14 @@
 import { Loader2, MoreHorizontal } from '@lucide/vue'
 import { PopoverTrigger } from 'reka-ui'
-import { defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType, VNodeChild } from 'vue'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { cn } from '#/web/lib/cn.ts'
+
+export const ACTION_POPOVER_CONTENT_CLASS =
+  'w-max min-w-[min(12rem,calc(100vw-2rem))] max-w-[min(18rem,calc(100vw-2rem))] overflow-hidden p-0'
 
 interface ActionPopoverState {
   readonly close: () => void
@@ -18,6 +21,7 @@ export const ActionPopover = defineComponent<{
   busy?: boolean
   triggerClass?: string
   contentClass?: string
+  focusContentOnOpen?: boolean
 }>({
   name: 'ActionPopover',
   props: {
@@ -27,10 +31,21 @@ export const ActionPopover = defineComponent<{
     busy: Boolean,
     triggerClass: String,
     contentClass: String,
+    focusContentOnOpen: Boolean,
   },
 
   setup(props, { slots }) {
     const internalOpen = ref(false)
+    const focusTarget = ref<HTMLDivElement | null>(null)
+    const open = computed(() => props.open ?? internalOpen.value)
+
+    watch(
+      [open, focusTarget],
+      ([isOpen, target]) => {
+        if (isOpen) target?.focus({ preventScroll: true })
+      },
+      { flush: 'post' },
+    )
 
     function setOpen(next: boolean): void {
       if (props.open === undefined) internalOpen.value = next
@@ -40,7 +55,7 @@ export const ActionPopover = defineComponent<{
     const state: ActionPopoverState = { close: () => setOpen(false) }
 
     return () => (
-      <Popover open={props.open ?? internalOpen.value} onOpenChange={setOpen}>
+      <Popover open={open.value} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             data-action-popover-trigger=""
@@ -59,12 +74,18 @@ export const ActionPopover = defineComponent<{
         </PopoverTrigger>
         <PopoverContent
           align="end"
-          class={cn('w-max min-w-48 max-w-72 overflow-hidden p-0', props.contentClass)}
+          class={cn(ACTION_POPOVER_CONTENT_CLASS, props.contentClass)}
           onOpenAutoFocus={(event: Event) => event.preventDefault()}
           onPointerdown={stopPropagation}
           onClick={stopPropagation}
         >
-          {slots.default?.(state)}
+          {props.focusContentOnOpen ? (
+            <div ref={focusTarget} tabindex={-1} class="outline-none">
+              {slots.default?.(state)}
+            </div>
+          ) : (
+            slots.default?.(state)
+          )}
         </PopoverContent>
       </Popover>
     )

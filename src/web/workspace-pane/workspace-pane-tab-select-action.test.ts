@@ -398,7 +398,6 @@ function navigationWith(
     activateWorkspace: (workspaceId) =>
       workspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),
     closeWorkspace: async () => ({ ok: true }),
-    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (workspaceId, branch, tab) => {
