@@ -17,6 +17,7 @@ interface WorkspacePickerProps {
   currentWorkspaceId: WorkspaceId | null
   labels: WorkspacePickerLabels
   onActivate: (id: WorkspaceId, onCommit?: () => void) => void
+  onOpenDashboard: (id: WorkspaceId) => void
   onClose: (id: WorkspaceId) => void
   onOpenLocal: () => void
   onOpenRemote: () => void
@@ -30,6 +31,7 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
     'currentWorkspaceId',
     'labels',
     'onActivate',
+    'onOpenDashboard',
     'onClose',
     'onOpenLocal',
     'onOpenRemote',
@@ -121,6 +123,7 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
                   closeLabel={props.labels.close}
                   buttonRef={focusRegistry.setRef(workspace.id)}
                   onActivate={() => props.onActivate(workspace.id)}
+                  onOpenDashboard={() => props.onOpenDashboard(workspace.id)}
                   onClose={() => props.onClose(workspace.id)}
                   onKeydown={(event) => navigateWorkspace(event, index)}
                 />

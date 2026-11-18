@@ -30,6 +30,7 @@ describe('WorkspacePicker keyboard navigation', () => {
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={onActivate}
+        onOpenDashboard={() => {}}
         onClose={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}

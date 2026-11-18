@@ -15,11 +15,15 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 const navigationMocks = vi.hoisted(() => ({
   activateWorkspace: vi.fn(),
   openWorkspaceNavigator: vi.fn(),
+  openWorkspaceDashboard: vi.fn(),
   compact: { value: false },
 }))
 
 vi.mock('#/web/app/navigation/route-navigation.ts', () => ({
-  useAppRouteNavigation: () => ({ openWorkspaceNavigator: navigationMocks.openWorkspaceNavigator }),
+  useAppRouteNavigation: () => ({
+    openWorkspaceNavigator: navigationMocks.openWorkspaceNavigator,
+    openWorkspaceDashboard: navigationMocks.openWorkspaceDashboard,
+  }),
 }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => navigationMocks.compact,
@@ -40,6 +44,7 @@ beforeEach(() => {
   navigationMocks.compact.value = false
   navigationMocks.activateWorkspace.mockClear()
   navigationMocks.openWorkspaceNavigator.mockClear()
+  navigationMocks.openWorkspaceDashboard.mockClear()
 })
 
 describe('WorkspacePickerHost', () => {
@@ -84,10 +89,17 @@ describe('WorkspacePickerHost', () => {
       />,
     )
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'sample-two' }))
+    const user = userEvent.setup()
+    const target = screen.getByRole('button', { name: 'sample-two' })
+    await user.click(target)
 
     expect(navigationMocks[action]).toHaveBeenCalledWith(second, undefined)
     expect(navigationMocks[otherAction]).not.toHaveBeenCalled()
+    expect(navigationMocks.openWorkspaceDashboard).not.toHaveBeenCalled()
+
+    await user.dblClick(target)
+
+    expect(navigationMocks.openWorkspaceDashboard).toHaveBeenCalledExactlyOnceWith(second)
   })
 })
 

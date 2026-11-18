@@ -21,6 +21,7 @@ interface WorkspacePickerRowProps {
   closeLabel: string
   buttonRef: (node: HTMLButtonElement | null) => void
   onActivate: () => void
+  onOpenDashboard: () => void
   onClose: () => void
   onKeydown: (event: KeyboardEvent) => void
 }
@@ -35,6 +36,7 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
     'closeLabel',
     'buttonRef',
     'onActivate',
+    'onOpenDashboard',
     'onClose',
     'onKeydown',
   ],
@@ -66,13 +68,14 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
         <NavigatorRow
           selected={props.selected}
           onClick={props.onActivate}
+          onDblclick={props.onOpenDashboard}
           content={
             <button
               ref={toButtonVNodeRef(props.buttonRef)}
               type="button"
               data-interactive
               class={cn(
-                'pointer-events-auto flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left outline-none',
+                'pointer-events-auto flex min-w-0 flex-1 cursor-pointer touch-manipulation items-center gap-1.5 rounded-sm text-left outline-none',
                 focusRing,
               )}
               aria-current={props.selected ? 'true' : undefined}

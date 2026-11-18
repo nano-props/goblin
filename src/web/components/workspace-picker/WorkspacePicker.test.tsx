@@ -30,6 +30,7 @@ describe('WorkspacePicker', () => {
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/folder')}
         labels={labels}
         onActivate={() => {}}
+        onOpenDashboard={() => {}}
         onClose={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
@@ -55,6 +56,7 @@ describe('WorkspacePicker', () => {
         currentWorkspaceId={firstId}
         labels={labels}
         onActivate={onActivate}
+        onOpenDashboard={() => {}}
         onClose={onClose}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
@@ -110,6 +112,7 @@ describe('WorkspacePicker', () => {
         currentWorkspaceId={null}
         labels={labels}
         onActivate={() => {}}
+        onOpenDashboard={() => {}}
         onClose={() => {}}
         onOpenLocal={onOpenLocal}
         onOpenRemote={onOpenRemote}

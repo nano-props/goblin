@@ -93,6 +93,7 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
           if (result === 'blocked')
             toast.warning(t('workspace-picker.switch-blocked'), { id: 'workspace-switch-blocked' })
         }}
+        onOpenDashboard={routeNavigation.openWorkspaceDashboard}
         onClose={(workspaceId) => void closeWorkspace(workspaceId)}
         onOpenLocal={props.onOpenWorkspacePathDialog}
         onOpenRemote={props.onOpenRemote}
