@@ -96,7 +96,11 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
                 )}
               </span>
               <span
-                class={cn(NAVIGATOR_ROW_LABEL_CLASS, props.selected ? 'text-selected-foreground' : 'text-foreground')}
+                class={cn(
+                  NAVIGATOR_ROW_LABEL_CLASS,
+                  'uppercase',
+                  props.selected ? 'text-selected-foreground' : 'text-foreground',
+                )}
               >
                 {workspace.name}
               </span>
