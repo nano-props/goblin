@@ -235,7 +235,6 @@ function navigationWith(): AppNavigationActions {
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(),
-    cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),

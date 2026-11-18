@@ -23,6 +23,8 @@ export const en = {
 
   // ---- Workspace picker -----------------------------------------------------
   'workspace-picker.workspaces': 'Workspaces',
+  'workspace-picker.switch-blocked':
+    'Wait for the pending operation in that workspace to finish, then try switching again.',
   'workspace-picker.close': 'Close',
   'workspace-picker.open-local': 'Open Workspace…',
   'workspace-picker.open-remote': 'Open Remote Workspace…',

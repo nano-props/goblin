@@ -18,6 +18,7 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Workspace picker ----------------------------------------------------
   'workspace-picker.workspaces': '工作区',
+  'workspace-picker.switch-blocked': '目标工作区有操作正在进行。请等操作完成后再切换。',
   'workspace-picker.close': '关闭',
   'workspace-picker.open-local': '打开工作区…',
   'workspace-picker.open-remote': '打开远程工作区…',

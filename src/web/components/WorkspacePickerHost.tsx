@@ -2,6 +2,7 @@
 // canonical workspace-picker component modules.
 
 import { computed, defineComponent } from 'vue'
+import { toast } from 'vue-sonner'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
@@ -77,7 +78,11 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
           clone: t('workspace-picker.clone'),
           unavailable: t('workspace-unavailable.title'),
         }}
-        onActivate={navigation.activateWorkspace}
+        onActivate={(workspaceId, onCommit) => {
+          const result = navigation.activateWorkspace(workspaceId, onCommit ? { onCommit } : undefined)
+          if (result === 'blocked')
+            toast.warning(t('workspace-picker.switch-blocked'), { id: 'workspace-switch-blocked' })
+        }}
         onClose={(workspaceId) => void closeWorkspace(workspaceId)}
         onOpenLocal={props.onOpenWorkspacePathDialog}
         onOpenRemote={props.onOpenRemote}

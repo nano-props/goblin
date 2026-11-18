@@ -1064,7 +1064,6 @@ function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavig
   return observedAppNavigationActionsForTest({
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(),
-    cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(() => true),
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),

@@ -105,7 +105,6 @@ beforeEach(() => {
       closeRepoSpy(repoId)
       return workspacesStore.getState().closeWorkspace(repoId)
     },
-    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {

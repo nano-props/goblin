@@ -223,7 +223,6 @@ function navigationWithStoreActions(): ObservedAppNavigationActionsForTest {
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),
     closeWorkspace: (workspaceId) => workspacesStore.getState().closeWorkspace(workspaceId),
-    cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {

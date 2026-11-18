@@ -619,7 +619,6 @@ function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavig
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),
-    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,

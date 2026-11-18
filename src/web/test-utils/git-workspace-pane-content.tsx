@@ -320,7 +320,6 @@ export function navigationWith(overrides: AppNavigationOverridesForTest): AppNav
   return observedAppNavigationActionsForTest({
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),
-    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,

@@ -16,7 +16,7 @@ interface WorkspacePickerProps {
   workspaces: WorkspacePickerItem[]
   currentWorkspaceId: WorkspaceId | null
   labels: WorkspacePickerLabels
-  onActivate: (id: WorkspaceId) => void
+  onActivate: (id: WorkspaceId, onCommit?: () => void) => void
   onClose: (id: WorkspaceId) => void
   onOpenLocal: () => void
   onOpenRemote: () => void
@@ -56,8 +56,10 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
       const nextWorkspace = props.workspaces[nextIndex]
       if (!nextWorkspace || event.defaultPrevented) return
       event.preventDefault()
-      props.onActivate(nextWorkspace.id)
-      focusRegistry.focus(nextWorkspace.id)
+      const source = document.activeElement
+      props.onActivate(nextWorkspace.id, () => {
+        if (document.activeElement === source) focusRegistry.focus(nextWorkspace.id)
+      })
     }
 
     return () => {

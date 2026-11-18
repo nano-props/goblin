@@ -98,7 +98,6 @@ export const navigation: AppNavigationActions = {
   currentWorkspacePaneRoute: () => undefined,
   activateWorkspace: vi.fn(),
   closeWorkspace: vi.fn(),
-  cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),

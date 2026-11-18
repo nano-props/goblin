@@ -19,6 +19,8 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Workspace picker ----------------------------------------------------
   'workspace-picker.workspaces': 'ワークスペース',
+  'workspace-picker.switch-blocked':
+    '切り替え先のワークスペースで操作を実行中です。完了後にもう一度切り替えてください。',
   'workspace-picker.close': '閉じる',
   'workspace-picker.open-local': 'ワークスペースを開く…',
   'workspace-picker.open-remote': 'リモートワークスペースを開く…',

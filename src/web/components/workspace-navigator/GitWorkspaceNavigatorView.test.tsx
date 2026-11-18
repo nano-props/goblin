@@ -44,7 +44,6 @@ const navigation: AppNavigationActions = {
   currentWorkspacePaneRoute: () => undefined,
   activateWorkspace: vi.fn(),
   closeWorkspace: vi.fn(),
-  cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
   selectRepoWorktree: vi.fn(),
   commitFilesystemWorkspacePaneRoute: vi.fn(async () => true),
