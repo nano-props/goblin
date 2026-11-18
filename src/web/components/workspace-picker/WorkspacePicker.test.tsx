@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { flushTestUpdates } from '#/test-utils/render.tsx'
-import { screen } from '@testing-library/vue'
+import { screen, within } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
@@ -71,7 +71,18 @@ describe('WorkspacePicker', () => {
     expect(second.closest('li')?.textContent).toContain('3')
 
     await user.click(second)
-    screen.getByRole('button', { name: 'Close Repo-A' }).focus()
+    const firstRow = screen.getAllByRole('listitem')[0]!
+    const actions = within(firstRow).getByRole('button', { name: 'action.menu' })
+    expect(screen.queryByRole('button', { name: 'Close Repo-A' })).toBeNull()
+    actions.focus()
+    await user.keyboard('{Enter}')
+    const menu = await screen.findByRole('dialog')
+    expect(onClose).not.toHaveBeenCalled()
+    expect(within(menu).getAllByRole('button')).toHaveLength(1)
+    await user.keyboard('{Enter}')
+    expect(onClose).not.toHaveBeenCalled()
+    await user.tab()
+    expect(document.activeElement).toBe(within(menu).getByRole('button', { name: 'Close Repo-A' }))
     await user.keyboard('{Enter}')
 
     expect(onActivate.mock.calls).toEqual([[secondId]])

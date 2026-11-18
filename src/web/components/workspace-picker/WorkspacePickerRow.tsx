@@ -1,9 +1,9 @@
 import { AlertCircle, Folder, FolderGit2, Loader2, Server, X } from '@lucide/vue'
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import { isRemoteWorkspaceId, remoteWorkspaceConnectionTarget } from '#/shared/remote-workspace.ts'
-import { Button } from '#/web/components/ui/button.tsx'
+import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import { toButtonVNodeRef } from '#/web/components/ui/refs.ts'
-import { compositeFocusRing } from '#/web/components/ui/focus.ts'
+import { focusRing } from '#/web/components/ui/focus.ts'
 import { NAVIGATOR_ROW_LABEL_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
 import { NavigatorRowActionSlot } from '#/web/components/workspace-navigator/NavigatorRowActionSlot.tsx'
@@ -41,6 +41,7 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
 
   setup(props) {
     const t = useT()
+    const menuOpen = ref(false)
 
     return () => {
       const workspace = props.workspace
@@ -65,13 +66,15 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
         <NavigatorRow
           selected={props.selected}
           onClick={props.onActivate}
-          class={compositeFocusRing}
           content={
             <button
               ref={toButtonVNodeRef(props.buttonRef)}
               type="button"
               data-interactive
-              class="pointer-events-auto flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left outline-none"
+              class={cn(
+                'pointer-events-auto flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left outline-none',
+                focusRing,
+              )}
               aria-current={props.selected ? 'true' : undefined}
               aria-label={label}
               aria-description={location}
@@ -90,7 +93,11 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
                 )}
               </span>
               <span
-                class={cn(NAVIGATOR_ROW_LABEL_CLASS, props.selected ? 'text-selected-foreground' : 'text-foreground')}
+                class={cn(
+                  NAVIGATOR_ROW_LABEL_CLASS,
+                  'uppercase',
+                  props.selected ? 'text-selected-foreground' : 'text-foreground',
+                )}
               >
                 {workspace.name}
               </span>
@@ -102,23 +109,32 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
           }
           actions={
             <NavigatorRowActionSlot
-              actionHidden={!props.compact}
+              actionHidden={!(props.compact || menuOpen.value)}
               terminalBellCount={props.compact ? 0 : count}
               terminalOutputActive={false}
               action={
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  aria-label={props.closeLabel}
-                  title={props.closeLabel}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    props.onClose()
+                <ActionPopover
+                  label={t('action.menu')}
+                  focusContentOnOpen
+                  open={menuOpen.value}
+                  onOpenChange={(open) => {
+                    menuOpen.value = open
                   }}
                 >
-                  <X class="size-4" aria-hidden="true" />
-                </Button>
+                  {({ close }: { close: () => void }) => (
+                    <div class="p-1">
+                      <ActionPopoverItem
+                        label={props.closeLabel}
+                        icon={<X aria-hidden="true" />}
+                        destructive
+                        onSelect={() => {
+                          close()
+                          props.onClose()
+                        }}
+                      />
+                    </div>
+                  )}
+                </ActionPopover>
               }
             />
           }

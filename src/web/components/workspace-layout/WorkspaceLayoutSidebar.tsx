@@ -132,7 +132,7 @@ const WorkspaceShellPrimaryActions: FunctionalComponent<WorkspaceShellPrimaryAct
     <SidebarWorkspacePicker workspaceId={props.workspaceId} />
     {props.workspaceId ? (
       <div class="flex min-w-0 flex-col gap-1 px-3">
-        <Separator class="my-2" />
+        <Separator class="my-2 dark:bg-border" />
         <WorkspaceDashboardRowAction selected={props.dashboardSelected} onOpenDashboard={props.onOpenDashboard} />
         {props.gitAvailable ? (
           <CreateWorktreeRowAction
