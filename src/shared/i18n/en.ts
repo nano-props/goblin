@@ -23,7 +23,7 @@ export const en = {
 
   // ---- Workspace picker -----------------------------------------------------
   'workspace-picker.workspaces': 'Workspaces',
-  'workspace-picker.close-named': 'Close {name}',
+  'workspace-picker.close': 'Close',
   'workspace-picker.open-local': 'Open Workspace…',
   'workspace-picker.open-remote': 'Open Remote Workspace…',
   'workspace-open.invalid-path': 'The link must contain one absolute directory path (up to 4096 characters).',

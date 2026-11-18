@@ -73,7 +73,7 @@ describe('WorkspacePicker', () => {
     await user.click(second)
     const firstRow = screen.getAllByRole('listitem')[0]!
     const actions = within(firstRow).getByRole('button', { name: 'action.menu' })
-    expect(screen.queryByRole('button', { name: 'Close Repo-A' })).toBeNull()
+    expect(screen.queryByRole('button', { name: labels.close })).toBeNull()
     actions.focus()
     await user.keyboard('{Enter}')
     const menu = await screen.findByRole('dialog')
@@ -82,7 +82,7 @@ describe('WorkspacePicker', () => {
     await user.keyboard('{Enter}')
     expect(onClose).not.toHaveBeenCalled()
     await user.tab()
-    expect(document.activeElement).toBe(within(menu).getByRole('button', { name: 'Close Repo-A' }))
+    expect(document.activeElement).toBe(within(menu).getByRole('button', { name: labels.close }))
     await user.keyboard('{Enter}')
 
     expect(onActivate.mock.calls).toEqual([[secondId]])
@@ -164,7 +164,7 @@ function workspace(name: string, id: string, overrides: Partial<WorkspacePickerI
 
 const labels = {
   workspaces: 'Workspaces',
-  closeWithName: (name: string) => `Close ${name}`,
+  close: 'Close',
   open: 'Open',
   openLocal: 'Open local repository…',
   openRemote: 'Open remote repository…',

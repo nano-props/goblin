@@ -19,7 +19,7 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Workspace picker ----------------------------------------------------
   'workspace-picker.workspaces': '워크스페이스',
-  'workspace-picker.close-named': '{name} 닫기',
+  'workspace-picker.close': '닫기',
   'workspace-picker.open-local': '작업 공간 열기…',
   'workspace-picker.open-remote': '원격 작업 공간 열기…',
   'workspace-open.invalid-path': '링크에는 절대 디렉터리 경로 하나가 필요합니다(최대 4096자).',

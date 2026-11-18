@@ -70,7 +70,7 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
         currentWorkspaceId={props.currentWorkspaceId}
         labels={{
           workspaces: t('workspace-picker.workspaces'),
-          closeWithName: (name) => t('workspace-picker.close-named', { name }),
+          close: t('workspace-picker.close'),
           open: t('app-chrome.open'),
           openLocal: t('workspace-picker.open-local'),
           openRemote: t('workspace-picker.open-remote'),

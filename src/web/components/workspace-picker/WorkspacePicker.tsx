@@ -130,7 +130,7 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
                     selected={workspace.id === props.currentWorkspaceId}
                     compact={compact.value}
                     unavailableLabel={props.labels.unavailable}
-                    closeLabel={props.labels.closeWithName(workspace.name)}
+                    closeLabel={props.labels.close}
                     buttonRef={focusRegistry.setRef(workspace.id)}
                     onActivate={() => props.onActivate(workspace.id)}
                     onClose={() => props.onClose(workspace.id)}

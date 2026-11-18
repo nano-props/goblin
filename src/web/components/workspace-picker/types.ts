@@ -11,7 +11,7 @@ export interface WorkspacePickerItem {
 
 export interface WorkspacePickerLabels {
   workspaces: string
-  closeWithName: (name: string) => string
+  close: string
   open: string
   openLocal: string
   openRemote: string

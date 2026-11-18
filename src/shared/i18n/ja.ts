@@ -19,7 +19,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Workspace picker ----------------------------------------------------
   'workspace-picker.workspaces': 'ワークスペース',
-  'workspace-picker.close-named': '{name} を閉じる',
+  'workspace-picker.close': '閉じる',
   'workspace-picker.open-local': 'ワークスペースを開く…',
   'workspace-picker.open-remote': 'リモートワークスペースを開く…',
   'workspace-open.invalid-path': 'リンクには絶対ディレクトリパスを 1 つ指定してください（最大 4096 文字）。',

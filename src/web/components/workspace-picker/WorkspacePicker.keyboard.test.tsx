@@ -86,7 +86,7 @@ function workspace(name: string, id: string): WorkspacePickerItem {
 
 const labels = {
   workspaces: 'Workspaces',
-  closeWithName: (name: string) => `Close ${name}`,
+  close: 'Close',
   open: 'Open',
   openLocal: 'Open local repository…',
   openRemote: 'Open remote repository…',
