@@ -59,6 +59,7 @@ export default defineConfig(({ mode }) => ({
           },
         },
   build: {
+    chunkSizeWarningLimit: 1000,
     outDir: path.resolve(import.meta.dirname, 'dist/web'),
     emptyOutDir: true,
     sourcemap: mode === 'production' ? false : 'inline',
