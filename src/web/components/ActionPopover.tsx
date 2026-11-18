@@ -7,6 +7,9 @@ import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
+export const ACTION_POPOVER_CONTENT_CLASS =
+  'w-max min-w-[min(12rem,calc(100vw-2rem))] max-w-[min(18rem,calc(100vw-2rem))] overflow-hidden p-0'
+
 interface ActionPopoverState {
   readonly close: () => void
 }
@@ -71,7 +74,7 @@ export const ActionPopover = defineComponent<{
         </PopoverTrigger>
         <PopoverContent
           align="end"
-          class={cn('w-max min-w-48 max-w-72 overflow-hidden p-0', props.contentClass)}
+          class={cn(ACTION_POPOVER_CONTENT_CLASS, props.contentClass)}
           onOpenAutoFocus={(event: Event) => event.preventDefault()}
           onPointerdown={stopPropagation}
           onClick={stopPropagation}

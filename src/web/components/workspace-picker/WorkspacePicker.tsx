@@ -6,7 +6,7 @@ import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts
 import { Button } from '#/web/components/ui/button.tsx'
 import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { NavigatorSectionHeader } from '#/web/components/workspace-navigator/NavigatorSectionHeader.tsx'
-import { ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
+import { ACTION_POPOVER_CONTENT_CLASS, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 import { WorkspacePickerRow } from '#/web/components/workspace-picker/WorkspacePickerRow.tsx'
 import type { WorkspacePickerItem, WorkspacePickerLabels } from '#/web/components/workspace-picker/types.ts'
@@ -90,11 +90,7 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
                 </Button>
               </PopoverTrigger>
             </NavigatorSectionHeader>
-            <PopoverContent
-              align="end"
-              aria-label={props.labels.open}
-              class="w-max max-w-[calc(100vw-2rem)] overflow-hidden p-0"
-            >
+            <PopoverContent align="end" aria-label={props.labels.open} class={ACTION_POPOVER_CONTENT_CLASS}>
               <div class="space-y-0.5 p-1">
                 {actions.map(({ label, icon: Icon, select }) => (
                   <ActionPopoverItem
