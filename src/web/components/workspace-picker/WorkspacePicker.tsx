@@ -1,5 +1,5 @@
 import { Download, FolderOpen, List, ListFilter, Plus, Server } from '@lucide/vue'
-import { PopoverTrigger } from 'reka-ui'
+import { PopoverAnchor, PopoverTrigger } from 'reka-ui'
 import { defineComponent, ref } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
@@ -107,13 +107,22 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
                   <FilterIcon aria-hidden="true" />
                 </Button>
               </Tip>
-              <Tip label={props.labels.open}>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="ghost" size="icon-lg" data-interactive aria-label={props.labels.open}>
-                    <Plus aria-hidden="true" />
-                  </Button>
-                </PopoverTrigger>
-              </Tip>
+              {/* The tooltip has its own positioning context. Anchor the menu outside it. */}
+              <PopoverAnchor as="span" class="inline-flex shrink-0">
+                <Tip label={props.labels.open}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-lg"
+                      data-interactive
+                      aria-label={props.labels.open}
+                    >
+                      <Plus aria-hidden="true" />
+                    </Button>
+                  </PopoverTrigger>
+                </Tip>
+              </PopoverAnchor>
             </NavigatorSectionHeader>
             <PopoverContent align="end" aria-label={props.labels.open} class={ACTION_POPOVER_CONTENT_CLASS}>
               <div class="space-y-0.5 p-1">
