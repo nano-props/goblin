@@ -7,7 +7,7 @@ import {
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { AboutSection } from '#/web/components/settings/pages/AboutSettingsSection.tsx'
+import { AboutSection } from '#/web/components/settings/pages/AboutSection.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { themeStore } from '#/web/stores/theme.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
