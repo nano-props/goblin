@@ -37,7 +37,6 @@ import {
   appNavigationIsCurrent,
   currentAppNavigationGeneration,
   type AppNavigationExecutionOptions,
-  type AppNavigationGeneration,
 } from '#/web/app/navigation/lifecycle.ts'
 
 export interface AppNavigationOptions<

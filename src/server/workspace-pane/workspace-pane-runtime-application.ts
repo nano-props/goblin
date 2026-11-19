@@ -114,7 +114,6 @@ export class WorkspacePaneRuntimeApplication {
     if (!restorableTarget || !executionPath) {
       return runtimeFailure(input.runtimeType, 'error.invalid-arguments')
     }
-    const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
     const runtimeCapture = this.captureRuntimeCapability(userId, workspaceId, workspaceRuntimeId, clientId)
     if (runtimeCapture.kind === 'failed') return runtimeFailure(input.runtimeType, runtimeCapture.message)
     const runtimeCapability = runtimeCapture.capability
@@ -143,7 +142,6 @@ export class WorkspacePaneRuntimeApplication {
             userId,
             input,
             runtimeTarget,
-            scope,
             executionPath,
             physicalCapability,
             permit,
@@ -206,7 +204,6 @@ export class WorkspacePaneRuntimeApplication {
     userId: string,
     input: TerminalWorkspacePaneRuntimeOpenInput,
     target: NonNullable<TerminalWorkspacePaneRuntimeOpenInput['request']['target']>,
-    scope: string,
     requestedExecutionPath: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,

@@ -318,6 +318,66 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
+  test('rejects malformed workspace locators for runtime-open targets', () => {
+    const message = {
+      type: 'request',
+      requestId: 'request_runtime_open',
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+      input: {
+        runtimeType: 'terminal',
+        request: {
+          kind: 'primary',
+          target: {
+            kind: 'git-worktree',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'repo-runtime-test',
+            root: 'goblin+file:///repo/worktree',
+          },
+        },
+      },
+    }
+    expect(
+      normalizeAppRealtimeClientMessage({
+        ...message,
+        input: {
+          ...message.input,
+          request: {
+            ...message.input.request,
+            target: { ...message.input.request.target, workspaceId: '/repo' },
+          },
+        },
+      }),
+    ).toBeNull()
+    expect(
+      normalizeAppRealtimeClientMessage({
+        ...message,
+        input: {
+          ...message.input,
+          request: {
+            ...message.input.request,
+            target: { ...message.input.request.target, root: '/repo/worktree' },
+          },
+        },
+      }),
+    ).toBeNull()
+    expect(
+      normalizeAppRealtimeClientMessage({
+        ...message,
+        input: {
+          ...message.input,
+          request: {
+            ...message.input.request,
+            target: {
+              kind: 'workspace-root',
+              workspaceId: '/repo',
+              workspaceRuntimeId: 'repo-runtime-test',
+            },
+          },
+        },
+      }),
+    ).toBeNull()
+  })
+
   test('normalizes runtime close application requests and rejects invalid session ids', () => {
     const target = {
       target: {

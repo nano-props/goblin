@@ -307,11 +307,7 @@ async function openWorkspacePaneStaticTabAction(
   if (!workspacePaneStaticTabTransactionIsCurrent(transaction)) {
     return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
   }
-  const navigationOutcome = await commitWorkspacePaneStaticTabPresentation(
-    { ...input, model },
-    sourceRoute,
-    transaction,
-  )
+  const navigationOutcome = await commitWorkspacePaneStaticTabPresentation({ ...input, model }, transaction)
   if (!workspacePaneActionOutcomeSucceeded(navigationOutcome)) return navigationOutcome
   return navigationOutcome.kind === 'completed' ? { ...navigationOutcome, changed: !alreadyOpen } : navigationOutcome
 }

@@ -486,7 +486,7 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
   const states = workspaceRuntimesByUser.get(userId)
   const closed: WorkspaceRuntimeClosedEvent[] = []
   if (states) {
-    for (const [workspaceId, state] of states) {
+    for (const state of states.values()) {
       if (desired.has(state.workspaceId)) continue
       const workspaceRuntimeId = state.currentWorkspaceRuntimeId
       if (!workspaceRuntimeId) continue

@@ -94,7 +94,7 @@ export class WorktreeRemovalApplication {
                 signal.throwIfAborted()
                 if (!this.isCurrentRuntime(userId, input))
                   return { ok: false, message: 'error.workspace-runtime-stale' }
-                const quiescence = await this.quiesce(input.repoRoot, worktreePath, physicalCapability)
+                const quiescence = await this.quiesce(worktreePath, physicalCapability)
                 signal.throwIfAborted()
                 affectedScopes = quiescence.scopes
                 if (!quiescence.ok) return { ok: false, message: quiescence.message }
@@ -152,7 +152,6 @@ export class WorktreeRemovalApplication {
   }
 
   private async quiesce(
-    repoRoot: WorkspaceId,
     worktreePath: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   ): Promise<
