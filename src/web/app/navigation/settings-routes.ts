@@ -23,7 +23,6 @@ const settingsPages = {
   github: () =>
     import('#/web/components/settings/pages/GitHubSettings.tsx').then(({ GitHubSettings }) => GitHubSettings),
   web: () => import('#/web/components/settings/pages/WebSettings.tsx').then(({ WebSettings }) => WebSettings),
-  about: () => import('#/web/components/settings/pages/AboutSettings.tsx').then(({ AboutSettings }) => AboutSettings),
 } satisfies Record<SettingsPage, RouteRecordRaw['component']>
 
 export const settingsRoute: RouteRecordRaw = {

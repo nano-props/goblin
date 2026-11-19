@@ -43,8 +43,8 @@ vi.mock('#/web/components/settings/pages/GeneralSettings.tsx', () => ({
   GeneralSettings: defineComponent({ setup: () => () => <div>general settings</div> }),
 }))
 
-vi.mock('#/web/components/settings/pages/AboutSettings.tsx', () => ({
-  AboutSettings: defineComponent({ setup: () => () => <div>about settings</div> }),
+vi.mock('#/web/components/settings/pages/KeyboardShortcutSettings.tsx', () => ({
+  KeyboardShortcutSettings: defineComponent({ setup: () => () => <div>shortcut settings</div> }),
 }))
 
 vi.mock('#/web/Layout.tsx', () => ({
@@ -240,16 +240,16 @@ describe('unmatched app routes', () => {
 
 describe('lazy route navigation', () => {
   test('loads settings deep links and switches pages without remounting the layout', async () => {
-    navigateBrowser('/settings/about')
+    navigateBrowser('/settings/shortcuts')
     const view = renderRouter()
 
-    await waitFor(() => expect(view.container.textContent).toContain('about settings'))
+    await waitFor(() => expect(view.container.textContent).toContain('shortcut settings'))
     expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
 
     await appRouter.push('/settings/general')
 
     await waitFor(() => expect(view.container.textContent).toContain('general settings'))
-    expect(view.container.textContent).not.toContain('about settings')
+    expect(view.container.textContent).not.toContain('shortcut settings')
     expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
     expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
   })
@@ -285,9 +285,9 @@ describe('lazy route navigation', () => {
       expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
       expect(view.getByRole('link', { name: 'help.row.reload-page' }).getAttribute('href')).toBe('/lazy-page')
 
-      await appRouter.push('/settings/about')
+      await appRouter.push('/settings/shortcuts')
 
-      await waitFor(() => expect(view.container.textContent).toContain('about settings'))
+      await waitFor(() => expect(view.container.textContent).toContain('shortcut settings'))
       expect(view.queryByRole('dialog')).toBeNull()
       expect(isShortcutBlockingLayerOpen()).toBe(false)
       expect(loadPage).toHaveBeenCalledTimes(1)
@@ -310,13 +310,13 @@ describe('lazy route navigation', () => {
       const oldNavigation = appRouter.push('/slow-page')
       const oldFailure = expect(oldNavigation).rejects.toThrow('Old download interrupted')
       await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(1))
-      await appRouter.push('/settings/about')
-      await waitFor(() => expect(view.container.textContent).toContain('about settings'))
+      await appRouter.push('/settings/shortcuts')
+      await waitFor(() => expect(view.container.textContent).toContain('shortcut settings'))
 
       download.reject(new Error('Old download interrupted'))
       await oldFailure
 
-      expect(appRouter.currentRoute.value.fullPath).toBe('/settings/about')
+      expect(appRouter.currentRoute.value.fullPath).toBe('/settings/shortcuts')
       expect(view.queryByRole('dialog')).toBeNull()
       expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
       expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()

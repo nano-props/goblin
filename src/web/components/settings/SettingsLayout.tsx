@@ -6,17 +6,7 @@ import { useT } from '#/web/stores/i18n-vue.ts'
 import { SETTINGS_PAGE_CONFIG, SETTINGS_PAGES } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { GitHubMark } from '#/web/components/GitHubMark.tsx'
-import {
-  AppWindow,
-  Bell,
-  Info,
-  Keyboard,
-  Router,
-  Settings2,
-  Shield,
-  SlidersHorizontal,
-  type LucideIcon,
-} from '@lucide/vue'
+import { AppWindow, Bell, Keyboard, Router, Settings2, Shield, SlidersHorizontal, type LucideIcon } from '@lucide/vue'
 
 const SETTINGS_PAGE_ICONS = {
   general: Settings2,
@@ -27,7 +17,6 @@ const SETTINGS_PAGE_ICONS = {
   apps: AppWindow,
   github: GitHubMark,
   web: Router,
-  about: Info,
 } as const satisfies Record<SettingsPage, LucideIcon | typeof GitHubMark>
 
 export const SettingsLayout = defineComponent<{

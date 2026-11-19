@@ -1,14 +1,4 @@
-export const SETTINGS_PAGES = [
-  'general',
-  'shortcuts',
-  'notifications',
-  'ssh',
-  'sync',
-  'apps',
-  'github',
-  'web',
-  'about',
-] as const
+export const SETTINGS_PAGES = ['general', 'shortcuts', 'notifications', 'ssh', 'sync', 'apps', 'github', 'web'] as const
 
 export type SettingsPage = (typeof SETTINGS_PAGES)[number]
 
@@ -21,5 +11,4 @@ export const SETTINGS_PAGE_CONFIG = {
   apps: { titleKey: 'settings.group.apps', labelKey: 'settings.group.apps' },
   github: { titleKey: 'settings.github.title', labelKey: 'settings.nav.github' },
   web: { titleKey: 'settings.web.title', labelKey: 'settings.nav.web' },
-  about: { titleKey: 'settings.about', labelKey: 'settings.about' },
 } as const satisfies Record<SettingsPage, { titleKey: string; labelKey: string }>

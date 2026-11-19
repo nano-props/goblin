@@ -7,10 +7,11 @@ import { SettingsCard, SettingsListItem } from '#/web/components/settings/Settin
 import { openProjectGitHub } from '#/web/app/shell-client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
+
 const appIconUrl = new URL('../../../../../assets/icon.png', import.meta.url).href
 
-export const AboutSettings = defineComponent({
-  name: 'AboutSettings',
+export const AboutSection = defineComponent({
+  name: 'AboutSection',
   setup() {
     const t = useT()
     const commit = __BUILD_INFO__.commit

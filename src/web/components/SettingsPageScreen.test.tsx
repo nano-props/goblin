@@ -86,6 +86,8 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL, init?: RequestInit)
 })
 
 beforeEach(() => {
+  vi.stubGlobal('__APP_VERSION__', 'test')
+  vi.stubGlobal('__BUILD_INFO__', { commit: '' })
   setClientBridgeForTests(null)
   resetWorkspacesStore()
   sendTestNotification.mockClear()
@@ -136,6 +138,18 @@ describe('SettingsPageScreen', () => {
     expect(container.querySelector('#settings-workspace-layout')).toBeNull()
     expect(container.textContent).not.toContain('settings.workspace-layout')
     expect(container.textContent).not.toContain('settings.workspace-layout-hint')
+  })
+
+  test('renders the about section on the general page', () => {
+    const { container } = render(
+      <SettingsPageScreen page="general" onPageChange={() => {}}>
+        <GeneralSettings />
+      </SettingsPageScreen>,
+    )
+
+    expect(container.textContent).toContain('settings.about')
+    expect(container.textContent).toContain('about.version')
+    expect(container.textContent).toContain('about.build')
   })
 
   test('keeps settings navigation selected state and page changes wired', async () => {
