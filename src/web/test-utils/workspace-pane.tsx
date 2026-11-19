@@ -198,7 +198,6 @@ export function navigationWithStore(
   const store = workspacesStore.getState()
   const navigation = createAppNavigationActions({
     currentWorkspaceId: REPO_ID,
-    workspaceOrder: [REPO_ID],
     closeLanding: 'restore',
     closeWorkspace: store.closeWorkspace,
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,

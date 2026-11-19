@@ -8,7 +8,11 @@ import type {
   WorkspacePaneRouteTarget,
 } from '#/web/app/navigation/route-model.ts'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
-import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/workspaces/types.ts'
+import type {
+  CloseWorkspaceResult,
+  WorkspaceMembershipActions,
+  WorkspaceNavigationHistoryTraversal,
+} from '#/web/stores/workspaces/types.ts'
 import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
@@ -31,6 +35,7 @@ import {
 import {
   beginAppNavigation,
   appNavigationIsCurrent,
+  currentAppNavigationGeneration,
   type AppNavigationExecutionOptions,
   type AppNavigationGeneration,
 } from '#/web/app/navigation/lifecycle.ts'
@@ -77,9 +82,8 @@ export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommit
 
 interface CreateAppNavigationActionsOptions {
   currentWorkspaceId: WorkspaceId | null
-  workspaceOrder: WorkspaceId[]
   closeLanding: 'navigator' | 'restore'
-  closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
+  closeWorkspace: WorkspaceMembershipActions['closeWorkspace']
   peekWorkspaceNavigation: (
     workspaceId: WorkspaceId,
     direction: 'back' | 'forward',
@@ -90,7 +94,6 @@ interface CreateAppNavigationActionsOptions {
 
 export function createAppNavigationActions({
   currentWorkspaceId,
-  workspaceOrder,
   closeLanding,
   closeWorkspace,
   peekWorkspaceNavigation,
@@ -126,19 +129,32 @@ export function createAppNavigationActions({
     async closeWorkspace(workspaceId) {
       if (workspaceId !== currentWorkspaceId) return closeWorkspace(workspaceId)
 
-      const nextWorkspaceId = nextWorkspaceIdAfterClose(workspaceOrder, workspaceId)
-      const routeOptions = { navigationGeneration: beginAppNavigation() }
-      const result = await closeWorkspace(workspaceId)
-      if (!result.ok) return result
+      const observedGeneration = currentAppNavigationGeneration()
+      return closeWorkspace(workspaceId, (removeProjection) => {
+        if (!appNavigationIsCurrent(observedGeneration)) return Promise.resolve()
 
-      if (!nextWorkspaceId) {
-        routeNavigation.openHome(routeOptions)
-      } else if (closeLanding === 'navigator') {
-        routeNavigation.openWorkspaceNavigator(nextWorkspaceId, routeOptions)
-      } else {
-        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, routeOptions, 'dashboard')
-      }
-      return result
+        const navigationGeneration = beginAppNavigation()
+        const nextWorkspaceId = nextWorkspaceIdAfterClose(workspacesStore.getState().workspaceOrder, workspaceId)
+        const { promise, resolve } = Promise.withResolvers<void>()
+        const routeOptions = {
+          navigationGeneration,
+          replace: true,
+          onCommit() {
+            resolve()
+            removeProjection()
+          },
+          onAbandon: resolve,
+        }
+
+        if (!nextWorkspaceId) {
+          routeNavigation.openHome(routeOptions)
+        } else if (closeLanding === 'navigator') {
+          routeNavigation.openWorkspaceNavigator(nextWorkspaceId, routeOptions)
+        } else {
+          restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, routeOptions, 'dashboard')
+        }
+        return promise
+      })
     },
     selectRepoBranch(target, options) {
       if (!gitBranchPaneTargetLeaseOwnerIsCurrent(target)) return false
@@ -296,7 +312,17 @@ function restoreWorkspacePresentationOrOpenDashboard(
       ? entry.route.kind !== 'workspace-root'
       : entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
   if (entryCanResume) {
-    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, routeOptions)
+    // Ignore synchronous rejection when the dashboard will own settlement.
+    const options = routeOptions.onAbandon
+      ? {
+          ...routeOptions,
+          onAbandon: () =>
+            queueMicrotask(() => {
+              if (result.kind === 'accepted') routeOptions.onAbandon?.()
+            }),
+        }
+      : routeOptions
+    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, options)
     if (result.kind === 'accepted') return
     if (result.kind === 'blocked' && onBlocked === 'stay') return 'blocked'
   }

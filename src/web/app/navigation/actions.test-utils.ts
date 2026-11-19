@@ -101,10 +101,12 @@ type AppNavigationActionOptions = Parameters<typeof createAppNavigationActionsCo
 type AppNavigationActionTestOptions = Omit<
   AppNavigationActionOptions,
   'closeLanding' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
-> &
-  Partial<Pick<AppNavigationActionOptions, 'closeLanding' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>>
+> & { workspaceOrder: WorkspaceId[] } & Partial<
+    Pick<AppNavigationActionOptions, 'closeLanding' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>
+  >
 
-export function createAppNavigationActions(options: AppNavigationActionTestOptions) {
+export function createAppNavigationActions({ workspaceOrder, ...options }: AppNavigationActionTestOptions) {
+  workspacesStore.setState({ workspaceOrder })
   if (options.currentWorkspaceId && !workspacesStore.getState().workspaces[options.currentWorkspaceId]) {
     const workspace = emptyWorkspace(options.currentWorkspaceId, 'navigation-actions-runtime')
     workspacesStore.setState((state) => ({
@@ -147,11 +149,11 @@ export function routeNavigation(): AppRouteNavigation {
   return {
     workspaceSlugForId: vi.fn(() => 'repo-slug'),
     currentWorkspacePaneRoute: () => undefined,
-    openHome: vi.fn(),
+    openHome: vi.fn((options) => options?.onCommit?.()),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),
-    openWorkspaceNavigator: vi.fn(),
-    openWorkspaceDashboard: vi.fn(),
+    openWorkspaceNavigator: vi.fn((_workspaceId, options) => options?.onCommit?.()),
+    openWorkspaceDashboard: vi.fn((_workspaceId, options) => options?.onCommit?.()),
     openWorkspaceRootPane: vi.fn((_repoId, options) => {
       options?.onCommit?.()
       return true

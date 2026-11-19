@@ -5,6 +5,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   REPO_ID,
@@ -25,6 +26,15 @@ import {
 } from '#/web/app/navigation/actions.test-utils.ts'
 
 beforeEach(setupAppNavigationActionsTests)
+
+function successfulWorkspaceClose() {
+  return vi.fn<Parameters<typeof createAppNavigationActions>[0]['closeWorkspace']>(
+    async (_workspaceId, onSessionRemoved) => {
+      await onSessionRemoved?.(() => {})
+      return { ok: true }
+    },
+  )
+}
 
 describe('createAppNavigationActions workspace lifecycle', () => {
   test('activates a repo at its current workspace history entry', async () => {
@@ -154,8 +164,48 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
+  test('keeps the outgoing workspace until the landing route commits even when runtime release is slow', async () => {
+    const releaseRuntime = Promise.withResolvers<void>()
+    const closeRuntime = vi.fn(async () => {
+      await releaseRuntime.promise
+      return { ok: true, released: true, runtimeClosed: true }
+    })
+    installGoblinTestBridge({
+      'settings.removeWorkspaceEntry': () => ({ openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }),
+      'workspace.runtimeClose': closeRuntime,
+    })
+    const navigation = routeNavigation()
+    vi.mocked(navigation.openHome).mockImplementation(() => {})
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID],
+      closeWorkspace: workspacesStore.getState().closeWorkspace,
+      routeNavigation: navigation,
+    })
+
+    const closing = actions.closeWorkspace(REPO_A_ID)
+    const repeatedClose = actions.closeWorkspace(REPO_A_ID)
+    try {
+      await vi.waitFor(() => expect(navigation.openHome).toHaveBeenCalledWith(presentationOptions({ replace: true })))
+      expect(workspacesStore.getState().workspaces[REPO_A_ID]).toBeDefined()
+      expect(closeRuntime).not.toHaveBeenCalled()
+
+      const [options] = vi.mocked(navigation.openHome).mock.lastCall!
+      options?.onCommit?.()
+      expect(workspacesStore.getState().workspaces[REPO_A_ID]).toBeUndefined()
+      await vi.waitFor(() => expect(closeRuntime).toHaveBeenCalledOnce())
+    } finally {
+      vi.mocked(navigation.openHome).mock.lastCall?.[0]?.onAbandon?.()
+      releaseRuntime.resolve()
+    }
+
+    await expect(closing).resolves.toEqual({ ok: true })
+    await expect(repeatedClose).resolves.toMatchObject({ ok: false })
+    expect(navigation.openHome).toHaveBeenCalledOnce()
+  })
+
   test('closes the current repo and navigates to the next repo dashboard without history', async () => {
-    const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
+    const closeWorkspace = successfulWorkspaceClose()
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_B_ID,
@@ -166,7 +216,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
 
     await actions.closeWorkspace(REPO_B_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID, expect.any(Function))
     expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
   })
 
@@ -177,7 +227,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       currentBranchName: 'feature/remembered',
     })
     workspacesStore.getState().recordWorkspaceNavigation(branchHistoryEntry(REPO_C_ID, 'feature/remembered', 'history'))
-    const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
+    const closeWorkspace = successfulWorkspaceClose()
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_B_ID,
@@ -188,7 +238,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
 
     await actions.closeWorkspace(REPO_B_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID, expect.any(Function))
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
       REPO_C_ID,
       'feature/remembered',
@@ -202,7 +252,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       workspaceId: REPO_C_ID,
       route: { kind: 'dashboard' },
     })
-    const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
+    const closeWorkspace = successfulWorkspaceClose()
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_B_ID,
@@ -214,7 +264,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
 
     await actions.closeWorkspace(REPO_B_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID, expect.any(Function))
     expect(navigation.openWorkspaceNavigator).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
   })
@@ -230,7 +280,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     const entry = branchHistoryEntry(REPO_ID, BRANCH_NAME, 'status')
     workspacesStore.getState().recordWorkspaceNavigation(entry)
     installTerminalSessionCommandBridgeForTest(createPendingWorktreeSnapshot())
-    const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
+    const closeWorkspace = successfulWorkspaceClose()
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -241,7 +291,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
 
     await actions.closeWorkspace(REPO_A_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith(REPO_A_ID)
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_A_ID, expect.any(Function))
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
     expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
@@ -252,7 +302,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID],
-      closeWorkspace: vi.fn(async () => ({ ok: true as const })),
+      closeWorkspace: successfulWorkspaceClose(),
       routeNavigation: navigation,
     })
 

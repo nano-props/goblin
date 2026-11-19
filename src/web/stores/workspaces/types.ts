@@ -254,7 +254,10 @@ export interface WorkspaceMembershipActions {
   /** Opens authoritative workspace membership without implying anything about
    *  the current active selection. */
   openWorkspaceMembership: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
-  closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
+  closeWorkspace: (
+    workspaceId: WorkspaceId,
+    onSessionRemoved?: (removeProjection: () => void) => Promise<void>,
+  ) => Promise<CloseWorkspaceResult>
   /**
    * Explicitly re-probe a remote workspace lifecycle for the user-facing
    * Retry action. Safe to call regardless of the current lifecycle phase —

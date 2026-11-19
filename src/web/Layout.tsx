@@ -87,7 +87,6 @@ const AuthenticatedAppShell = defineComponent({
     const overlays = useAppOverlays()
     const compact = useIsCompactUi()
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
-    const workspaceOrder = useStoreSelector(workspacesStore, (state) => state.workspaceOrder)
     const routeContext = computed(() => workspaceRouteContextFromVueRoute(route))
     const routedWorkspaceId = computed(() => {
       const workspaceSlug = routeContext.value?.workspaceSlug
@@ -130,7 +129,6 @@ const AuthenticatedAppShell = defineComponent({
     const navigation = computed(() =>
       createAppNavigationActions({
         currentWorkspaceId: hydratedRouteWorkspaceId.value,
-        workspaceOrder: workspaceOrder.value,
         closeLanding: compact.value ? 'navigator' : 'restore',
         closeWorkspace,
         peekWorkspaceNavigation,

@@ -239,8 +239,11 @@ export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: Workspa
       return runWorkspaceCommand(workspaceInput, () => openLocalWorkspace(set, get, workspaceInput))
     },
 
-    async closeWorkspace(workspaceId: WorkspaceId): Promise<CloseWorkspaceResult> {
-      return runWorkspaceCommand(workspaceId, () => closeWorkspaceMembership(set, get, workspaceId))
+    async closeWorkspace(
+      workspaceId: WorkspaceId,
+      onSessionRemoved?: (removeProjection: () => void) => Promise<void>,
+    ): Promise<CloseWorkspaceResult> {
+      return runWorkspaceCommand(workspaceId, () => closeWorkspaceMembership(set, get, workspaceId, onSessionRemoved))
     },
 
     async retryRemoteWorkspaceConnection(id: string) {
@@ -398,6 +401,7 @@ async function closeWorkspaceMembership(
   set: WorkspacesSet,
   get: WorkspacesGet,
   workspaceId: WorkspaceId,
+  onSessionRemoved?: (removeProjection: () => void) => Promise<void>,
 ): Promise<CloseWorkspaceResult> {
   const workspace = get().workspaces[workspaceId]
   if (!workspace) return { ok: false, kind: 'failed', message: 'error.workspace-close-failed' }
@@ -412,7 +416,16 @@ async function closeWorkspaceMembership(
   }
   cancelWorkspaceCapabilityRefreshes(workspaceId, workspaceRuntimeId)
   disposeRepoOperationScheduler(workspaceId)
-  set((state) => removeWorkspaceFromSessionState(state, workspaceId))
+  // Keep the outgoing page renderable while its replacement route loads.
+  const removeProjection = () => set((state) => removeWorkspaceFromSessionState(state, workspaceId))
+  if (onSessionRemoved) {
+    try {
+      await onSessionRemoved(removeProjection)
+    } catch (err) {
+      workspacesLog.warn('workspace close navigation failed after session removal', { workspaceId, err })
+    }
+  }
+  removeProjection()
   try {
     await closeWorkspaceRuntimeWithCache(workspace.id, workspaceRuntimeId)
   } catch (err) {

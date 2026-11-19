@@ -241,7 +241,6 @@ function primaryNavigationActions() {
     routeNavigation,
     actions: createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
-      workspaceOrder: [REPO_ID],
       closeLanding: 'restore',
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation: store.peekWorkspaceNavigation,

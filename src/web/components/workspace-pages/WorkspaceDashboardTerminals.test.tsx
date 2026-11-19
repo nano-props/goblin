@@ -645,7 +645,6 @@ const RealDashboardTerminalNavigationHarness = defineComponent<{
     const store = workspacesStore.getState()
     const navigation = createAppNavigationActions({
       currentWorkspaceId: WORKSPACE_ID,
-      workspaceOrder: [WORKSPACE_ID],
       closeLanding: 'restore',
       closeWorkspace: async () => ({ ok: true }),
       peekWorkspaceNavigation: store.peekWorkspaceNavigation,
