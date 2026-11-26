@@ -10,11 +10,14 @@ import type {
   WorkspaceRestoreResult,
   UserSettingsUpdateResponse,
   SettingsSnapshot,
+  ServerWorkspaceState,
   ThemeState,
 } from '#/shared/api-types.ts'
 import type { LangPref, UserSettings, ThemePref } from '#/shared/settings.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { WorkspaceOrderEdge } from '#/shared/workspace-order.ts'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceExternalAppRecentKey, type WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
@@ -183,6 +186,24 @@ export async function restoreServerWorkspace(
 
 export async function addWorkspaceEntry(entry: WorkspaceSessionEntry): Promise<void> {
   await postServerCommandJson('/api/settings/workspace/entries/add', { entry }, decodeWith(ServerWorkspaceStateSchema))
+}
+
+const WORKSPACE_ORDER_REQUEST_TIMEOUT_MS = 10_000
+
+export function readWorkspaceOrder(signal: AbortSignal): Promise<WorkspaceId[]> {
+  return postServerJson('/api/settings/workspace/entries/order', {}, decodeWith(v.array(WorkspaceIdSchema)), {
+    signal,
+    timeoutMs: WORKSPACE_ORDER_REQUEST_TIMEOUT_MS,
+  })
+}
+
+export function moveWorkspaceEntry(workspaceId: WorkspaceId, edge: WorkspaceOrderEdge): Promise<ServerWorkspaceState> {
+  return postServerCommandJson(
+    '/api/settings/workspace/entries/move',
+    { workspaceId, edge },
+    decodeWith(ServerWorkspaceStateSchema),
+    { timeoutMs: WORKSPACE_ORDER_REQUEST_TIMEOUT_MS },
+  )
 }
 
 export async function removeWorkspaceEntry(workspaceId: WorkspaceId): Promise<void> {

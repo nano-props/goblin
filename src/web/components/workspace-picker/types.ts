@@ -14,6 +14,8 @@ export interface WorkspacePickerLabels {
   filter: string
   filterStatus: string
   close: string
+  moveFirst: string
+  moveLast: string
   open: string
   openLocal: string
   openRemote: string

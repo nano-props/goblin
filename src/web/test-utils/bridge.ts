@@ -351,6 +351,7 @@ export function installGoblinTestBridge(handlers: Record<string, ServerTestHandl
         if (url.pathname === '/api/settings/recent-workspaces/add') return call('settings.addRecentWorkspace', body)
         if (url.pathname === '/api/settings/workspace/restore') return call('settings.restoreWorkspace', body)
         if (url.pathname === '/api/settings/workspace/entries/add') return call('settings.addWorkspaceEntry', body)
+        if (url.pathname === '/api/settings/workspace/entries/move') return call('settings.moveWorkspaceEntry', body)
         if (url.pathname === '/api/settings/workspace/entries/remove')
           return call('settings.removeWorkspaceEntry', body)
         if (url.pathname === '/api/settings/fetch-interval') return call('settings.setFetchInterval', body)

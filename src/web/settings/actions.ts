@@ -1,6 +1,7 @@
 // Actions are the write boundary that commits to the server transport and
 // projects server-returned values into TanStack Query.
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { WorkspaceOrderEdge } from '#/shared/workspace-order.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
 import type { I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
@@ -13,6 +14,8 @@ import {
   restoreServerWorkspace,
   addWorkspaceEntry,
   removeWorkspaceEntry,
+  moveWorkspaceEntry,
+  readWorkspaceOrder,
   setI18nPref as setSettingsI18nPref,
   setRecentWorkspaceExternalApp,
   setSettingsFetchInterval,
@@ -53,6 +56,14 @@ export async function restoreWorkspaceAtBoot(
 
 export async function addWorkspaceToSession(entry: WorkspaceSessionEntry): Promise<void> {
   await addWorkspaceEntry(entry)
+}
+
+export function readWorkspaceSessionOrder(signal: AbortSignal) {
+  return readWorkspaceOrder(signal)
+}
+
+export function moveWorkspaceInSession(workspaceId: WorkspaceId, edge: WorkspaceOrderEdge) {
+  return moveWorkspaceEntry(workspaceId, edge)
 }
 
 export async function removeWorkspaceFromSession(workspaceId: WorkspaceId): Promise<void> {

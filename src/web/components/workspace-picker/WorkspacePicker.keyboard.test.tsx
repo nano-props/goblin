@@ -33,6 +33,9 @@ describe('WorkspacePicker keyboard navigation', () => {
         labels={labels}
         onActivate={onActivate}
         onOpenDashboard={() => {}}
+        refreshOrder={async () => []}
+        movePending={false}
+        onMove={() => {}}
         onClose={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
@@ -67,6 +70,8 @@ const labels = {
   filter: 'Filter workspaces',
   filterStatus: 'All workspaces',
   close: 'Close',
+  moveFirst: 'Move to top',
+  moveLast: 'Move to bottom',
   open: 'Open',
   openLocal: 'Open local repository…',
   openRemote: 'Open remote repository…',

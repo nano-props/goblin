@@ -480,6 +480,32 @@ describe('settings source', () => {
     }
   })
 
+  test('persists moves at either edge without adding a closed workspace', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+    previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+    process.env.GOBLIN_SERVER_DATA_DIR = tmp
+    const source = await import('#/server/settings/source.ts')
+    const first = { id: REPO_A }
+    const second = { id: REPO_B }
+    await source.addServerWorkspaceEntry(first)
+    await source.addServerWorkspaceEntry(second)
+
+    await expect(source.moveServerWorkspaceEntry(second.id, 'first')).resolves.toMatchObject({
+      openWorkspaceEntries: [second, first],
+    })
+    source.resetServerSettingsSourceForTests()
+    await expect(source.getServerWorkspaceState()).resolves.toMatchObject({ openWorkspaceEntries: [second, first] })
+    await expect(source.moveServerWorkspaceEntry(second.id, 'first')).resolves.toMatchObject({
+      openWorkspaceEntries: [second, first],
+    })
+    await expect(source.moveServerWorkspaceEntry(second.id, 'last')).resolves.toMatchObject({
+      openWorkspaceEntries: [first, second],
+    })
+    await source.removeServerWorkspaceEntry(second.id)
+    await expect(source.moveServerWorkspaceEntry(second.id, 'first')).resolves.toBeNull()
+    await expect(source.getServerWorkspaceState()).resolves.toMatchObject({ openWorkspaceEntries: [first] })
+  })
+
   test('confirms one canonical workspace repo entry without writing settings', async () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

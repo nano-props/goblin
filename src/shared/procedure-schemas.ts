@@ -19,6 +19,7 @@ import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.t
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import { EDITOR_APP_VALUES, LANG_PREF_VALUES, TERMINAL_APP_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
 import { FetchIntervalSecSchema } from '#/shared/settings-response-schema.ts'
+import { WORKSPACE_ORDER_EDGES } from '#/shared/workspace-order.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(TERMINAL_APP_VALUES)
@@ -300,6 +301,8 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     activeWorkspaceId: v.optional(v.nullable(WorkspaceIdSchema)),
   }),
   workspaceEntryAdd: v.object({ entry: WorkspaceSessionEntrySchema }),
+  workspaceEntryOrder: v.strictObject({}),
+  workspaceEntryMove: v.object({ workspaceId: WorkspaceIdSchema, edge: v.picklist(WORKSPACE_ORDER_EDGES) }),
   workspaceEntryRemove: v.object({ workspaceId: WorkspaceIdSchema }),
   // Lazily projects a non-active workspace that was hydrated as a stub.
   restoreWorkspaceTabs: v.object({

@@ -3,6 +3,8 @@
 
 import { computed, defineComponent } from 'vue'
 import { toast } from 'vue-sonner'
+import type { WorkspaceOrderEdge } from '#/shared/workspace-order.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
@@ -78,6 +80,19 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
       })),
     )
 
+    const movePending = useStoreSelector(workspacesStore, (state) => state.workspaceMovePending)
+
+    async function moveWorkspace(workspaceId: WorkspaceId, edge: WorkspaceOrderEdge): Promise<void> {
+      try {
+        await workspacesStore.getState().moveWorkspace(workspaceId, edge)
+      } catch (error) {
+        const messageKey = hasErrorCode(error, 'OUTCOME_UNCERTAIN')
+          ? 'workspace-picker.move-uncertain'
+          : 'workspace-picker.move-failed'
+        toast.error(t(messageKey))
+      }
+    }
+
     async function closeWorkspace(workspaceId: WorkspaceId): Promise<void> {
       const workspace = workspacesStore.getState().workspaces[workspaceId]
       if (!workspace) return
@@ -96,6 +111,8 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
           filterStatus: filterStatusLabel.value,
           workspaces: t('workspace-picker.workspaces'),
           close: t('workspace-picker.close'),
+          moveFirst: t('workspace-picker.move-first'),
+          moveLast: t('workspace-picker.move-last'),
           open: t('workspace-picker.open-title'),
           openLocal: t('workspace-picker.open-local'),
           openRemote: t('workspace-picker.open-remote'),
@@ -114,6 +131,9 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
             toast.warning(t('workspace-picker.switch-blocked'), { id: 'workspace-switch-blocked' })
         }}
         onOpenDashboard={routeNavigation.openWorkspaceDashboard}
+        refreshOrder={workspacesStore.getState().refreshWorkspaceOrder}
+        movePending={movePending.value}
+        onMove={(workspaceId, edge) => void moveWorkspace(workspaceId, edge)}
         onClose={(workspaceId) => void closeWorkspace(workspaceId)}
         onOpenLocal={props.onOpenWorkspacePathDialog}
         onOpenRemote={props.onOpenRemote}

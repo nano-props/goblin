@@ -3,7 +3,13 @@ import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-oper
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspaces/runtime/capability-refresh.ts'
 import { requestInitialRepoSnapshotLoad } from '#/web/stores/workspaces/refresh.ts'
 import { closeWorkspaceRuntime, openWorkspaceRuntime, openWorkspaceRuntimeForInput } from '#/web/workspaces/client.ts'
-import { addWorkspaceToSession, recordRecentWorkspace, removeWorkspaceFromSession } from '#/web/settings/actions.ts'
+import {
+  addWorkspaceToSession,
+  moveWorkspaceInSession,
+  readWorkspaceSessionOrder,
+  recordRecentWorkspace,
+  removeWorkspaceFromSession,
+} from '#/web/settings/actions.ts'
 import {
   removeWorkspaceRuntimeFromCache,
   refreshWorkspaceRuntimes,
@@ -30,12 +36,14 @@ import {
   normalizeRemoteWorkspaceRef,
   parseRemoteWorkspaceId,
   remoteWorkspaceSessionEntry,
+  workspaceSessionEntryId,
   type WorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import {
   addResolvedWorkspace,
   insertPlaceholderWorkspace,
+  projectWorkspaceOrder,
   removeWorkspaceFromSessionState,
   type ResolvedWorkspace,
 } from '#/web/stores/workspaces/workspace-session-state.ts'
@@ -229,7 +237,36 @@ function projectResolvedWorkspaceIntoSession(
 }
 
 export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: WorkspacesGet): WorkspaceMembershipActions {
+  function applyConfirmedOrder(confirmedWorkspaceOrder: readonly WorkspaceId[]): void {
+    set((state) => {
+      const currentOrder = state.workspaceOrder
+      const workspaceOrder = projectWorkspaceOrder(confirmedWorkspaceOrder, currentOrder)
+      return workspaceOrder.length === currentOrder.length &&
+        workspaceOrder.every((id, index) => id === currentOrder[index])
+        ? state
+        : { workspaceOrder }
+    })
+  }
+
   return {
+    async refreshWorkspaceOrder(signal) {
+      const order = await readWorkspaceSessionOrder(signal)
+      if (signal.aborted || get().workspaceMovePending) return null
+      applyConfirmedOrder(order)
+      return order
+    },
+
+    async moveWorkspace(workspaceId, edge) {
+      if (get().workspaceMovePending) return
+      set({ workspaceMovePending: true })
+      try {
+        const { openWorkspaceEntries } = await moveWorkspaceInSession(workspaceId, edge)
+        applyConfirmedOrder(openWorkspaceEntries.map(workspaceSessionEntryId))
+      } finally {
+        set({ workspaceMovePending: false })
+      }
+    },
+
     async openWorkspaceMembership(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenWorkspaceResult> {
       const admission = workspaceAdmissionFromInput(pathOrEntry)
       if (admission.kind === 'workspace-entry' && isRemoteWorkspaceId(admission.entry.id)) {

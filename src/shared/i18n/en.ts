@@ -30,6 +30,11 @@ export const en = {
   'workspace-picker.switch-blocked':
     'Wait for the pending operation in that workspace to finish, then try switching again.',
   'workspace-picker.close': 'Close',
+  'workspace-picker.order-load-failed': 'Could not load the workspace order. Reopen the menu to retry.',
+  'workspace-picker.move-first': 'Move to top',
+  'workspace-picker.move-last': 'Move to bottom',
+  'workspace-picker.move-failed': 'Could not reorder the workspace. Reload and try again.',
+  'workspace-picker.move-uncertain': 'Could not confirm the workspace order. Reload to check before trying again.',
   'workspace-picker.open-local': 'Open Workspace…',
   'workspace-picker.open-remote': 'Open Remote Workspace…',
   'workspace-open.invalid-path': 'The link must contain one absolute directory path (up to 4096 characters).',

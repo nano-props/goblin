@@ -26,6 +26,13 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.switch-blocked':
     '切り替え先のワークスペースで操作を実行中です。完了後にもう一度切り替えてください。',
   'workspace-picker.close': '閉じる',
+  'workspace-picker.order-load-failed':
+    'ワークスペースの順序を取得できませんでした。メニューを開き直してお試しください。',
+  'workspace-picker.move-first': '先頭に移動',
+  'workspace-picker.move-last': '末尾に移動',
+  'workspace-picker.move-failed': 'ワークスペースの順序を変更できませんでした。再読み込みしてからお試しください。',
+  'workspace-picker.move-uncertain':
+    'ワークスペースの順序が更新されたか確認できませんでした。ページを再読み込みして確認してください。',
   'workspace-picker.open-local': 'ワークスペースを開く…',
   'workspace-picker.open-remote': 'リモートワークスペースを開く…',
   'workspace-open.invalid-path': 'リンクには絶対ディレクトリパスを 1 つ指定してください（最大 4096 文字）。',

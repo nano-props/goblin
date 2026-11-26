@@ -38,6 +38,7 @@ export const workspacesStore = createStore<WorkspacesStore>()((set, get) => ({
   branchViewModeByWorkspace: {},
 
   // Local client-only state.
+  workspaceMovePending: false,
   workspaceMembershipReady: false,
   sessionPersistenceReady: false,
   sessionRestoreError: null,

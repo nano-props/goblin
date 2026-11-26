@@ -198,6 +198,7 @@ export function resetWorkspacesStore(): void {
     workspaces: {},
     workspaceOrder: [],
     restoredWorkspaceId: null,
+    workspaceMovePending: false,
     workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: null,

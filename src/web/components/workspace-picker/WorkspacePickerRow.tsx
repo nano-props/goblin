@@ -1,5 +1,8 @@
-import { AlertCircle, Folder, FolderGit2, Loader2, Server, X } from '@lucide/vue'
-import { defineComponent, ref } from 'vue'
+import { AlertCircle, ArrowDownToLine, ArrowUpToLine, Folder, FolderGit2, Loader2, Server, X } from '@lucide/vue'
+import { defineComponent, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceOrderEdge } from '#/shared/workspace-order.ts'
 import { isRemoteWorkspaceId, remoteWorkspaceConnectionTarget } from '#/shared/remote-workspace.ts'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import { toButtonVNodeRef } from '#/web/components/ui/refs.ts'
@@ -22,6 +25,11 @@ interface WorkspacePickerRowProps {
   compact: boolean
   unavailableLabel: string
   closeLabel: string
+  moveFirstLabel: string
+  moveLastLabel: string
+  refreshOrder: (signal: AbortSignal) => Promise<readonly WorkspaceId[] | null>
+  movePending: boolean
+  onMove: (edge: WorkspaceOrderEdge) => void
   buttonRef: (node: HTMLButtonElement | null) => void
   onActivate: () => void
   onOpenDashboard: () => void
@@ -37,6 +45,11 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
     'compact',
     'unavailableLabel',
     'closeLabel',
+    'moveFirstLabel',
+    'moveLastLabel',
+    'refreshOrder',
+    'movePending',
+    'onMove',
     'buttonRef',
     'onActivate',
     'onOpenDashboard',
@@ -47,9 +60,36 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
   setup(props) {
     const t = useT()
     const menuOpen = ref(false)
+    const order = ref<readonly WorkspaceId[] | null>(null)
+    const loadingOrder = ref(false)
+
+    watch([menuOpen, () => props.movePending], async ([open, moving], _, onCleanup) => {
+      order.value = null
+      loadingOrder.value = false
+      if (!open || moving) return
+
+      const request = new AbortController()
+      onCleanup(() => request.abort())
+      loadingOrder.value = true
+      try {
+        const workspaceOrder = await props.refreshOrder(request.signal)
+        if (!request.signal.aborted) order.value = workspaceOrder
+      } catch {
+        if (!request.signal.aborted) toast.error(t('workspace-picker.order-load-failed'))
+      } finally {
+        if (!request.signal.aborted) loadingOrder.value = false
+      }
+    })
+
+    const moveActions = [
+      { edge: 'first', icon: ArrowUpToLine },
+      { edge: 'last', icon: ArrowDownToLine },
+    ] as const
 
     return () => {
       const workspace = props.workspace
+      const workspaceOrder = order.value
+      const orderIndex = workspaceOrder?.indexOf(workspace.id) ?? -1
       const count = workspace.terminalBellCount ?? 0
       const connecting = workspace.lifecycle?.kind === 'connecting'
       const failed = workspace.lifecycle?.kind === 'failed'
@@ -125,7 +165,25 @@ export const WorkspacePickerRow = defineComponent<WorkspacePickerRowProps>({
                   }}
                 >
                   {({ close }: { close: () => void }) => (
-                    <div class="p-1">
+                    <div class="space-y-0.5 p-1">
+                      {moveActions.map(({ edge, icon: MoveIcon }) => (
+                        <ActionPopoverItem
+                          key={edge}
+                          label={edge === 'first' ? props.moveFirstLabel : props.moveLastLabel}
+                          icon={<MoveIcon aria-hidden="true" />}
+                          busy={loadingOrder.value}
+                          disabled={
+                            props.movePending ||
+                            !workspaceOrder ||
+                            orderIndex === -1 ||
+                            orderIndex === (edge === 'first' ? 0 : workspaceOrder.length - 1)
+                          }
+                          onSelect={() => {
+                            close()
+                            props.onMove(edge)
+                          }}
+                        />
+                      ))}
                       <ActionPopoverItem
                         label={props.closeLabel}
                         icon={<X aria-hidden="true" />}

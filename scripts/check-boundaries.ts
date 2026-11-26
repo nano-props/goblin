@@ -84,6 +84,8 @@ const RULES: Rule[] = [
         'refreshGitHubCliState',
         'restoreWorkspaceTabs',
         'restoreServerWorkspace',
+        'moveWorkspaceEntry',
+        'readWorkspaceOrder',
         'removeWorkspaceEntry',
         'setI18nPref',
         'setRecentWorkspaceExternalApp',

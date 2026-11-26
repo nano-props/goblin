@@ -122,6 +122,58 @@ describe('repo lifecycle', () => {
     })
   })
 
+  test('opens another workspace while waiting for a move response', async () => {
+    const moveStarted = Promise.withResolvers<void>()
+    const releaseMove = Promise.withResolvers<void>()
+    installGoblin({
+      'settings.moveWorkspaceEntry': async () => {
+        moveStarted.resolve()
+        await releaseMove.promise
+        return { openWorkspaceEntries: [{ id: REPO_A }], workspacePaneTabsByTargetByWorkspace: {} }
+      },
+    })
+    const store = workspacesStore.getState()
+    await expect(store.openWorkspaceMembership(REPO_A)).resolves.toMatchObject({ ok: true })
+    const moving = store.moveWorkspace(REPO_A, 'last')
+    try {
+      await moveStarted.promise
+      await expect(store.openWorkspaceMembership(REPO_B)).resolves.toMatchObject({ ok: true })
+    } finally {
+      releaseMove.resolve()
+      await moving
+    }
+    expect(workspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
+  })
+
+  test('does not retain a position for a closed workspace from a late move response', async () => {
+    const moveStarted = Promise.withResolvers<void>()
+    const releaseMove = Promise.withResolvers<void>()
+    installGoblin({
+      'settings.moveWorkspaceEntry': async () => {
+        moveStarted.resolve()
+        await releaseMove.promise
+        return {
+          openWorkspaceEntries: [{ id: REPO_A }, { id: REPO_B }],
+          workspacePaneTabsByTargetByWorkspace: {},
+        }
+      },
+    })
+    const store = workspacesStore.getState()
+    await expect(store.openWorkspaceMembership(REPO_B)).resolves.toMatchObject({ ok: true })
+    await expect(store.openWorkspaceMembership(REPO_A)).resolves.toMatchObject({ ok: true })
+    const moving = store.moveWorkspace(REPO_A, 'first')
+    try {
+      await moveStarted.promise
+      await expect(store.closeWorkspace(REPO_A)).resolves.toMatchObject({ ok: true })
+    } finally {
+      releaseMove.resolve()
+      await moving
+    }
+    expect(workspacesStore.getState().workspaceOrder).toEqual([REPO_B])
+    await expect(store.openWorkspaceMembership(REPO_A)).resolves.toMatchObject({ ok: true })
+    expect(workspacesStore.getState().workspaceOrder).toEqual([REPO_B, REPO_A])
+  })
+
   test('openWorkspaceMembership writes server runtime membership into the query cache', async () => {
     installGoblin()
 

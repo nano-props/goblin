@@ -28,6 +28,7 @@ import {
   restorableWorkspacePaneTargetKey,
   workspacePaneTabsTargetFromRestorable,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspaceOrderEdge } from '#/shared/workspace-order.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import {
@@ -311,6 +312,25 @@ export async function addServerWorkspaceEntry(entry: WorkspaceSessionEntry): Pro
     const openWorkspaceEntries = [...data.workspace.openWorkspaceEntries]
     if (existingIndex === -1) openWorkspaceEntries.push(entry)
     else openWorkspaceEntries[existingIndex] = entry
+    const workspace = { ...data.workspace, openWorkspaceEntries }
+    return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
+  })
+}
+
+export async function moveServerWorkspaceEntry(
+  workspaceId: WorkspaceId,
+  edge: WorkspaceOrderEdge,
+): Promise<ServerWorkspaceState | null> {
+  return await mutateUserSettings<ServerWorkspaceState | null>(async (data) => {
+    const entries = data.workspace.openWorkspaceEntries
+    const index = entries.findIndex((entry) => workspaceSessionEntryId(entry) === workspaceId)
+    if (index === -1) return unchangedUserSettings(data, null)
+    const destination = edge === 'first' ? 0 : entries.length - 1
+    if (index === destination) return unchangedUserSettings(data, cloneWorkspace(data.workspace))
+
+    const openWorkspaceEntries = [...entries]
+    const [entry] = openWorkspaceEntries.splice(index, 1)
+    openWorkspaceEntries.splice(destination, 0, entry)
     const workspace = { ...data.workspace, openWorkspaceEntries }
     return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
   })

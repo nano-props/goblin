@@ -1,7 +1,13 @@
 import { getServerExternalAppsSnapshot } from '#/server/external-apps/catalog.ts'
 import { getServerGitHubCliState } from '#/server/external-apps/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/settings/snapshot.ts'
-import { addServerWorkspaceEntry, getUserSettings, removeServerWorkspaceEntry } from '#/server/settings/source.ts'
+import {
+  addServerWorkspaceEntry,
+  getServerWorkspaceState,
+  getUserSettings,
+  moveServerWorkspaceEntry,
+  removeServerWorkspaceEntry,
+} from '#/server/settings/source.ts'
 import { restoreServerWorkspace } from '#/server/workspaces/restore/session.ts'
 import { restoreWorkspaceTabs } from '#/server/workspaces/restore/tabs.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
@@ -14,6 +20,7 @@ import {
   handleUpdateUserSettings,
 } from '#/server/settings/write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
+import { workspaceSessionEntryId } from '#/shared/remote-workspace.ts'
 import type { LanInfo } from '#/shared/api-types.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
@@ -84,6 +91,21 @@ export function createSettingsRoutes(options: {
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const { entry } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceEntryAdd, c)
     return c.json(await addServerWorkspaceEntry(entry))
+  })
+  app.post('/workspace/entries/order', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceEntryOrder, c)
+    const { openWorkspaceEntries } = await getServerWorkspaceState()
+    return c.json(openWorkspaceEntries.map(workspaceSessionEntryId))
+  })
+  app.post('/workspace/entries/move', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { workspaceId, edge } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceEntryMove, c)
+    const workspace = await moveServerWorkspaceEntry(workspaceId, edge)
+    if (!workspace) return c.json({ ok: false as const, message: 'Workspace is no longer open' }, 409)
+    return c.json(workspace)
   })
   app.post('/workspace/entries/remove', async (c) => {
     const userId = userIdFromContext(c)

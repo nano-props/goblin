@@ -20,6 +20,7 @@ import type {
   WorkspaceGitReadyProbeState,
   WorkspaceProbeState,
 } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceOrderEdge } from '#/shared/workspace-order.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type RepoEventAction =
@@ -187,6 +188,7 @@ export interface WorkspaceNavigationHistoryCollectionState {
 export interface LocalWorkspaceState extends WorkspaceNavigationHistoryCollectionState {
   /** Client-only workspace UI state that should never be serialized into
    *  ClientWorkspaceState or treated as restorable workspace state. */
+  workspaceMovePending: boolean
   /** Workspace membership restore flag. True once boot workspace entries have
    *  produced the placeholder workspace set (or proved there are no workspaces), so the
    *  workspace shell can render without overwriting the saved workspace with an
@@ -251,6 +253,8 @@ export interface RestorableWorkspaceActions {
 }
 
 export interface WorkspaceMembershipActions {
+  refreshWorkspaceOrder: (signal: AbortSignal) => Promise<readonly WorkspaceId[] | null>
+  moveWorkspace: (id: WorkspaceId, edge: WorkspaceOrderEdge) => Promise<void>
   /** Opens authoritative workspace membership without implying anything about
    *  the current active selection. */
   openWorkspaceMembership: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>

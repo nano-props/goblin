@@ -1,6 +1,7 @@
 import { Download, FolderOpen, List, ListFilter, Plus, Server } from '@lucide/vue'
 import { PopoverAnchor, PopoverTrigger } from 'reka-ui'
 import { defineComponent, ref } from 'vue'
+import type { WorkspaceOrderEdge } from '#/shared/workspace-order.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { Tip } from '#/web/components/Tip.tsx'
@@ -21,6 +22,9 @@ interface WorkspacePickerProps {
   labels: WorkspacePickerLabels
   onActivate: (id: WorkspaceId, onCommit?: () => void) => void
   onOpenDashboard: (id: WorkspaceId) => void
+  refreshOrder: (signal: AbortSignal) => Promise<readonly WorkspaceId[] | null>
+  movePending: boolean
+  onMove: (id: WorkspaceId, edge: WorkspaceOrderEdge) => void
   onClose: (id: WorkspaceId) => void
   onOpenLocal: () => void
   onOpenRemote: () => void
@@ -37,6 +41,9 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
     'labels',
     'onActivate',
     'onOpenDashboard',
+    'refreshOrder',
+    'movePending',
+    'onMove',
     'onClose',
     'onOpenLocal',
     'onOpenRemote',
@@ -154,6 +161,11 @@ export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
                   buttonRef={focusRegistry.setRef(workspace.id)}
                   onActivate={() => props.onActivate(workspace.id)}
                   onOpenDashboard={() => props.onOpenDashboard(workspace.id)}
+                  moveFirstLabel={props.labels.moveFirst}
+                  moveLastLabel={props.labels.moveLast}
+                  refreshOrder={props.refreshOrder}
+                  movePending={props.movePending}
+                  onMove={(edge) => props.onMove(workspace.id, edge)}
                   onClose={() => props.onClose(workspace.id)}
                   onKeydown={(event) => navigateWorkspace(event, index)}
                 />

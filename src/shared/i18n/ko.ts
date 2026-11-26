@@ -25,6 +25,12 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.workspaces': '워크스페이스',
   'workspace-picker.switch-blocked': '대상 워크스페이스에서 작업이 진행 중입니다. 완료 후 다시 전환하세요.',
   'workspace-picker.close': '닫기',
+  'workspace-picker.order-load-failed': '작업 공간 순서를 불러올 수 없습니다. 메뉴를 다시 열어 시도하세요.',
+  'workspace-picker.move-first': '맨 앞으로 이동',
+  'workspace-picker.move-last': '맨 뒤로 이동',
+  'workspace-picker.move-failed': '작업 공간 순서를 변경할 수 없습니다. 새로고침한 후 다시 시도하세요.',
+  'workspace-picker.move-uncertain':
+    '작업 공간 순서가 변경되었는지 확인할 수 없습니다. 페이지를 새로고침하여 확인하세요.',
   'workspace-picker.open-local': '작업 공간 열기…',
   'workspace-picker.open-remote': '원격 작업 공간 열기…',
   'workspace-open.invalid-path': '링크에는 절대 디렉터리 경로 하나가 필요합니다(최대 4096자).',

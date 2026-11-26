@@ -1,6 +1,6 @@
 {
   "name": "goblin",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Goblin — Workspace Manager",
   "private": true,
   "type": "module",

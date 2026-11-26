@@ -133,6 +133,15 @@ export function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string):
   }
 }
 
+export function projectWorkspaceOrder(
+  confirmedOrder: readonly WorkspaceId[],
+  visibleOrder: WorkspaceId[],
+): WorkspaceId[] {
+  const confirmedIds = new Set(confirmedOrder)
+  const visibleIds = new Set(visibleOrder)
+  return [...confirmedOrder.filter((id) => visibleIds.has(id)), ...visibleOrder.filter((id) => !confirmedIds.has(id))]
+}
+
 function orderedInsert(
   workspaceOrder: WorkspaceId[],
   id: WorkspaceId,

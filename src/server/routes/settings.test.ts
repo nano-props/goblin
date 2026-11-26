@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getServerGitHubCliState: vi.fn(),
   getSettingsSnapshot: vi.fn(),
   getUserSettings: vi.fn(),
+  getServerWorkspaceState: vi.fn(),
   handleSetFetchInterval: vi.fn(),
 
   handleAddRecentWorkspace: vi.fn(),
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   restoreServerWorkspace: vi.fn(),
   restoreWorkspaceTabs: vi.fn<RestoreWorkspaceTabsWrite>(),
   addServerWorkspaceEntry: vi.fn(),
+  moveServerWorkspaceEntry: vi.fn(),
   removeServerWorkspaceEntry: vi.fn(),
 }))
 
@@ -38,7 +40,9 @@ vi.mock('#/server/settings/snapshot.ts', () => ({
 
 vi.mock('#/server/settings/source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
+  getServerWorkspaceState: mocks.getServerWorkspaceState,
   addServerWorkspaceEntry: mocks.addServerWorkspaceEntry,
+  moveServerWorkspaceEntry: mocks.moveServerWorkspaceEntry,
   removeServerWorkspaceEntry: mocks.removeServerWorkspaceEntry,
 }))
 
@@ -181,7 +185,9 @@ describe('settings routes', () => {
       openWorkspaceEntries: [{ id: 'goblin+file:///repo-a' }],
       workspacePaneTabsByTargetByWorkspace: {},
     }
+    mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.addServerWorkspaceEntry.mockResolvedValue(workspace)
+    mocks.moveServerWorkspaceEntry.mockResolvedValueOnce(workspace).mockResolvedValueOnce(null)
     mocks.removeServerWorkspaceEntry.mockResolvedValue({ ...workspace, openWorkspaceEntries: [] })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = new Hono<{ Variables: { userId: string } }>()
@@ -196,6 +202,18 @@ describe('settings routes', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ entry: { id: 'goblin+file:///repo-a' } }),
     })
+    const orderResponse = await app.request('/workspace/entries/order', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+    const move = () =>
+      app.request('/workspace/entries/move', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: 'goblin+file:///repo-a', edge: 'last' }),
+      })
+    const moveResponse = await move()
     const removeResponse = await app.request('/workspace/entries/remove', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -203,8 +221,12 @@ describe('settings routes', () => {
     })
 
     await expect(addResponse.json()).resolves.toEqual(workspace)
+    await expect(orderResponse.json()).resolves.toEqual(['goblin+file:///repo-a'])
+    await expect(moveResponse.json()).resolves.toEqual(workspace)
+    expect((await move()).status).toBe(409)
     await expect(removeResponse.json()).resolves.toEqual({ ...workspace, openWorkspaceEntries: [] })
     expect(mocks.addServerWorkspaceEntry).toHaveBeenCalledWith({ id: 'goblin+file:///repo-a' })
+    expect(mocks.moveServerWorkspaceEntry).toHaveBeenCalledWith('goblin+file:///repo-a', 'last')
     expect(mocks.removeServerWorkspaceEntry).toHaveBeenCalledWith('goblin+file:///repo-a')
   })
 

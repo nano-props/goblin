@@ -33,6 +33,9 @@ describe('WorkspacePicker', () => {
         labels={labels}
         onActivate={() => {}}
         onOpenDashboard={() => {}}
+        refreshOrder={async () => []}
+        movePending={false}
+        onMove={() => {}}
         onClose={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
@@ -61,6 +64,9 @@ describe('WorkspacePicker', () => {
         labels={labels}
         onActivate={onActivate}
         onOpenDashboard={() => {}}
+        refreshOrder={async () => []}
+        movePending={false}
+        onMove={() => {}}
         onClose={onClose}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
@@ -84,7 +90,7 @@ describe('WorkspacePicker', () => {
     await user.keyboard('{Enter}')
     const menu = await screen.findByRole('dialog')
     expect(onClose).not.toHaveBeenCalled()
-    expect(within(menu).getAllByRole('button')).toHaveLength(1)
+    expect(within(menu).getAllByRole('button')).toHaveLength(3)
     await user.keyboard('{Enter}')
     expect(onClose).not.toHaveBeenCalled()
     await user.tab()
@@ -119,6 +125,9 @@ describe('WorkspacePicker', () => {
         labels={labels}
         onActivate={() => {}}
         onOpenDashboard={() => {}}
+        refreshOrder={async () => []}
+        movePending={false}
+        onMove={() => {}}
         onClose={() => {}}
         onOpenLocal={onOpenLocal}
         onOpenRemote={onOpenRemote}
@@ -176,6 +185,8 @@ const labels = {
   filter: 'Filter workspaces',
   filterStatus: 'All workspaces',
   close: 'Close',
+  moveFirst: 'Move to top',
+  moveLast: 'Move to bottom',
   open: 'Open',
   openLocal: 'Open local repository…',
   openRemote: 'Open remote repository…',
