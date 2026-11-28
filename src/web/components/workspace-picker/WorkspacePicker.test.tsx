@@ -147,8 +147,6 @@ describe('WorkspacePicker', () => {
     expect(document.body.textContent).toContain('Clone repository…')
     expect(document.body.querySelector('button[aria-current]')).toBeNull()
 
-    // Clicking an action invokes the matching callback and closes
-    // the popover (which the parent would do via onSelectAction).
     const cloneButton = [...document.body.querySelectorAll('button')].find((b) =>
       b.textContent?.includes('Clone repository…'),
     )

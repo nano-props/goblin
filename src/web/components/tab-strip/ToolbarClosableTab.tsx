@@ -29,7 +29,6 @@ interface ToolbarClosableTabProps {
   overlay?: VNodeChild
   buttonRef?: ElementRef<HTMLButtonElement>
   buttonProps?: ToolbarClosableTabButtonProps
-  buttonClass?: string
   close?: ToolbarTabClose
 }
 
@@ -45,10 +44,7 @@ export const ToolbarClosableTab: FunctionalComponent<ToolbarClosableTabProps> = 
       ref={toButtonVNodeRef(props.buttonRef)}
       type="button"
       {...props.buttonProps}
-      class={cn(
-        'flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none disabled:cursor-not-allowed disabled:opacity-70',
-        props.buttonClass,
-      )}
+      class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none disabled:cursor-not-allowed disabled:opacity-70"
     >
       {slots.default?.()}
       {props.close?.kind === 'placeholder' ? (
@@ -72,7 +68,6 @@ ToolbarClosableTab.props = [
   'overlay',
   'buttonRef',
   'buttonProps',
-  'buttonClass',
   'close',
 ]
 

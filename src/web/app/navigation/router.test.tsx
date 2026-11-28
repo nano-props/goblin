@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, waitFor } from '@testing-library/vue'
-import { defineComponent, onMounted, onUnmounted } from 'vue'
+import { defineComponent, nextTick, onMounted, onUnmounted } from 'vue'
 import type { PropType } from 'vue'
 import { RouterView } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -218,20 +218,33 @@ describe('unmatched app routes', () => {
     await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('home'))
   })
 
-  test('keeps the root Layout owner mounted while navigating through an unmatched route', async () => {
+  test('keeps the root Layout owner mounted while navigating through an unmatched route', async (context) => {
     navigateBrowser('/settings/general')
     renderRouter()
-    await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('settings-general'))
+    await appRouter.isReady()
+    await nextTick()
+    expect(appRouter.currentRoute.value.name).toBe('settings-general')
     expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
 
     await appRouter.push('/unknown')
-    await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('not-found'))
+    await nextTick()
+    expect(appRouter.currentRoute.value.name).toBe('not-found')
     expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'PUSH' })
     expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
     expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
 
+    const backNavigation = Promise.withResolvers<void>()
+    const stopObservingBack = appRouter.afterEach((_to, _from, failure) => {
+      stopObservingBack()
+      if (failure) backNavigation.reject(failure)
+      else backNavigation.resolve()
+    })
+    context.onTestFinished(stopObservingBack)
+    context.onTestFinished(appRouter.onError(backNavigation.reject))
     appRouter.back()
-    await waitFor(() => expect(appRouter.currentRoute.value.fullPath).toBe('/settings/general'))
+    await backNavigation.promise
+    await nextTick()
+    expect(appRouter.currentRoute.value.fullPath).toBe('/settings/general')
     expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'BACK' })
     expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
     expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()

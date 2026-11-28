@@ -4,9 +4,7 @@ import { focusRing } from '#/web/components/ui/focus.ts'
 
 type SidebarRowButtonProps = Omit<ButtonHTMLAttributes, 'size'> & {
   leading?: VNodeChild
-  trailing?: VNodeChild
   contentClass?: HTMLAttributes['class']
-  fill?: boolean
   selected?: boolean
   size?: 'default' | 'compact' | 'dense' | 'icon'
 }
@@ -19,16 +17,12 @@ export const SidebarRowButton: FunctionalComponent<SidebarRowButtonProps> = (pro
   const {
     class: classValue,
     contentClass,
-    fill: fillProp,
     leading,
     selected = false,
     size = 'default',
-    trailing,
     type = 'button',
     ...buttonProps
   } = props
-  const fill = fillProp ?? size !== 'icon'
-
   return (
     <button
       {...buttonProps}
@@ -41,7 +35,7 @@ export const SidebarRowButton: FunctionalComponent<SidebarRowButtonProps> = (pro
         size === 'compact' && 'h-9 gap-2 px-2.5',
         size === 'dense' && 'h-8 gap-2 px-3 font-normal',
         size === 'icon' && 'size-9 justify-center px-0',
-        fill ? 'w-full shrink-0' : size === 'icon' ? 'shrink-0' : 'max-w-64 shrink-0',
+        size === 'icon' ? 'shrink-0' : 'w-full shrink-0',
         selected
           ? 'bg-selected text-selected-foreground hover:bg-selected'
           : 'text-foreground hover:bg-accent hover:text-accent-foreground',
@@ -51,7 +45,6 @@ export const SidebarRowButton: FunctionalComponent<SidebarRowButtonProps> = (pro
     >
       {leading ? <span class={SIDEBAR_ROW_ICON_CLASS}>{leading}</span> : null}
       <span class={cn('min-w-0 flex-1 truncate', contentClass)}>{slots.default?.()}</span>
-      {trailing ? <span class="ml-auto flex shrink-0 items-center text-muted-foreground/70">{trailing}</span> : null}
     </button>
   )
 }

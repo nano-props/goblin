@@ -2,9 +2,9 @@
 // identified by its canonical workspace id. Git repositories enrich that
 // workspace with Git client state; plain directories do not need Git.
 //
-// `workspaceOrder` controls workspace switcher order; `restoredWorkspaceId` is the workspace
-// restored from the previous session for `/` startup routing. Route state owns
-// the workspace currently visible on the right. `workspaces[id]` owns the client
+// `workspaceOrder` orders the sidebar list and supplies the first workspace for
+// `/` after membership is ready if `restoredWorkspaceId` cannot be resolved.
+// Route state owns the workspace currently visible on the right. `workspaces[id]` owns the client
 // shell, UI intent, command presentation, and session-local state. Git
 // domain read data such as branches, status, and worktrees is server/TanStack
 // Query authoritative and is composed into presentation models at the UI edge.
